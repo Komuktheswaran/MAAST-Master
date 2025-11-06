@@ -52,75 +52,72 @@ const formatDates = (dateStr) => {
 
   useEffect(() => {
     // Fetch employee list for dropdown
-const fetchEmployees = async () => {
-  try {
-    const res = await axios.get("https://192.168.2.54:443/api/employees");
+    const fetchEmployees = async () => {
+      try {
+        const res = await axios.get("https://103.38.50.149:5000/api/employees");
 
-    if (Array.isArray(res.data)) {
-      setEmployeeOptions(res.data); // keep objects [{ name, userid }]
-    }
-  } catch (err) {
-    console.error("Error fetching employee list:", err);
-  }
-};
-
+        if (Array.isArray(res.data)) {
+          setEmployeeOptions(res.data); // keep objects [{ name, userid }]
+        }
+      } catch (err) {
+        console.error("Error fetching employee list:", err);
+      }
+    };
 
     fetchEmployees();
   }, []);
 
-const fetchJobData = async () => {
-  if (!employeeId) {
-    setError("Please select an employee.");
-    return;
-  }
-  if (!fromDate || !toDate) {
-    setError("Please select an Month.");
-    return;
-  }
-  
-
-
-  setError("");
-  setLoading(true);
-
-  try {
-    const response = await axios.post(
-      "https://192.168.2.54:443/api/employee-Jobreport",
-      {
-        fromDate: formatDateforbackend(fromDate),
-        toDate: formatDateforbackend(toDate),
-        employeeId: employeeId, // ✅ send employeeId instead of name
-      },
-      { timeout: 330000 }
-    );
-
-    if (response.data && Array.isArray(response.data.records)) {
-      setJobDataData(response.data.records);
-    
-      if (response.data.records.length === 0) {
-        setError("No JobData found for the selected filters.");
-      }
-    } else {
-      setError("Invalid response format from server.");
+  const fetchJobData = async () => {
+    if (!employeeId) {
+      setError("Please select an employee.");
+      return;
     }
-  } catch (error) {
-    console.error("Error fetching Employee Job Card Data:", error);
-    if (error.code === "ECONNABORTED") {
-      setError("Request timeout. Please try again.");
-    } else if (error.response) {
-      setError(
-        `Server error: ${error.response.data || error.response.statusText}`
+    if (!fromDate || !toDate) {
+      setError("Please select an Month.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        "https://103.38.50.149:5000/api/employee-Jobreport",
+        {
+          fromDate: formatDateforbackend(fromDate),
+          toDate: formatDateforbackend(toDate),
+          employeeId: employeeId, // ✅ send employeeId instead of name
+        },
+        { timeout: 330000 }
       );
-    } else if (error.request) {
-      setError("Network error. Please check your connection.");
-    } else {
-      setError("An unexpected error occurred. Please try again.");
+
+      if (response.data && Array.isArray(response.data.records)) {
+        setJobDataData(response.data.records);
+
+        if (response.data.records.length === 0) {
+          setError("No JobData found for the selected filters.");
+        }
+      } else {
+        setError("Invalid response format from server.");
+      }
+    } catch (error) {
+      console.error("Error fetching Employee Job Card Data:", error);
+      if (error.code === "ECONNABORTED") {
+        setError("Request timeout. Please try again.");
+      } else if (error.response) {
+        setError(
+          `Server error: ${error.response.data || error.response.statusText}`
+        );
+      } else if (error.request) {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError("An unexpected error occurred. Please try again.");
+      }
+      setJobDataData([]);
+    } finally {
+      setLoading(false);
     }
-    setJobDataData([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
 
 

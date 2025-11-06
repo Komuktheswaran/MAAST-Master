@@ -71,7 +71,9 @@ const isAdmin = AdminFlag === 1;
     setLoadingImages(true);
     setErrorImages('');
     try {
-      const response = await axios.get('https://192.168.2.54:443/api/carousel-images');
+      const response = await axios.get(
+        "https://103.38.50.149:5000/api/carousel-images"
+      );
       setCarouselImages(response.data || []);
     } catch (error) {
       console.error('Error fetching carousel images:', error);

@@ -29,7 +29,9 @@ const SkillMaster = () => {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get('https://192.168.2.54:443/api/skill-master');
+      const response = await axios.get(
+        "https://103.38.50.149:5000/api/skill-master"
+      );
       setSkills(response.data);
     } catch (error) {
       console.error('Error fetching skill data:', error);
@@ -56,7 +58,10 @@ const SkillMaster = () => {
 
   const addSkill = async () => {
     try {
-      const response = await axios.post('https://192.168.2.54:443/api/skill-master', newSkill);
+      const response = await axios.post(
+        "https://103.38.50.149:5000/api/skill-master",
+        newSkill
+      );
       setSkills([...skills, response.data]);
       setNewSkill({ Skill_Description: '', Skill_Rating: '' });
       setNotification('Skill added successfully');
@@ -70,7 +75,10 @@ const SkillMaster = () => {
 
   const updateSkill = async () => {
     try {
-      const response = await axios.put(`https://192.168.2.54:443/api/skill-master/${editingSkill.Skill_id}`, newSkill);
+      const response = await axios.put(
+        `https://103.38.50.149:5000/api/skill-master/${editingSkill.Skill_id}`,
+        newSkill
+      );
       const updatedSkills = skills.map(skill =>
         skill.Skill_id === editingSkill.Skill_id ? response.data : skill
       );

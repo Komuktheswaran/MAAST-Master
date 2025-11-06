@@ -51,10 +51,10 @@ const Attendance = () => {
       setLoadingLines(true);
       try {
         const shiftResponse = await axios.get(
-          "https://192.168.2.54:443/api/shifts"
+          "https://103.38.50.149:5000/api/shifts"
         );
         const lineResponse = await axios.get(
-          "https://192.168.2.54:443/api/lines"
+          "https://103.38.50.149:5000/api/lines"
         );
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data)
@@ -75,12 +75,12 @@ const Attendance = () => {
     if (selectedShifts.length === 0 || selectedLines.length === 0) {
       return;
     }
-    
+
     const formattedDate = formatDate(selectedDate);
     setLoadingDetails(true);
     try {
       const response = await axios.get(
-        "https://192.168.2.54:443/api/attendance",
+        "https://103.38.50.149:5000/api/attendance",
         {
           params: {
             date: formattedDate,
@@ -107,10 +107,15 @@ const Attendance = () => {
     setDetailType(type);
 
     try {
-      if (!shiftId && !stageName && !line && (type === "present" || type === "absent")) {
+      if (
+        !shiftId &&
+        !stageName &&
+        !line &&
+        (type === "present" || type === "absent")
+      ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "https://192.168.2.54:443/api/attendance/showAll",
+          "https://103.38.50.149:5000/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -120,16 +125,25 @@ const Attendance = () => {
           }
         );
         console.log("Total button response:", response.data);
-        
+
         const responseData = response.data || [];
-        
+
         // Enhanced filtering with debug logs
         const filtered = responseData.filter((record) => {
           if (!record) return false;
-          
-          const status = record.STATUS ? String(record.STATUS).toLowerCase().trim() : "";
-          console.log("Record status:", record.STATUS, "Normalized:", status, "Looking for:", type);
-          
+
+          const status = record.STATUS
+            ? String(record.STATUS).toLowerCase().trim()
+            : "";
+          console.log(
+            "Record status:",
+            record.STATUS,
+            "Normalized:",
+            status,
+            "Looking for:",
+            type
+          );
+
           if (type === "present") {
             return status === "present";
           } else if (type === "absent") {
@@ -138,14 +152,15 @@ const Attendance = () => {
           return false;
         });
 
-        console.log(`Total records: ${responseData.length}, Filtered ${type} records: ${filtered.length}`);
+        console.log(
+          `Total records: ${responseData.length}, Filtered ${type} records: ${filtered.length}`
+        );
         setDetailedRecords(filtered);
         setShowAllDetails(false);
-        
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "https://192.168.2.54:443/api/attendance/showAll",
+          "https://103.38.50.149:5000/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -156,19 +171,27 @@ const Attendance = () => {
         );
 
         const responseData = response.data || [];
-        
+
         // Enhanced filtering with debug logs
         const filtered = responseData.filter((record) => {
           if (!record) return false;
-          
-          const matchesShift = safeTrim(String(record.SHIFT_ID || "")) === safeTrim(String(shiftId || ""));
-          const matchesStage = safeTrim(String(record.Stage_name || "")) === safeTrim(String(stageName || ""));
-          const matchesLine = safeTrim(String(record.LINE || "")) === safeTrim(String(line || ""));
-          
+
+          const matchesShift =
+            safeTrim(String(record.SHIFT_ID || "")) ===
+            safeTrim(String(shiftId || ""));
+          const matchesStage =
+            safeTrim(String(record.Stage_name || "")) ===
+            safeTrim(String(stageName || ""));
+          const matchesLine =
+            safeTrim(String(record.LINE || "")) ===
+            safeTrim(String(line || ""));
+
           // Enhanced status matching
-          const recordStatus = record.STATUS ? String(record.STATUS).toLowerCase().trim() : "";
+          const recordStatus = record.STATUS
+            ? String(record.STATUS).toLowerCase().trim()
+            : "";
           let matchesType = false;
-          
+
           if (type === "present") {
             matchesType = recordStatus === "present";
           } else if (type === "absent") {
@@ -176,24 +199,28 @@ const Attendance = () => {
           } else if (type === "allot") {
             matchesType = true; // For allot, show all records regardless of status
           }
-          
-          const result = matchesShift && matchesStage && matchesLine && matchesType;
-          
+
+          const result =
+            matchesShift && matchesStage && matchesLine && matchesType;
+
           // Debug logging
           console.log("Filtering record:", {
             USERID: record.USERID,
             status: recordStatus,
             matchesShift,
-            matchesStage, 
+            matchesStage,
             matchesLine,
             matchesType,
-            finalResult: result
+            finalResult: result,
           });
-          
+
           return result;
         });
 
-        console.log(`Stage-wise filtered records for ${type}:`, filtered.length);
+        console.log(
+          `Stage-wise filtered records for ${type}:`,
+          filtered.length
+        );
         setDetailedRecords(filtered);
         setShowAllDetails(false);
       }
@@ -263,10 +290,10 @@ const Attendance = () => {
     setShowTable(true);
     setShowAllDetails(true);
     setDetailType("showAll");
-    
+
     try {
       const response = await axios.get(
-        "https://192.168.2.54:443/api/attendance/showAll",
+        "https://103.38.50.149:5000/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -275,9 +302,9 @@ const Attendance = () => {
           },
         }
       );
-      
+
       setDetailedRecords(response.data || []);
-      console.log("showall",response.data)
+      console.log("showall", response.data);
     } catch (error) {
       console.error("Error fetching all records:", error);
       setDetailedRecords([]);
@@ -388,7 +415,7 @@ const Attendance = () => {
 
   const handleSaveAllSwaps = () => {
     if (!Array.isArray(detailedRecords)) return;
-    
+
     const recordsToSwap = detailedRecords.filter(
       (record) => record && record.swapEmployee
     );
@@ -406,11 +433,11 @@ const Attendance = () => {
       originalUserId: record?.USERID || "",
       absentUserId: record?.USERID || "",
       swapUserId: record.swapEmployee ? record.swapEmployee.split(" ")[0] : "",
-      originalUserStatus: record?.STATUS || detailType
+      originalUserStatus: record?.STATUS || detailType,
     }));
 
     axios
-      .post("https://192.168.2.54:443/api/saveUserSwap", swaps)
+      .post("https://103.38.50.149:5000/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -428,7 +455,7 @@ const Attendance = () => {
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("https://192.168.2.54:443/api/getEmployees", {
+        .get("https://103.38.50.149:5000/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,

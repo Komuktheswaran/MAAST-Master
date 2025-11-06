@@ -58,73 +58,72 @@ const formatDatefordisplay = (dateStr) => {
 
   useEffect(() => {
     // Fetch employee list for dropdown
-const fetchEmployees = async () => {
-  try {
-    const res = await axios.get("https://192.168.2.54:443/api/employees");
+    const fetchEmployees = async () => {
+      try {
+        const res = await axios.get("https://103.38.50.149:5000/api/employees");
 
-    if (Array.isArray(res.data)) {
-      setEmployeeOptions(res.data); // keep objects [{ name, userid }]
-    }
-  } catch (err) {
-    console.error("Error fetching employee list:", err);
-  }
-};
-
+        if (Array.isArray(res.data)) {
+          setEmployeeOptions(res.data); // keep objects [{ name, userid }]
+        }
+      } catch (err) {
+        console.error("Error fetching employee list:", err);
+      }
+    };
 
     fetchEmployees();
   }, []);
-const fetchHistory = async () => {
-  if (!fromDate || !toDate) {
-    setError("Please select both From and To dates.");
-    return;
-  }
-  if (!employeeId) {
-    setError("Please select an employee.");
-    return;
-  }
-
-  setError("");
-  setLoading(true);
-
-  try {
-    const response = await axios.post(
-      "https://192.168.2.54:443/api/employee-history",
-      {
-        fromDate: formatDate(fromDate),
-        toDate: formatDate(toDate),
-        employeeId: employeeId, // ✅ send employeeId instead of name
-      },
-      { timeout: 330000 }
-    );
-    console.log("fromdate",fromDate)
-    
-    if (response.data && Array.isArray(response.data.records)) {
-      setHistoryData(response.data.records);
-      console.log(EmployeeHistory)
-      if (response.data.records.length === 0) {
-        setError("No history found for the selected filters.");
-      }
-    } else {
-      setError("Invalid response format from server.");
+  const fetchHistory = async () => {
+    if (!fromDate || !toDate) {
+      setError("Please select both From and To dates.");
+      return;
     }
-  } catch (error) {
-    console.error("Error fetching employee history:", error);
-    if (error.code === "ECONNABORTED") {
-      setError("Request timeout. Please try again.");
-    } else if (error.response) {
-      setError(
-        `Server error: ${error.response.data || error.response.statusText}`
+    if (!employeeId) {
+      setError("Please select an employee.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        "https://103.38.50.149:5000/api/employee-history",
+        {
+          fromDate: formatDate(fromDate),
+          toDate: formatDate(toDate),
+          employeeId: employeeId, // ✅ send employeeId instead of name
+        },
+        { timeout: 330000 }
       );
-    } else if (error.request) {
-      setError("Network error. Please check your connection.");
-    } else {
-      setError("An unexpected error occurred. Please try again.");
+      console.log("fromdate", fromDate);
+
+      if (response.data && Array.isArray(response.data.records)) {
+        setHistoryData(response.data.records);
+        console.log(EmployeeHistory);
+        if (response.data.records.length === 0) {
+          setError("No history found for the selected filters.");
+        }
+      } else {
+        setError("Invalid response format from server.");
+      }
+    } catch (error) {
+      console.error("Error fetching employee history:", error);
+      if (error.code === "ECONNABORTED") {
+        setError("Request timeout. Please try again.");
+      } else if (error.response) {
+        setError(
+          `Server error: ${error.response.data || error.response.statusText}`
+        );
+      } else if (error.request) {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError("An unexpected error occurred. Please try again.");
+      }
+      setHistoryData([]);
+    } finally {
+      setLoading(false);
     }
-    setHistoryData([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
 
 const downloadExcel = () => {

@@ -40,7 +40,9 @@ const ImageUpload = () => {
   const fetchImages = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('https://192.168.2.54:443/api/carousel-images');
+      const response = await axios.get(
+        "https://103.38.50.149:5000/api/carousel-images"
+      );
       setImages(response.data);
     } catch (error) {
       console.error('Error fetching images:', error);
@@ -76,11 +78,15 @@ const ImageUpload = () => {
     formData.append('displayOrder', images.length);
 
     try {
-      await axios.post('https://192.168.2.54:443/api/carousel-images/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      await axios.post(
+        "https://103.38.50.149:5000/api/carousel-images/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       setSuccess('Image uploaded successfully!');
       fetchImages(); // Refresh the image list
@@ -99,7 +105,9 @@ const ImageUpload = () => {
     if (!window.confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      await axios.delete(`https://192.168.2.54:443/api/carousel-images/${id}`);
+      await axios.delete(
+        `https://103.38.50.149:5000/api/carousel-images/${id}`
+      );
       setSuccess('Image deleted successfully!');
       fetchImages();
     } catch (error) {
@@ -120,9 +128,12 @@ const ImageUpload = () => {
     // Update display orders in the database
     try {
       const updatePromises = items.map((item, index) =>
-        axios.put(`https://192.168.2.54:443/api/carousel-images/${item.id}/order`, {
-          displayOrder: index
-        })
+        axios.put(
+          `https://103.38.50.149:5000/api/carousel-images/${item.id}/order`,
+          {
+            displayOrder: index,
+          }
+        )
       );
       
       await Promise.all(updatePromises);

@@ -7,8 +7,8 @@ import axios from "axios";
 import * as XLSX from "xlsx"; // SheetJS
 import { Modal, ListGroup } from "react-bootstrap";
 
-const API_BASE_URL = "https://192.168.2.54:443";
-const EMPLOYEE_API_URL = "https://192.168.2.54:443/api/employees";
+const API_BASE_URL = "https://103.38.50.149:5000";
+const EMPLOYEE_API_URL = "https://103.38.50.149:5000/api/employees";
 
 const NPunchReport = () => {
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10));

@@ -8,7 +8,7 @@ const path = require("path");
 const excel = require("exceljs");
 
 const bodyParser = require("body-parser");
-const {isnull}=require("util")
+const { isnull } = require("util");
 const port = process.env.PORT || 5000;
 
 const config = {
@@ -74,6 +74,7 @@ initializeDatabase();
 //   }
 // });
 // Login route
+
 app.post("/api/login", async (req, res) => {
   const { userId, password } = req.body;
 
@@ -85,7 +86,7 @@ app.post("/api/login", async (req, res) => {
       .input("userId", sql.VarChar, userId)
       .input("password", sql.VarChar, password)
       .query(
-        "SELECT user_id, password, Adminflag FROM Mx_UserLogin WHERE user_id = @userId AND password = @password"
+        "SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin WHERE user_id = @userId AND password = @password"
       );
 
     if (result.recordset.length > 0) {
@@ -96,6 +97,7 @@ app.post("/api/login", async (req, res) => {
         user: {
           user_id: user.user_id,
           Adminflag: user.Adminflag, // 1 = Admin, 0 = Employee
+          LINE: user.LINE,
         },
       });
     } else {
@@ -109,6 +111,7 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
+
 app.post("/api/login", async (req, res) => {
   const { userId, password } = req.body;
 
@@ -120,7 +123,7 @@ app.post("/api/login", async (req, res) => {
       .input("userId", sql.VarChar, userId)
       .input("password", sql.VarChar, password)
       .query(
-        "SELECT user_id, password, Adminflag FROM Mx_UserLogin WHERE user_id = @userId AND password = @password"
+        "SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin WHERE user_id = @userId AND password = @password"
       );
 
     if (result.recordset.length > 0) {
@@ -131,6 +134,7 @@ app.post("/api/login", async (req, res) => {
         user: {
           user_id: user.user_id,
           Adminflag: user.Adminflag, // 1 = Admin, 0 = Employee
+          LINE: user.LINE,
         },
       });
     } else {
@@ -194,7 +198,7 @@ app.get("/api/User-master", async (req, res) => {
     // Query
     let result = await pool
       .request()
-      .query("SELECT user_id, password, Adminflag FROM Mx_UserLogin");
+      .query("SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin");
 
     res.json(result.recordset); // Send result as JSON
   } catch (err) {
@@ -210,9 +214,13 @@ app.get("/api/User-master/:id", async (req, res) => {
       .request()
       .input("id", sql.NVarChar, req.params.id)
       .query(
-        "SELECT user_id, password, Adminflag FROM Mx_UserLogin WHERE user_id = @id"
+        `SELECT user_id, password, Adminflag, LINE 
+         FROM Mx_UserLogin 
+         WHERE user_id = @id`
       );
+
     res.json(result.recordset[0] || null);
+    console.log(result.recordset[0]);
   } catch (err) {
     console.error("GET /api/User-master/:id error:", err);
     res.status(500).json({ error: err.message });
@@ -220,8 +228,10 @@ app.get("/api/User-master/:id", async (req, res) => {
 });
 
 // POST - add new user (prevent duplicate user_id)
+// POST - add new user
 app.post("/api/User-master", async (req, res) => {
-  const { user_id, password, Adminflag } = req.body;
+  const { user_id, password, Adminflag, lines } = req.body;
+
   if (
     !user_id ||
     !password ||
@@ -230,11 +240,9 @@ app.post("/api/User-master", async (req, res) => {
       Adminflag !== 0 &&
       Adminflag !== 1)
   ) {
-    return res
-      .status(400)
-      .json({
-        error: "user_id, password and Adminflag ('0' or '1') are required",
-      });
+    return res.status(400).json({
+      error: "user_id, password, Adminflag ('0' or '1'), and LINE are required",
+    });
   }
 
   try {
@@ -254,8 +262,14 @@ app.post("/api/User-master", async (req, res) => {
       .input("id", sql.NVarChar, user_id)
       .input("pwd", sql.NVarChar, password)
       .input("af", sql.NVarChar, String(Adminflag))
+      .input(
+        "line",
+        sql.NVarChar,
+        Array.isArray(lines) ? lines.join(",") : lines
+      )
+
       .query(
-        "INSERT INTO Mx_UserLogin (user_id, password, Adminflag) VALUES (@id, @pwd, @af)"
+        "INSERT INTO Mx_UserLogin (user_id, password, Adminflag, LINE) VALUES (@id, @pwd, @af, @line)"
       );
 
     res.status(201).json({ message: "User added" });
@@ -267,8 +281,10 @@ app.post("/api/User-master", async (req, res) => {
 
 // PUT - update user (by user_id)
 app.put("/api/User-master/:id", async (req, res) => {
-  const { password, Adminflag } = req.body;
+  const { password, Adminflag, lines } = req.body;
+  console.log(req.body);
   const id = req.params.id;
+
   if (
     !password ||
     (Adminflag !== "0" &&
@@ -288,12 +304,19 @@ app.put("/api/User-master/:id", async (req, res) => {
       .input("id", sql.NVarChar, id)
       .input("pwd", sql.NVarChar, password)
       .input("af", sql.NVarChar, String(Adminflag))
+      .input(
+        "line",
+        sql.NVarChar,
+        Array.isArray(lines) ? lines.join(",") : lines
+      )
+
       .query(
-        "UPDATE Mx_UserLogin SET password = @pwd, Adminflag = @af WHERE user_id = @id"
+        "UPDATE Mx_UserLogin SET password = @pwd, Adminflag = @af, LINE = @line WHERE user_id = @id"
       );
 
     if (result.rowsAffected[0] === 0)
       return res.status(404).json({ error: "User not found" });
+
     res.json({ message: "User updated" });
   } catch (err) {
     console.error("PUT /api/User-master/:id error:", err);
@@ -302,10 +325,35 @@ app.put("/api/User-master/:id", async (req, res) => {
 });
 
 // DELETE - remove user by user_id
+app.delete("/api/User-master/:id", async (req, res) => {
+  const id = req.params.id;
 
+  if (!id) {
+    return res.status(400).json({ error: "User ID is required" });
+  }
+
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool
+      .request()
+      .input("id", sql.NVarChar, id)
+      .query("DELETE FROM Mx_UserLogin WHERE user_id = @id");
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("DELETE /api/User-master/:id error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE - remove user by user_id
 
 app.post("/api/stage-master", async (req, res) => {
-  console.log("post",req.body)
+  console.log("post", req.body);
   const { Stage_name, Stage_Type, Stage_Serial } = req.body;
 
   if (!Stage_name || !Stage_Type || !Stage_Serial) {
@@ -367,10 +415,8 @@ app.post("/api/stage-master", async (req, res) => {
   }
 });
 
-
 app.get("/api/stage-master", async (req, res) => {
-  
-  console.log("get")
+  console.log("get");
 
   try {
     const pool = await sql.connect(config);
@@ -386,11 +432,9 @@ app.get("/api/stage-master", async (req, res) => {
   }
 });
 
-
 app.get("/api/stage-master/types", async (req, res) => {
-  console.log("get-types")
+  console.log("get-types");
   try {
-
     const pool = await sql.connect(config);
     const result = await pool
       .request()
@@ -407,7 +451,7 @@ app.get("/api/stage-master/types", async (req, res) => {
 });
 
 app.put("/api/stage-master/:id", async (req, res) => {
-  console.log("put",req.params)
+  console.log("put", req.params);
   const { id } = req.params;
   const { Stage_name, Stage_Type, Stage_Serial } = req.body;
 
@@ -465,8 +509,7 @@ app.put("/api/stage-master/:id", async (req, res) => {
 });
 
 app.delete("/api/stage-master/:id", async (req, res) => {
-
-  console.log("delete",req.params)
+  console.log("delete", req.params);
   const { id } = req.params;
 
   try {
@@ -513,7 +556,9 @@ app.delete("/api/stage-master/:id", async (req, res) => {
       return res.status(404).json({ message: "Stage not found" });
     }
 
-    res.status(200).json({ message: "Stage deleted and serials updated successfully" });
+    res
+      .status(200)
+      .json({ message: "Stage deleted and serials updated successfully" });
   } catch (err) {
     console.error("Error deleting stage:", err);
     res.status(500).send("Error deleting stage");
@@ -521,7 +566,6 @@ app.delete("/api/stage-master/:id", async (req, res) => {
 });
 
 // app.delete("/api/stage-master/:id", async (req, res) => {
-
 
 //   const { id } = req.params;
 //   console.log("delete",req.params)
@@ -576,7 +620,6 @@ app.delete("/api/stage-master/:id", async (req, res) => {
 //     res.status(500).send("Error deleting stage");
 //   }
 // });
-
 
 // app.delete("/api/stage-master/:id", async (req, res) => {
 //   const { id } = req.params;
@@ -634,10 +677,7 @@ app.delete("/api/stage-master/:id", async (req, res) => {
 //   }
 // });
 
-
-
 // Skill Master - Insert a new skill
-
 
 app.post("/api/skill-master", async (req, res) => {
   const { Skill_Rating, Skill_Description } = req.body;
@@ -799,7 +839,6 @@ app.get("/api/stagemaster", async (req, res) => {
       .request()
       .query("SELECT Stage_id, Stage_name FROM Mx_StageMaster");
     res.json(result.recordset);
-
   } catch (error) {
     console.error("Error fetching stages:", error);
     res.status(500).send(error.message);
@@ -925,58 +964,80 @@ app.delete("/api/user-skills/:userId", async (req, res) => {
 
 app.post("/api/saveUserSkills", async (req, res) => {
   const skillsData = req.body;
+  const invalidStages = [];
 
   try {
-    // Connect to SQL Server
     await sql.connect(config);
     const request = new sql.Request();
-
-    const batchSize = 50; // Number of records per batch
+    const batchSize = 50;
 
     for (let i = 0; i < skillsData.length; i += batchSize) {
-      let QUERY1 = "";
-
-      // Get the current batch of skills
       const batch = skillsData.slice(i, i + batchSize);
 
+      let QUERY1 = "";
       for (let skill of batch) {
         const { userid, STAGE_NAME, Skill_Description, Skill_Rating } = skill;
 
-        if (QUERY1.length > 0) {
-          QUERY1 += " UNION ALL ";
-        }
-        QUERY1 += `SELECT '${userid}' AS userid, '${STAGE_NAME}' AS STAGE_NAME, '${Skill_Description}' AS Skill_Description, '${Skill_Rating}' AS Skill_Rating`;
+        if (QUERY1.length > 0) QUERY1 += " UNION ALL ";
+        QUERY1 += ` SELECT '${userid}' AS userid, '${STAGE_NAME}' AS STAGE_NAME, '${Skill_Description}' AS Skill_Description, '${Skill_Rating}' AS Skill_Rating`;
       }
 
-      const insertQuery = `
-INSERT INTO Mx_UserSkills (userid, Skill_id, Stage_id, Update_at, State)
-SELECT Q1.userid, ISNULL(P1.Skill_id, 0) AS Skill_id, ISNULL(P2.Stage_serial, 0) AS Stage_serial, GETDATE() AS Update_at, 1 AS State
-FROM (${QUERY1}) AS Q1
-LEFT OUTER JOIN Mx_SkillMaster AS P1 
-ON LTRIM(RTRIM(LOWER(Q1.Skill_Description))) = LTRIM(RTRIM(LOWER(P1.Skill_Description)))
-LEFT OUTER JOIN Mx_StageMaster AS P2 
-ON REPLACE(LTRIM(RTRIM(LOWER(Q1.STAGE_NAME))), ' ', '') = REPLACE(LTRIM(RTRIM(LOWER(P2.Stage_name))), ' ', '')
-
+      const validateQuery = `
+        SELECT Q1.userid, Q1.STAGE_NAME, Q1.Skill_Description, Q1.Skill_Rating,
+               CASE WHEN P2.Stage_Id IS NULL THEN 0 ELSE 1 END AS IsValidStage
+        FROM (${QUERY1}) AS Q1
+        LEFT JOIN Mx_StageMaster AS P2 
+        ON REPLACE(LTRIM(RTRIM(LOWER(Q1.STAGE_NAME))), ' ', '') = REPLACE(LTRIM(RTRIM(LOWER(P2.Stage_name))), ' ', '')
       `;
 
-      console.log("Insert Query:", insertQuery);
+      const validationResult = await request.query(validateQuery);
 
-      try {
-        //await request.query(deleteQuery);
+      const validRows = validationResult.recordset.filter(
+        (row) => row.IsValidStage === 1
+      );
+      const invalidRows = validationResult.recordset.filter(
+        (row) => row.IsValidStage === 0
+      );
+
+      invalidRows.forEach((row) => {
+        invalidStages.push({
+          userid: row.userid,
+          STAGE_NAME: row.STAGE_NAME,
+          Skill_Description: row.Skill_Description,
+          Skill_Rating: row.Skill_Rating,
+          Status: "Invalid Stage Name",
+        });
+      });
+
+      if (validRows.length > 0) {
+        const insertQuery = `
+          INSERT INTO Mx_UserSkills (userid, Skill_id, Stage_id, Update_at, State)
+          SELECT Q1.userid, ISNULL(P1.Skill_id, 0), ISNULL(P2.Stage_Serial, 0), GETDATE(), 1
+          FROM (
+            ${validRows
+              .map(
+                (row) =>
+                  `SELECT '${row.userid}' AS userid, '${row.STAGE_NAME}' AS STAGE_NAME, '${row.Skill_Description}' AS Skill_Description, '${row.Skill_Rating}' AS Skill_Rating`
+              )
+              .join(" UNION ALL ")}
+          ) AS Q1
+          LEFT JOIN Mx_SkillMaster AS P1 
+          ON LTRIM(RTRIM(LOWER(Q1.Skill_Description))) = LTRIM(RTRIM(LOWER(P1.Skill_Description)))
+          LEFT JOIN Mx_StageMaster AS P2 
+          ON REPLACE(LTRIM(RTRIM(LOWER(Q1.STAGE_NAME))), ' ', '') = REPLACE(LTRIM(RTRIM(LOWER(P2.Stage_name))), ' ', '')
+        `;
+
         await request.query(insertQuery);
-        console.log(`Batch ${i / batchSize + 1} processed successfully.`);
-      } catch (error) {
-        console.error(`Error processing batch ${i / batchSize + 1}:`, error);
       }
     }
 
-    // Close SQL connection
     await sql.close();
-
-    res.status(200).send("User skills saved successfully.");
+    res.json({ success: true, invalidRows: invalidStages }); // ✅ Send invalid rows to frontend
   } catch (err) {
     console.error("Error saving user skills:", err);
-    res.status(500).send("Error saving user skills.");
+    res
+      .status(500)
+      .json({ success: false, message: "Error saving user skills." });
   }
 });
 //USER SHIFT
@@ -984,84 +1045,181 @@ ON REPLACE(LTRIM(RTRIM(LOWER(Q1.STAGE_NAME))), ' ', '') = REPLACE(LTRIM(RTRIM(LO
 app.post("/api/saveUserShifts", async (req, res) => {
   const shiftsData = req.body;
   const invalidStages = [];
+  const duplicates = [];
 
   try {
     await sql.connect(config);
     const request = new sql.Request();
 
-    const stageResult = await request.query(`SELECT Stage_Serial, Stage_name FROM Mx_StageMaster`);
+    // Fetch Stage Master
+    const stageResult = await request.query(`
+      SELECT Stage_Id, Stage_name
+      FROM Mx_StageMaster
+    `);
+
     const stageMap = new Map();
-    stageResult.recordset.forEach(stage => {
-      stageMap.set(stage.Stage_name.toLowerCase().replace(/\s+/g, ""), stage.Stage_Serial);
+    stageResult.recordset.forEach((stage) => {
+      stageMap.set(
+        stage.Stage_name.toLowerCase().replace(/\s+/g, ""),
+        stage.Stage_Id
+      );
     });
 
     const batchSize = 50;
 
-    for (let i = 0; i < shiftsData.length; i += batchSize) {
+    function normalizeDate(dateStr) {
+      if (!dateStr) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+        const [dd, mm, yyyy] = dateStr.split("-");
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      return null;
+    }
+
+    // ✅ NEW: Track unique combinations to detect duplicates BEFORE inserting
+    const uniqueKeys = new Set();
+    const validShifts = [];
+
+    // ✅ Pre-validate ALL data first
+    for (let shift of shiftsData) {
+      let {
+        Shift_date_from,
+        Shift_date_to,
+        userid,
+        STAGE_NAME,
+        SHIFT_ID,
+        LINE,
+      } = shift;
+
+      Shift_date_from = normalizeDate(Shift_date_from);
+      Shift_date_to = normalizeDate(Shift_date_to);
+
+      // Validate stage name
+      if (!STAGE_NAME || typeof STAGE_NAME !== "string") {
+        invalidStages.push({
+          ...shift,
+          reason: "Missing or invalid STAGE_NAME",
+        });
+        continue;
+      }
+
+      const stageNameNormalized = STAGE_NAME.toLowerCase().replace(/\s+/g, "");
+      if (!stageMap.has(stageNameNormalized)) {
+        invalidStages.push({ ...shift, reason: "Stage not found in DB" });
+        continue;
+      }
+
+      const stage_id = stageMap.get(stageNameNormalized);
+
+      // ✅ Create unique key: date + userid + stage_id + shift_id + line
+      const uniqueKey = `${Shift_date_from}|${Shift_date_to}|${userid}|${stage_id}|${SHIFT_ID}|${LINE}`;
+
+      if (uniqueKeys.has(uniqueKey)) {
+        duplicates.push({
+          ...shift,
+          reason:
+            "Duplicate: Same user, date, stage, shift, and line combination already exists in this upload",
+        });
+        continue;
+      }
+      uniqueKeys.add(uniqueKey);
+
+      // ✅ Valid shift - add to processing queue
+      validShifts.push({
+        ...shift,
+        Shift_date_from,
+        Shift_date_to,
+        stage_id,
+      });
+    }
+
+    // ✅ Process only valid shifts in batches
+    for (let i = 0; i < validShifts.length; i += batchSize) {
+      const batch = validShifts.slice(i, i + batchSize);
       let QUERY1 = "";
-      const batch = shiftsData.slice(i, i + batchSize);
 
       for (let shift of batch) {
-  const { Shift_date_from, Shift_date_to, userid, STAGE_NAME, SHIFT_ID, LINE } = shift;
-
-  // ✅ Check if STAGE_NAME exists
-
-let stageNameNormalized = null;
-
-if (STAGE_NAME && typeof STAGE_NAME === "string") {
-  stageNameNormalized = STAGE_NAME.trim().toLowerCase().replace(/\s+/g, "");
-}
-
-if (!stageNameNormalized) {
-  invalidStages.push({ ...shift, reason: "Missing STAGE_NAME value" });
-  continue;
-}
-
-if (!stageMap.has(stageNameNormalized)) {
-  invalidStages.push({ ...shift, reason: "Stage not found in DB" });
-  continue;
-}
-
-  if (QUERY1.length > 0) QUERY1 += " UNION ALL ";
-  QUERY1 += `SELECT '${Shift_date_from}' AS SHIFT_FROM_DATE, '${Shift_date_to}' AS SHIFT_TO_DATE, '${userid}' AS userid, '${STAGE_NAME}' AS STAGE_NAME, '${SHIFT_ID}' AS SHIFT_ID, '${LINE}' AS LINE`;
-}
-
+        if (QUERY1.length > 0) QUERY1 += " UNION ALL ";
+        QUERY1 += `
+          SELECT '${shift.Shift_date_from}' AS SHIFT_FROM_DATE,
+                 '${shift.Shift_date_to}' AS SHIFT_TO_DATE,
+                 '${shift.userid}' AS userid,
+                 '${shift.STAGE_NAME}' AS STAGE_NAME,
+                 '${shift.SHIFT_ID}' AS SHIFT_ID,
+                 '${shift.LINE}' AS LINE
+        `;
+      }
 
       if (QUERY1) {
-        const deleteQuery = `
-          DELETE p1
-          FROM Mx_UserShifts AS p1
-          INNER JOIN (
-            SELECT SHIFT_FROM_DATE, SHIFT_TO_DATE, userid, P1.Stage_Serial, SHIFT_ID, LINE
+        try {
+          // Delete old records
+          const deleteQuery = `
+            DELETE p1
+            FROM Mx_UserShifts AS p1
+            INNER JOIN (
+              SELECT SHIFT_FROM_DATE, SHIFT_TO_DATE, userid, P1.Stage_Id, SHIFT_ID, LINE
+              FROM (${QUERY1}) AS Q1
+              LEFT JOIN Mx_StageMaster AS P1
+              ON REPLACE(LOWER(Q1.STAGE_NAME), ' ', '') = REPLACE(LOWER(P1.Stage_name), ' ', '')
+            ) AS q1
+            ON p1.shift_date_from = q1.SHIFT_FROM_DATE
+            AND p1.shift_date_to = q1.SHIFT_TO_DATE
+            AND p1.userid = q1.userid
+            AND p1.stage_id = q1.Stage_Id
+          `;
+
+          // Insert new records
+          const insertQuery = `
+            INSERT INTO Mx_UserShifts (Shift_date_from, Shift_date_to, userid, stage_id, SHIFT_ID, LINE)
+            SELECT SHIFT_FROM_DATE, SHIFT_TO_DATE, userid, P1.Stage_Id, SHIFT_ID, LINE
             FROM (${QUERY1}) AS Q1
             LEFT JOIN Mx_StageMaster AS P1
             ON REPLACE(LOWER(Q1.STAGE_NAME), ' ', '') = REPLACE(LOWER(P1.Stage_name), ' ', '')
-          ) AS q1
-          ON p1.shift_date_from = q1.shift_from_date
-          AND p1.shift_date_to = q1.shift_to_date
-          AND p1.userid = q1.userid
-        `;
+          `;
 
-        const finalQuery = `
-          INSERT INTO Mx_UserShifts (Shift_date_from, Shift_date_to, userid, stage_id, SHIFT_ID, LINE)
-          SELECT SHIFT_FROM_DATE, SHIFT_TO_DATE, userid, P1.Stage_Serial, SHIFT_ID, LINE
-          FROM (${QUERY1}) AS Q1
-          LEFT JOIN Mx_StageMaster AS P1
-          ON REPLACE(LOWER(Q1.STAGE_NAME), ' ', '') = REPLACE(LOWER(P1.Stage_name), ' ', '')
-        `;
+          await request.query(deleteQuery);
+          await request.query(insertQuery);
+        } catch (insertError) {
+          console.error(
+            "❌ Failed batch data:",
+            JSON.stringify(batch, null, 2)
+          );
+          console.error("❌ Insert error:", insertError.message);
 
-        await request.query(deleteQuery);
-        await request.query(finalQuery);
+          // ✅ Mark this batch as failed and continue
+          batch.forEach((shift) => {
+            invalidStages.push({
+              ...shift,
+              reason: `Database error: ${insertError.message}`,
+            });
+          });
+        }
       }
     }
 
     await sql.close();
 
-    res.json({ success: true, invalidRows: invalidStages });
+    // ✅ Return ALL failed rows (invalid + duplicates)
+    const allFailedRows = [...invalidStages, ...duplicates];
 
+    res.json({
+      success: allFailedRows.length === 0,
+      invalidRows: invalidStages,
+      duplicates: duplicates,
+      failedRows: allFailedRows, // ✅ Combined array
+      processedCount: validShifts.length,
+      totalCount: shiftsData.length,
+    });
   } catch (err) {
-    console.error("Error saving user shifts:", err);
-    res.status(500).json({ success: false, message: "Error saving user shifts." });
+    console.error("❌ Error saving user shifts:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error saving user shifts.",
+      error: err.message,
+    });
   }
 });
 
@@ -1089,14 +1247,15 @@ app.get("/api/getUserShifts", async (req, res) => {
 });
 
 app.get("/api/attendance/overall-summary", async (req, res) => {
-  const { date, shifts, lines } = req.query;
+  const { fromDate, toDate, shifts, lines } = req.query;
 
-  console.log("Received parameters:", { date, shifts, lines });
+  console.log("Received parameters:", { fromDate, toDate, shifts, lines });
 
   try {
-    if (!date) {
+    // Validate date parameters
+    if (!fromDate || !toDate) {
       return res.status(400).json({
-        error: "Date parameter is required",
+        error: "Both fromDate and toDate parameters are required",
       });
     }
 
@@ -1107,9 +1266,10 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
       ISNULL(P2.UserIDEnbl, 0) = 1 
     `;
 
-    // Add date filter
-    whereClause += ` AND P1.Shift_date_from = @date`;
-    request.input("date", sql.Date, new Date(date));
+    // Add date range filter
+    whereClause += ` AND P1.Shift_date_from >= @fromDate AND P1.Shift_date_from <= @toDate`;
+    request.input("fromDate", sql.Date, new Date(fromDate));
+    request.input("toDate", sql.Date, new Date(toDate));
 
     // Handle multiple shifts
     if (shifts && shifts.trim() !== "") {
@@ -1190,8 +1350,6 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
     });
   }
 });
-
-
 
 // app.get("/api/attendance/allot", async (req, res) => {
 //   const { date, shiftId, stageName, line } = req.query;
@@ -1320,10 +1478,10 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 
 //   const query = `
 // SELECT DISTINCT USERID, NAME, Stage_name, SHIFT_ID, LINE1 AS LINE,
-// 	 (SELECT TOP 1 Swap_userid+'-'+P6A.NAME  FROM MX_USERSWAP AS P6 
-// 		 LEFT OUTER JOIN Mx_UserMst AS P6A ON P6.Swap_userid = P6A.USERID 
-// 		 WHERE P6.SHIFT_DATE=@date 
-// 				 AND P6.Absent_userid = Q1.userid AND P6.Shift_id = Q1.SHIFT_ID AND P6.Line = Q1.LINE1 ) AS SWAPUSERNAME 
+// 	 (SELECT TOP 1 Swap_userid+'-'+P6A.NAME  FROM MX_USERSWAP AS P6
+// 		 LEFT OUTER JOIN Mx_UserMst AS P6A ON P6.Swap_userid = P6A.USERID
+// 		 WHERE P6.SHIFT_DATE=@date
+// 				 AND P6.Absent_userid = Q1.userid AND P6.Shift_id = Q1.SHIFT_ID AND P6.Line = Q1.LINE1 ) AS SWAPUSERNAME
 //    FROM (
 //       SELECT Q1.*,
 //         CASE WHEN ISNULL(PUNCHDATE, '') = '' THEN 1 ELSE 0 END AS ABSENT,
@@ -1380,7 +1538,6 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 //   }
 // });
 
-
 app.get("/api/attendance/showAll", async (req, res) => {
   const pool = await sql.connect(config);
   const { date, shifts, lines, stageId } = req.query;
@@ -1390,38 +1547,31 @@ app.get("/api/attendance/showAll", async (req, res) => {
     return res.status(400).json({ error: "date parameter is required" });
   }
   if (!shifts || !lines) {
-    return res.status(400).json({ 
-      error: "shifts and lines parameters are required" 
+    return res.status(400).json({
+      error: "shifts and lines parameters are required",
     });
   }
 
   // Process comma-separated values
-  const shiftsArr = shifts.split(",").map((s) => s.trim()).filter(Boolean);
-  const linesArr = lines.split(",").map((l) => l.trim()).filter(Boolean);
+  const shiftsArr = shifts
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const linesArr = lines
+    .split(",")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   if (!shiftsArr.length || !linesArr.length) {
-    return res.status(400).json({ 
-      error: "shifts and lines must each contain at least one value" 
+    return res.status(400).json({
+      error: "shifts and lines must each contain at least one value",
     });
   }
 
-  const shiftsString = shiftsArr.join(',');
-  const linesString = linesArr.join(',');
+  const shiftsString = shiftsArr.join(",");
+  const linesString = linesArr.join(",");
 
-const rawSql = `
-WITH Punches AS (
-    SELECT
-        E.USERID,
-        MIN(E.EDateTime) AS PUNCHIN,
-        MAX(E.EDateTime) AS PUNCHOUT,
-        COUNT(*) AS PunchCount
-    FROM dbo.Mx_ATDEventTrn E
-    INNER JOIN dbo.MX_USERMST U ON E.USERID = U.USERID
-    WHERE CAST(E.EDateTime AS DATE) = @Date
-      AND ISNULL(U.UserIDEnbl, 0) = 1
-    GROUP BY E.USERID
-),
-Assignments AS (
+  const rawSql = `WITH Assignments AS (
     SELECT
         US.USERID,
         US.stage_id AS Original_Stage_ID,
@@ -1431,10 +1581,11 @@ Assignments AS (
         SM.SFTName AS ShiftName,
         SM.SFTSTTime AS StartTime,
         SM.SFTEDTime AS EndTime,
-        DATEADD(day, DATEDIFF(day, 0, US.Shift_date_from), 0) + CAST(SM.SFTSTTime AS datetime) AS ShiftStartDateTime,
+        -- Smart shift calculation (handles night shifts)
+        CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
         CASE WHEN SM.SFTEDTime < SM.SFTSTTime
-             THEN DATEADD(day, DATEDIFF(day, 0, US.Shift_date_from) + 1, 0) + CAST(SM.SFTEDTime AS datetime)
-             ELSE DATEADD(day, DATEDIFF(day, 0, US.Shift_date_from), 0) + CAST(SM.SFTEDTime AS datetime)
+             THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
+             ELSE CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
         END AS ShiftEndDateTime
     FROM dbo.Mx_UserShifts US
     LEFT JOIN dbo.Mx_ShiftMst SM ON US.SHIFT_ID = SM.SFTID
@@ -1450,21 +1601,65 @@ Swaps AS (
         SW.SHIFT_DATE
     FROM dbo.Mx_Userswap SW
     WHERE SW.SHIFT_DATE = @Date
+),
+SmartPunches AS (
+    SELECT 
+        A.USERID,
+        A.SHIFT_ID,
+        A.ShiftStartDateTime,
+        A.ShiftEndDateTime,
+        -- Smart punch IN logic
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 FROM Mx_ATDEventTrn E2
+                WHERE E2.USERID = A.USERID
+                  AND E2.EDateTime BETWEEN DATEADD(MINUTE, -45, A.ShiftStartDateTime) AND A.ShiftStartDateTime
+            )
+            THEN (
+                SELECT MAX(E2.EDateTime)
+                FROM Mx_ATDEventTrn E2
+                WHERE E2.USERID = A.USERID
+                  AND E2.EDateTime BETWEEN DATEADD(MINUTE, -45, A.ShiftStartDateTime) AND A.ShiftStartDateTime
+            )
+            ELSE (
+                SELECT MIN(E2.EDateTime)
+                FROM Mx_ATDEventTrn E2
+                WHERE E2.USERID = A.USERID
+                  AND E2.EDateTime >= A.ShiftStartDateTime
+                  AND E2.EDateTime <= A.ShiftEndDateTime
+            )
+        END AS PUNCHIN,
+        -- Smart punch OUT logic
+        (
+            SELECT MAX(E2.EDateTime)
+            FROM Mx_ATDEventTrn E2
+            WHERE E2.USERID = A.USERID
+              AND E2.EDateTime >= A.ShiftStartDateTime
+              AND E2.EDateTime <= A.ShiftEndDateTime
+        ) AS PUNCHOUT,
+        -- Total punches in shift window
+        (
+            SELECT COUNT(*)
+            FROM Mx_ATDEventTrn E2
+            WHERE E2.USERID = A.USERID
+              AND E2.EDateTime >= DATEADD(MINUTE, -45, A.ShiftStartDateTime)
+              AND E2.EDateTime <= A.ShiftEndDateTime
+        ) AS PunchCount
+    FROM Assignments A
 )
 
 SELECT
-    COALESCE(P.USERID, A.USERID, S.SWAP_USERID) AS USERID,
-    COALESCE(PU.NAME, AU.NAME, SU.NAME) AS NAME,
-
-    -- Determine assignment source and handle unassigned present users
+    COALESCE(SP.USERID, A.USERID, S.SWAP_USERID) AS USERID,
+    COALESCE(AU.NAME, SU.NAME) AS NAME,
+    
+    -- Assignment source
     CASE
         WHEN A.USERID IS NOT NULL THEN 'Original'
         WHEN S.SWAP_USERID IS NOT NULL THEN 'Swapped In'
-        WHEN P.USERID IS NOT NULL AND A.USERID IS NULL THEN 'Unassigned Present'
         ELSE 'Unknown'
     END AS SwapStatus,
-
-    -- Assignment details (will be NULL for unassigned present users)
+    
+    -- Assignment details
     A.SHIFT_ID,
     A.ShiftName,
     A.StartTime,
@@ -1476,77 +1671,75 @@ SELECT
     ISNULL(S.LINE, A.Original_LINE) AS LINE,
     ST.stage_name AS Stage_name,
     ST.Stage_id,
-
-    -- Punch data
-    P.PUNCHIN,
-    FORMAT(P.PUNCHIN, 'HH:mm:ss') AS PunchInTimeOnly,
-    P.PUNCHOUT,
-    FORMAT(P.PUNCHOUT, 'HH:mm:ss') AS PunchOutTimeOnly,
-    P.PunchCount AS TotalPunches,
-
-    -- Status with special handling for unassigned present users
+    
+    -- Smart punch data
+    SP.PUNCHIN,
+    FORMAT(SP.PUNCHIN, 'HH:mm:ss') AS PunchInTimeOnly,
+    SP.PUNCHOUT,
+    FORMAT(SP.PUNCHOUT, 'HH:mm:ss') AS PunchOutTimeOnly,
+    SP.PunchCount AS TotalPunches,
+    
+    -- Status
     CASE
-        WHEN P.PUNCHIN IS NOT NULL AND A.USERID IS NULL THEN 'Present (Unassigned)'
-        WHEN P.PUNCHIN IS NOT NULL THEN 'Present'
+        WHEN SP.PUNCHIN IS NOT NULL THEN 'Present'
         ELSE 'Absent'
     END AS STATUS,
+    
+    -- Punctuality with 15-minute early arrival requirement
+CASE
+    WHEN SP.PUNCHIN IS NULL THEN 'No Punch'
+    WHEN A.ShiftStartDateTime IS NULL THEN 'No Shift Info'
+    WHEN SP.PUNCHIN <= DATEADD(MINUTE, -10, A.ShiftStartDateTime) THEN 'On Time'
+    ELSE 'Late'
+END AS PunctualityStatus,
 
-    CASE
-        WHEN P.PUNCHIN IS NULL THEN 'No Punch'
-        WHEN A.ShiftStartDateTime IS NULL THEN 'No Shift Info'  -- For unassigned users
-        WHEN P.PUNCHIN <= DATEADD(minute, 15, A.ShiftStartDateTime) THEN 'On Time'
-        ELSE 'Late'
-    END AS PunctualityStatus,
+CASE
+    WHEN SP.PUNCHIN IS NULL OR A.ShiftStartDateTime IS NULL THEN 0
+    WHEN SP.PUNCHIN > DATEADD(MINUTE, -15, A.ShiftStartDateTime)
+         THEN DATEDIFF(minute, DATEADD(MINUTE, -10, A.ShiftStartDateTime), SP.PUNCHIN)
+    ELSE 0
+END AS LateByMinutes,
 
-    CASE
-        WHEN P.PUNCHIN IS NULL OR A.ShiftStartDateTime IS NULL THEN 0
-        WHEN P.PUNCHIN > DATEADD(minute, 15, A.ShiftStartDateTime)
-             THEN DATEDIFF(minute, DATEADD(minute, 15, A.ShiftStartDateTime), P.PUNCHIN)
-        ELSE 0
-    END AS LateByMinutes,
-
-    -- Work time
-    CASE WHEN P.PUNCHIN IS NOT NULL AND P.PUNCHOUT IS NOT NULL AND P.PUNCHOUT >= P.PUNCHIN
-         THEN DATEDIFF(minute, P.PUNCHIN, P.PUNCHOUT)
+    
+    -- Accurate work time calculation
+    CASE WHEN SP.PUNCHIN IS NOT NULL AND SP.PUNCHOUT IS NOT NULL AND SP.PUNCHOUT >= SP.PUNCHIN
+         THEN DATEDIFF(minute, SP.PUNCHIN, SP.PUNCHOUT)
          ELSE 0 END AS WorkedMinutes,
-
-    -- Overtime (only calculable for assigned users)
-    CASE WHEN A.ShiftEndDateTime IS NOT NULL AND P.PUNCHOUT > A.ShiftEndDateTime
-         THEN DATEDIFF(minute, A.ShiftEndDateTime, P.PUNCHOUT)
+    
+    -- Overtime
+    CASE WHEN A.ShiftEndDateTime IS NOT NULL AND SP.PUNCHOUT > A.ShiftEndDateTime
+         THEN DATEDIFF(minute, A.ShiftEndDateTime, SP.PUNCHOUT)
          ELSE 0 END AS OvertimeMinutes
 
--- KEY CHANGE: Use FULL OUTER JOIN to capture all users
-FROM Punches P
-FULL OUTER JOIN Assignments A ON P.USERID = A.USERID
-FULL OUTER JOIN Swaps S ON COALESCE(P.USERID, A.USERID) = S.SWAP_USERID
+FROM SmartPunches SP
+INNER JOIN Assignments A ON SP.USERID = A.USERID
+LEFT JOIN Swaps S ON A.USERID = S.SWAP_USERID
     AND A.Original_Stage_ID = S.STAGE_ID
     AND A.Original_LINE = S.LINE
-LEFT JOIN dbo.MX_USERMST PU ON P.USERID = PU.USERID          -- For punch-only users
-LEFT JOIN dbo.MX_USERMST AU ON A.USERID = AU.USERID          -- For assigned users
-LEFT JOIN dbo.MX_USERMST SU ON S.SWAP_USERID = SU.USERID     -- For swapped users
+LEFT JOIN dbo.MX_USERMST AU ON A.USERID = AU.USERID
+LEFT JOIN dbo.MX_USERMST SU ON S.SWAP_USERID = SU.USERID
 LEFT JOIN dbo.Mx_STAGEMASTER ST ON ISNULL(S.STAGE_ID, A.Original_Stage_ID) = ST.Stage_Serial
-
 
 WHERE (@ShiftIds IS NULL OR A.SHIFT_ID IN (
     SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@ShiftIds, ',')
-) OR P.USERID IS NOT NULL AND A.USERID IS NULL)  -- Include unassigned present users regardless of shift filter
+))
 AND (@LineIds IS NULL OR ISNULL(S.LINE, A.Original_LINE) IN (
     SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@LineIds, ',')
-) OR P.USERID IS NOT NULL AND A.USERID IS NULL)  -- Include unassigned present users regardless of line filter
-AND (@StageId IS NULL OR ISNULL(S.STAGE_ID, A.Original_Stage_ID) = @StageId OR P.USERID IS NOT NULL)
+))
+AND (@StageId IS NULL OR ISNULL(S.STAGE_ID, A.Original_Stage_ID) = @StageId)
 
 ORDER BY
-    CASE WHEN A.USERID IS NOT NULL OR S.SWAP_USERID IS NOT NULL THEN 0 ELSE 1 END,  -- Assigned users first
-    ST.Stage_id, ST.stage_name, A.SHIFT_ID, COALESCE(P.USERID, A.USERID, S.SWAP_USERID);`;
+    ST.Stage_id, ST.stage_name, A.SHIFT_ID, A.USERID;
+`;
 
   try {
     const conn = await pool;
     const request = conn.request();
-    
+
     request.input("Date", sql.Date, date);
     request.input("ShiftIds", sql.NVarChar, shiftsString);
     request.input("LineIds", sql.NVarChar, linesString);
-    
+
     if (stageId && !isNaN(parseInt(stageId))) {
       request.input("StageId", sql.Int, parseInt(stageId));
     } else {
@@ -1554,7 +1747,7 @@ ORDER BY
     }
 
     const { recordset } = await request.query(rawSql);
-    console.log(recordset)
+    console.log(recordset);
     res.json(recordset);
   } catch (error) {
     console.error("Error fetching attendance records:", error.message);
@@ -1562,17 +1755,16 @@ ORDER BY
   }
 });
 
-
 app.get("/api/attendance", async (req, res) => {
   const { date, shifts, lines } = req.query;
+  console.log(req.query);
   let pool = await sql.connect(config);
 
   try {
-    const shiftList = shifts.split(",").map(s => s.trim());
-    const lineList = lines.split(",").map(l => l.trim());
+    const shiftList = shifts.split(",").map((s) => s.trim());
+    const lineList = lines.split(",").map((l) => l.trim());
 
-    const result = await pool.request()
-      .input("Date", sql.Date, new Date(date))
+    const result = await pool.request().input("Date", sql.Date, new Date(date))
       .query(`
         WITH Punches AS (
     SELECT 
@@ -1605,7 +1797,7 @@ WHERE A.Shift_date_from = @Date
 GROUP BY ST.Stage_name, A.LINE, A.SHIFT_ID, SM.SFTSTTime
 ORDER BY ALLOT DESC;
       `);
-      console.log(result.recordset)
+    console.log(result.recordset);
 
     res.json(result.recordset);
     console.log("attendance", result.recordset);
@@ -1616,7 +1808,6 @@ ORDER BY ALLOT DESC;
     await sql.close();
   }
 });
-
 
 app.get("/download-template-us", (req, res) => {
   const filePath = path.join(
@@ -1651,15 +1842,13 @@ app.get("/download-template", (req, res) => {
 app.get("/api/shifts", async (req, res) => {
   try {
     let pool = await sql.connect(config);
-    const result = await pool
-      .request()
-      .query(
-        `SELECT DISTINCT SHIFT_ID 
+    const result = await pool.request().query(
+      `SELECT DISTINCT SHIFT_ID 
 FROM   Mx_UserShifts
 ORDER  BY SHIFT_ID;
 `
-      );
-      console.log(result.recordset)
+    );
+    console.log(result.recordset);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching shifts:", err);
@@ -1681,28 +1870,27 @@ app.get("/api/lines", async (req, res) => {
   }
 });
 
-
-
 app.put("/api/lines/:oldLineName", async (req, res) => {
   let { oldLineName } = req.params;
-  const { newLineName } = req.body;  // <-- must come from frontend
+  const { newLineName } = req.body; // <-- must come from frontend
 
   if (!newLineName || newLineName.trim() === "") {
     return res.status(400).json({ error: "New line name is required" });
   }
-  
-    console.log(req.params)
-     if (oldLineName === "null") {
+
+  console.log(req.params);
+  if (oldLineName === "null") {
     oldLineName = null;
   }
 
   try {
     let pool = await sql.connect(config);
 
-  await pool.request()
-    .input('newLineName', sql.VarChar, newLineName)
-    .input('oldLineName', sql.VarChar, oldLineName) // This can be null
-    .query(`
+    await pool
+      .request()
+      .input("newLineName", sql.VarChar, newLineName)
+      .input("oldLineName", sql.VarChar, oldLineName) // This can be null
+      .query(`
         UPDATE Mx_UserShifts
         SET LINE = @newLineName
         WHERE (@oldLineName IS NULL AND LINE IS NULL) OR (LINE = @oldLineName);
@@ -1712,13 +1900,15 @@ app.put("/api/lines/:oldLineName", async (req, res) => {
         WHERE (@oldLineName IS NULL AND LINE IS NULL) OR (LINE = @oldLineName);
     `);
 
-    res.json({ success: true, message:` Line updated from '${oldLineName}' to '${newLineName}'. `});
+    res.json({
+      success: true,
+      message: ` Line updated from '${oldLineName}' to '${newLineName}'. `,
+    });
   } catch (err) {
     console.error("Error updating line:", err);
     res.status(500).json({ error: "Error updating line" });
   }
 });
-
 
 // DELETE API - Set LINE as NULL in both tables
 app.delete("/api/lines/:lineName", async (req, res) => {
@@ -1728,22 +1918,20 @@ app.delete("/api/lines/:lineName", async (req, res) => {
     let pool = await sql.connect(config);
 
     // Update both tables: Mx_UserShifts and Mx_UserSwap
-    await pool.request()
-      .input("lineName", sql.VarChar, lineName)
-      .query(`
+    await pool.request().input("lineName", sql.VarChar, lineName).query(`
         UPDATE Mx_UserShifts SET LINE = NULL WHERE LINE = @lineName;
         UPDATE Mx_UserSwap SET LINE = NULL WHERE LINE = @lineName;
       `);
 
-    res.json({ success: true, message: `Line '${lineName}' set to NULL in both tables.` });
+    res.json({
+      success: true,
+      message: `Line '${lineName}' set to NULL in both tables.`,
+    });
   } catch (err) {
     console.error("Error deleting line:", err);
     res.status(500).json({ error: "Error deleting line" });
   }
 });
-
-
-
 
 app.get("/api/getEmployees", async (req, res) => {
   const { date, shiftId, Stage_name, Line } = req.query;
@@ -1806,7 +1994,7 @@ AND USERID NOT IN
       .input("Stage_name", sql.NVarChar, Stage_name)
       .input("Line", sql.VarChar, Line)
       .query(query);
-    
+
     res.status(200).json(result.recordset);
   } catch (err) {
     console.error("Database error:", err);
@@ -1816,7 +2004,7 @@ AND USERID NOT IN
 
 app.post("/api/saveUserSwap", async (req, res) => {
   const swapRecords = req.body;
-  console.log(req.body)
+  console.log(req.body);
 
   try {
     const pool = await sql.connect(config);
@@ -1880,7 +2068,7 @@ app.get("/api/lines/master", async (req, res) => {
         "SELECT LineID, LineName, CreatedDate FROM Mx_LinesMaster ORDER BY LineName ASC"
       );
 
-      console.log(result.recordset)
+    console.log(result.recordset);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching lines master:", err);
@@ -2186,12 +2374,10 @@ app.put("/api/carousel-images/:id/order", async (req, res) => {
     res.json({ success: true, message: "Display order updated successfully" });
   } catch (error) {
     console.error("Error updating display order:", error);
-    res
-      .status(500)
-      .json({
-        error: "Failed to update display order",
-        details: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to update display order",
+      details: error.message,
+    });
   }
 });
 
@@ -2262,22 +2448,16 @@ app.put("/api/carousel-images/bulk-order", async (req, res) => {
     }
   } catch (error) {
     console.error("Error updating bulk display orders:", error);
-    res
-      .status(500)
-      .json({
-        error: "Failed to update display orders",
-        details: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to update display orders",
+      details: error.message,
+    });
   }
 });
 
-
-
-
-
 app.post("/api/employee-history", async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
-  console.log(req.body)
+  console.log(req.body);
 
   if (!employeeId || !fromDate || !toDate) {
     return res.status(400).send("Missing required parameters");
@@ -2287,11 +2467,11 @@ app.post("/api/employee-history", async (req, res) => {
     await sql.connect(config);
     const request = new sql.Request();
 
-    request.input('employeeId', sql.NVarChar, employeeId)
+    request.input("employeeId", sql.NVarChar, employeeId);
     request.input("FromDate", sql.Date, fromDate);
     request.input("ToDate", sql.Date, toDate);
 
-  const query = `
+    const query = `
   WITH EmployeeHistory AS (
     -- Data from Mx_UserShifts
     SELECT 
@@ -2486,7 +2666,7 @@ ORDER BY SL_NO;
       toDate,
       records: result.recordset,
     });
-    console.log(result.recordset)
+    console.log(result.recordset);
   } catch (err) {
     console.error("Error fetching attendance:", err);
     res.status(500).send("Error fetching attendance history");
@@ -2494,8 +2674,6 @@ ORDER BY SL_NO;
     await sql.close();
   }
 });
-
-
 
 app.get("/api/employees", async (req, res) => {
   try {
@@ -2508,14 +2686,11 @@ app.get("/api/employees", async (req, res) => {
     `);
 
     res.json(result.recordset); // [{ userid: 101, name: 'John' }, { userid: 102, name: 'Alice' }]
-   
   } catch (err) {
     console.error("Error fetching employees:", err);
     res.status(500).json({ error: "Failed to fetch employees" });
   }
 });
-
-
 
 app.get("/api/employees-showall", async (req, res) => {
   try {
@@ -2527,36 +2702,48 @@ app.get("/api/employees-showall", async (req, res) => {
     `);
 
     res.json(result.recordset); // [{ userid: 101, name: 'John' }, { userid: 102, name: 'Alice' }]
-   
   } catch (err) {
     console.error("Error fetching employees:", err);
     res.status(500).json({ error: "Failed to fetch employees" });
   }
 });
 
-app.get('/api/punch_report', async (req, res) => {
+app.get("/api/punch_report", async (req, res) => {
   try {
-    console.log(req.query)
+    console.log(req.query);
     // 1. Read & validate query-string parameters
-    const userId = req.query.userid;        // NVARCHAR(50)
-    const fromDate = req.query.fromDate;    // YYYY-MM-DD
-    const toDate = req.query.toDate;        // YYYY-MM-DD
-    
+    const userId = req.query.userid; // NVARCHAR(50)
+    const fromDate = req.query.fromDate; // YYYY-MM-DD
+    const toDate = req.query.toDate; // YYYY-MM-DD
+
     if (!userId || !fromDate || !toDate)
-      return res.status(400).json({ error: "Missing required 'userid', 'fromDate' and 'toDate' (YYYY-MM-DD)" });
+      return res.status(400).json({
+        error:
+          "Missing required 'userid', 'fromDate' and 'toDate' (YYYY-MM-DD)",
+      });
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate))
-      return res.status(400).json({ error: 'Invalid fromDate format. Use YYYY-MM-DD' });
-      
+      return res
+        .status(400)
+        .json({ error: "Invalid fromDate format. Use YYYY-MM-DD" });
+
     if (!/^\d{4}-\d{2}-\d{2}$/.test(toDate))
-      return res.status(400).json({ error: 'Invalid toDate format. Use YYYY-MM-DD' });
+      return res
+        .status(400)
+        .json({ error: "Invalid toDate format. Use YYYY-MM-DD" });
 
     // Validate date range
     if (new Date(fromDate) > new Date(toDate))
-      return res.status(400).json({ error: 'fromDate cannot be later than toDate' });
+      return res
+        .status(400)
+        .json({ error: "fromDate cannot be later than toDate" });
 
-    const earlyGrace = Number.isFinite(+req.query.earlyGrace) ? +req.query.earlyGrace : 30;
-    const lateGrace  = Number.isFinite(+req.query.lateGrace)  ? +req.query.lateGrace  : 30;
+    const earlyGrace = Number.isFinite(+req.query.earlyGrace)
+      ? +req.query.earlyGrace
+      : 45;
+    const lateGrace = Number.isFinite(+req.query.lateGrace)
+      ? +req.query.lateGrace
+      : 15;
 
     // 2. Get a pooled SQL connection (mssql)
     const pool = await sql.connect(config);
@@ -2771,8 +2958,11 @@ WorkingHoursCalculation AS (
     SELECT  
         WorkDate,
         SFTID,
-        SUM(CASE WHEN WorkingSeconds > 0 THEN WorkingSeconds ELSE 0 END) AS TotalWorkingSeconds,
-        CAST(SUM(CASE WHEN WorkingSeconds > 0 THEN WorkingSeconds ELSE 0 END) / 3600.0 AS DECIMAL(10,2)) AS ActualHoursWorked,
+        SUM(CASE WHEN WorkingSeconds > 0 THEN WorkingSeconds ELSE 0 END) AS TotalWorkingSeconds,CONCAT(
+  CAST(SUM(CASE WHEN WorkingSeconds > 0 THEN WorkingSeconds ELSE 0 END) / 3600 AS varchar(10)), ':',
+  RIGHT('00' + CAST((SUM(CASE WHEN WorkingSeconds > 0 THEN WorkingSeconds ELSE 0 END) / 60) % 60 AS varchar(2)), 2)
+) AS ActualHoursWorked,
+
         COUNT(CASE WHEN PunchOut IS NOT NULL THEN 1 END) AS CompletedWorkSessions,
         COUNT(CASE WHEN PunchOut IS NULL THEN 1 END) AS IncompleteWorkSessions,
         STRING_AGG(
@@ -2811,13 +3001,12 @@ SELECT
     FORMAT(PD.LastPunchShift ,'HH:mm')        AS lastpunch,
 
     -- Original calculations (for comparison)
-    CAST(DATEDIFF(SECOND, PD.FirstPunchShift, PD.LastPunchShift)/3600.0 AS DECIMAL(10,2)) AS HoursWorkedInclusive,
-    CAST(DATEDIFF(SECOND,
-          CASE WHEN PD.FirstPunchShift < PD.ShiftStart THEN PD.ShiftStart ELSE PD.FirstPunchShift END,
-          CASE WHEN PD.LastPunchShift  > PD.ShiftEnd   THEN PD.ShiftEnd   ELSE PD.LastPunchShift  END)/3600.0 AS DECIMAL(10,2)) AS HoursWithinShift,
-
+    CONVERT(char(5),
+        DATEADD(SECOND, DATEDIFF(SECOND, PD.ShiftStart, PD.ShiftEnd), 0),
+        108) AS HoursWorkedInclusive,
+    
     -- NEW: Actual working hours calculation
-    COALESCE(WHC.ActualHoursWorked, 0)        AS ActualHoursWorked,
+    COALESCE(WHC.ActualHoursWorked, '00:00')        AS ActualHoursWorked,
     COALESCE(WHC.CompletedWorkSessions, 0)    AS CompletedWorkSessions,
     COALESCE(WHC.IncompleteWorkSessions, 0)   AS IncompleteWorkSessions,
     WHC.WorkingSessions                       AS WorkingSessionsDetail,
@@ -2846,45 +3035,43 @@ OPTION (MAXRECURSION 366);
 
 `;
 
-
     // 4. Execute with parameter binding
-    const rs = await pool.request()
-      .input('UserIdParam',     sql.NVarChar(50), userId)
-      .input('FromDateParam',   sql.Date,         fromDate)
-      .input('ToDateParam',     sql.Date,         toDate)
-      .input('EarlyGraceParam', sql.Int,          earlyGrace)
-      .input('LateGraceParam',  sql.Int,          lateGrace)
+    const rs = await pool
+      .request()
+      .input("UserIdParam", sql.NVarChar(50), userId)
+      .input("FromDateParam", sql.Date, fromDate)
+      .input("ToDateParam", sql.Date, toDate)
+      .input("EarlyGraceParam", sql.Int, earlyGrace)
+      .input("LateGraceParam", sql.Int, lateGrace)
       .query(query);
 
     // 5. Return array of results (one row per date in range)
-    console.log(rs.recordset)
+    console.log(rs.recordset);
     return res.json(rs.recordset);
-
   } catch (err) {
-    console.error('Error in /api/punch_report:', err);
-    return res.status(500).json({ error: 'Server Error', details: String(err) });
+    console.error("Error in /api/punch_report:", err);
+    return res
+      .status(500)
+      .json({ error: "Server Error", details: String(err) });
   }
 });
 
-
 app.post("/api/employee-punctuality", async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
-console.log(req.body)
-  if (!employeeId ) {
+  console.log(req.body);
+  if (!employeeId) {
     return res.status(400).send("Missing required parameters");
   }
 
   try {
     await sql.connect(config);
 
+    const request = new sql.Request();
 
-const request = new sql.Request();
-
-request.input("EmployeeId", sql.NVarChar, employeeId); // ✅ match SQL variable name
+    request.input("EmployeeId", sql.NVarChar, employeeId); // ✅ match SQL variable name
 
     request.input("FromDate", sql.Date, fromDate);
     request.input("ToDate", sql.Date, toDate);
-
 
     const query = `
 WITH EmployeePunctuality AS (
@@ -3070,10 +3257,8 @@ ORDER BY EmployeePunctuality.[DATE] ASC;
 
  `;
 
-
-
     const result = await request.query(query);
-console.log(result.recordset)
+    console.log(result.recordset);
     res.json({
       employeeId,
       records: result.recordset,
@@ -3109,10 +3294,21 @@ app.post("/api/jobcard-upload", async (req, res) => {
       const batch = records.slice(i, i + batchSize);
 
       for (let rec of batch) {
-        const { Edatetime, UserID, Job_Target, Job_Actual, Job_Rejns, job_5S,PPE,Job_Disclipline  } = rec;
+        const {
+          Edatetime,
+          UserID,
+          Job_Target,
+          Job_Actual,
+          Job_Rejns,
+          job_5S,
+          PPE,
+          Job_Disclipline,
+        } = rec;
 
         if (!Edatetime || !UserID) {
-          return res.status(400).json({ error: "Edatetime and UserID are required in each record" });
+          return res.status(400).json({
+            error: "Edatetime and UserID are required in each record",
+          });
         }
 
         if (QUERY1.length > 0) {
@@ -3153,11 +3349,10 @@ app.post("/api/jobcard-upload", async (req, res) => {
 
       const result = await request.query(insertQuery);
 
-      result.recordset.forEach(row => {
-        if (row.Action === 'INSERT') totalInserted++;
-        else if (row.Action === 'UPDATE') totalUpdated++;
+      result.recordset.forEach((row) => {
+        if (row.Action === "INSERT") totalInserted++;
+        else if (row.Action === "UPDATE") totalUpdated++;
       });
-
     }
 
     await transaction.commit();
@@ -3167,13 +3362,12 @@ app.post("/api/jobcard-upload", async (req, res) => {
       success: true,
       message: "Job card data processed successfully.",
       inserted: totalInserted,
-      updated: totalUpdated
+      updated: totalUpdated,
     });
-
   } catch (error) {
     console.error("Error processing job card:", error);
-    try {      await transaction.rollback();
-
+    try {
+      await transaction.rollback();
     } catch (rollbackError) {
       console.error("Rollback failed:", rollbackError);
     }
@@ -3183,23 +3377,22 @@ app.post("/api/jobcard-upload", async (req, res) => {
 
 app.post("/api/employee-Jobreport", async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
-console.log(req.body)
-  if (!employeeId ) {
+  console.log(req.body);
+  if (!employeeId) {
     return res.status(400).send("Missing required parameters");
   }
 
   try {
     await sql.connect(config);
 
+    const request = new sql.Request();
 
-const request = new sql.Request();
-
-request.input("EmployeeId", sql.NVarChar, employeeId); // ✅ match SQL variable name
+    request.input("EmployeeId", sql.NVarChar, employeeId); // ✅ match SQL variable name
 
     request.input("FromDate", sql.Date, fromDate);
     request.input("ToDate", sql.Date, toDate);
 
-const query = `
+    const query = `
 WITH EmployeeJobreport AS (
     SELECT 
         U.USERID,
@@ -3373,10 +3566,8 @@ ORDER BY [DATE] ASC;
 
 `;
 
-
-
     const result = await request.query(query);
-console.log(result.recordset)
+    console.log(result.recordset);
     res.json({
       employeeId,
       records: result.recordset,
@@ -3389,33 +3580,23 @@ console.log(result.recordset)
   }
 });
 
-
 app.get("/download-templatejob", (req, res) => {
-
   const filePath = path.join(
-
     __dirname,
 
     "../master/public",
 
     "EmployeeJobCardSampleData.xlsx"
-
   );
 
   res.download(filePath, (err) => {
-
     if (err) {
-
       console.error("Error downloading file:", err);
 
       res.status(500).send("Error downloading file");
-
     }
-
   });
-
 });
-
 
 sql
   .connect(config)
@@ -3429,4 +3610,3 @@ sql
   .catch((err) => {
     console.error("❌ Database connection failed:", err);
   });
-
