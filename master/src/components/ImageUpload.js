@@ -41,12 +41,12 @@ const ImageUpload = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/carousel-images"
+        "https://192.168.2.54:443/api/carousel-images"
       );
       setImages(response.data);
     } catch (error) {
-      console.error('Error fetching images:', error);
-      setError('Failed to fetch images');
+      console.error("Error fetching images:", error);
+      setError("Failed to fetch images");
     } finally {
       setLoading(false);
     }
@@ -58,28 +58,28 @@ const ImageUpload = () => {
 
     // Validate file size (5MB limit)
     if (file.size > 1 * 1024 * 1024) {
-      setError('File size must be less than 1MB');
+      setError("File size must be less than 1MB");
       return;
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      setError('Only JPEG, PNG, GIF, and WebP images are allowed');
+      setError("Only JPEG, PNG, GIF, and WebP images are allowed");
       return;
     }
 
     setUploading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     const formData = new FormData();
-    formData.append('image', file);
-    formData.append('displayOrder', images.length);
+    formData.append("image", file);
+    formData.append("displayOrder", images.length);
 
     try {
       await axios.post(
-        "https://103.38.50.149:5000/api/carousel-images/upload",
+        "https://192.168.2.54:443/api/carousel-images/upload",
         formData,
         {
           headers: {
@@ -88,14 +88,14 @@ const ImageUpload = () => {
         }
       );
 
-      setSuccess('Image uploaded successfully!');
+      setSuccess("Image uploaded successfully!");
       fetchImages(); // Refresh the image list
-      
+
       // Reset file input
-      event.target.value = '';
+      event.target.value = "";
     } catch (error) {
-      console.error('Error uploading image:', error);
-      setError(error.response?.data?.error || 'Failed to upload image');
+      console.error("Error uploading image:", error);
+      setError(error.response?.data?.error || "Failed to upload image");
     } finally {
       setUploading(false);
     }
@@ -105,9 +105,7 @@ const ImageUpload = () => {
     if (!window.confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      await axios.delete(
-        `https://103.38.50.149:5000/api/carousel-images/${id}`
-      );
+      await axios.delete(`https://192.168.2.54:443/api/carousel-images/${id}`);
       setSuccess('Image deleted successfully!');
       fetchImages();
     } catch (error) {
@@ -129,7 +127,7 @@ const ImageUpload = () => {
     try {
       const updatePromises = items.map((item, index) =>
         axios.put(
-          `https://103.38.50.149:5000/api/carousel-images/${item.id}/order`,
+          `https://192.168.2.54:443/api/carousel-images/${item.id}/order`,
           {
             displayOrder: index,
           }

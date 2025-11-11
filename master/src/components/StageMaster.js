@@ -39,7 +39,7 @@ const StageMaster = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/stage-master"
+        "https://192.168.2.54:443/api/stage-master"
       );
       const sorted = response.data.sort(
         (a, b) => a.Stage_Serial - b.Stage_Serial
@@ -53,7 +53,7 @@ const StageMaster = () => {
   const fetchStageTypes = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/stage-master/types"
+        "https://192.168.2.54:443/api/stage-master/types"
       );
       setStageTypes(response.data);
     } catch (error) {
@@ -79,7 +79,7 @@ const StageMaster = () => {
   const addStage = async () => {
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/stage-master",
+        "https://192.168.2.54:443/api/stage-master",
         newStage
       );
       setStages([...stages, response.data]);
@@ -101,7 +101,7 @@ const StageMaster = () => {
   const updateStage = async () => {
     try {
       await axios.put(
-        `https://103.38.50.149:5000/api/stage-master/${editingStage.Stage_id}`,
+        `https://192.168.2.54:443/api/stage-master/${editingStage.Stage_id}`,
         newStage
       );
       setNewStage({ Stage_name: "", Stage_Type: "", Stage_Serial: "" });
@@ -119,7 +119,7 @@ const StageMaster = () => {
   const deleteStage = async (Stage_id) => {
     try {
       await axios.delete(
-        `https://103.38.50.149:5000/api/stage-master/${Stage_id}`
+        `https://192.168.2.54:443/api/stage-master/${Stage_id}`
       );
       setStages(stages.filter((stage) => stage.Stage_id !== Stage_id));
       fetchData();

@@ -49,7 +49,7 @@ const formatDates = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+        const res = await axios.get("https://192.168.2.54:443/api/employees");
 
         if (Array.isArray(res.data)) {
           setEmployeeOptions(res.data); // keep objects [{ name, userid }]
@@ -72,7 +72,7 @@ const formatDates = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/employee-punctuality",
+        "https://192.168.2.54:443/api/employee-punctuality",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),

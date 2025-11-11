@@ -1094,6 +1094,14 @@ app.post("/api/saveUserShifts", async (req, res) => {
         LINE,
       } = shift;
 
+      console.log("Processing shift:", shift);
+      console.log("Stage Map:", Shift_date_from);
+      console.log("Stage Map:", Shift_date_to);
+      console.log("Stage Map:", userid);
+      console.log("Stage Map:", STAGE_NAME);
+      console.log("Stage Map:", SHIFT_ID);
+      console.log("Stage Map:", LINE);
+
       Shift_date_from = normalizeDate(Shift_date_from);
       Shift_date_to = normalizeDate(Shift_date_to);
 

@@ -30,11 +30,11 @@ const SkillMaster = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/skill-master"
+        "https://192.168.2.54:443/api/skill-master"
       );
       setSkills(response.data);
     } catch (error) {
-      console.error('Error fetching skill data:', error);
+      console.error("Error fetching skill data:", error);
     }
   };
 
@@ -59,16 +59,20 @@ const SkillMaster = () => {
   const addSkill = async () => {
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/skill-master",
+        "https://192.168.2.54:443/api/skill-master",
         newSkill
       );
       setSkills([...skills, response.data]);
-      setNewSkill({ Skill_Description: '', Skill_Rating: '' });
-      setNotification('Skill added successfully');
+      setNewSkill({ Skill_Description: "", Skill_Rating: "" });
+      setNotification("Skill added successfully");
       setSnackbarOpen(true);
     } catch (error) {
-      console.error('Error adding skill:', error);
-      setNotification(error.response?.status === 409 ? 'Skill Name already exists' : 'Error adding skill');
+      console.error("Error adding skill:", error);
+      setNotification(
+        error.response?.status === 409
+          ? "Skill Name already exists"
+          : "Error adding skill"
+      );
       setSnackbarOpen(true);
     }
   };
@@ -76,7 +80,7 @@ const SkillMaster = () => {
   const updateSkill = async () => {
     try {
       const response = await axios.put(
-        `https://103.38.50.149:5000/api/skill-master/${editingSkill.Skill_id}`,
+        `https://192.168.2.54:443/api/skill-master/${editingSkill.Skill_id}`,
         newSkill
       );
       const updatedSkills = skills.map(skill =>

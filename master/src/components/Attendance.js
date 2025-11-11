@@ -51,13 +51,13 @@ const Attendance = () => {
       setLoadingLines(true);
       try {
         const shiftResponse = await axios.get(
-          "https://103.38.50.149:5000/api/shifts"
+          "https://192.168.2.54:443/api/shifts"
         );
         const lineResponse = await axios.get(
-          "https://103.38.50.149:5000/api/lines"
+          "https://192.168.2.54:443/api/lines"
         );
         setShiftOptions(shiftResponse.data || []);
-        console.log(shiftResponse.data)
+        console.log(shiftResponse.data);
         setLineOptions(lineResponse.data || []);
       } catch (error) {
         console.error("Error fetching options:", error);
@@ -80,7 +80,7 @@ const Attendance = () => {
     setLoadingDetails(true);
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance",
+        "https://192.168.2.54:443/api/attendance",
         {
           params: {
             date: formattedDate,
@@ -115,7 +115,7 @@ const Attendance = () => {
       ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "https://103.38.50.149:5000/api/attendance/showAll",
+          "https://192.168.2.54:443/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -160,7 +160,7 @@ const Attendance = () => {
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "https://103.38.50.149:5000/api/attendance/showAll",
+          "https://192.168.2.54:443/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -293,7 +293,7 @@ const Attendance = () => {
 
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance/showAll",
+        "https://192.168.2.54:443/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -317,7 +317,7 @@ const Attendance = () => {
     if (!Array.isArray(attendanceDetails)) {
       return { allot: 0, present: 0, absent: 0 };
     }
-    
+
     const totals = attendanceDetails.reduce(
       (acc, detail) => {
         if (detail) {
@@ -336,7 +336,7 @@ const Attendance = () => {
 
   const downloadExcel = () => {
     if (!Array.isArray(attendanceDetails)) return;
-    
+
     const data = attendanceDetails.map((record) => ({
       "Stage Name": record?.Stage_name || "N/A",
       "Shift ID": record?.SHIFT_ID || "N/A",
@@ -345,9 +345,10 @@ const Attendance = () => {
       Allot: record?.ALLOT || 0,
       Present: record?.PRESENT || 0,
       Absent: record?.ABSENT || 0,
-      "First Punch In": record?.FirstPunchIn ? 
-        DateTime.fromISO(record.FirstPunchIn).toFormat("dd-MM-yyyy HH:mm:ss") : "No Punch",
-      "Punctuality Status": record?.PunctualityStatus || "N/A"
+      "First Punch In": record?.FirstPunchIn
+        ? DateTime.fromISO(record.FirstPunchIn).toFormat("dd-MM-yyyy HH:mm:ss")
+        : "No Punch",
+      "Punctuality Status": record?.PunctualityStatus || "N/A",
     }));
 
     const totals = calculateTotals();
@@ -360,15 +361,22 @@ const Attendance = () => {
       Present: totals.present,
       Absent: totals.absent,
       "First Punch In": "",
-      "Punctuality Status": ""
+      "Punctuality Status": "",
     };
 
     data.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(data);
     worksheet["!cols"] = [
-      { wpx: 150 }, { wpx: 100 }, { wpx: 100 }, { wpx: 120 },
-      { wpx: 100 }, { wpx: 100 }, { wpx: 100 }, { wpx: 180 }, { wpx: 120 }
+      { wpx: 150 },
+      { wpx: 100 },
+      { wpx: 100 },
+      { wpx: 120 },
+      { wpx: 100 },
+      { wpx: 100 },
+      { wpx: 100 },
+      { wpx: 180 },
+      { wpx: 120 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -382,7 +390,7 @@ const Attendance = () => {
 
   const downloadAll = () => {
     if (!Array.isArray(detailedRecords)) return;
-    
+
     const data = detailedRecords.map((record) => ({
       "User ID": record?.USERID || "N/A",
       "User Name": record?.NAME || "N/A",
@@ -390,18 +398,26 @@ const Attendance = () => {
       "Shift ID": record?.SHIFT_ID || "N/A",
       Line: record?.LINE || "N/A",
       Status: record?.STATUS || "N/A",
-      "Punch Time": record?.PUNCHIN ? 
-        DateTime.fromISO(record.PUNCHIN).toFormat("dd-MM-yyyy HH:mm:ss") : "No Punch",
+      "Punch Time": record?.PUNCHIN
+        ? DateTime.fromISO(record.PUNCHIN).toFormat("dd-MM-yyyy HH:mm:ss")
+        : "No Punch",
       "Shift Start Time": record?.SFTSTTime || "N/A",
       "Punctuality Status": record?.PunctualityStatus || "N/A",
-      "Swap User": record?.SWAPUSERNAME || "No Swap"
+      "Swap User": record?.SWAPUSERNAME || "No Swap",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(data);
     worksheet["!cols"] = [
-      { wpx: 100 }, { wpx: 150 }, { wpx: 150 }, 
-      { wpx: 100 }, { wpx: 100 }, { wpx: 100 }, 
-      { wpx: 180 }, { wpx: 120 }, { wpx: 120 }, { wpx: 120 }
+      { wpx: 100 },
+      { wpx: 150 },
+      { wpx: 150 },
+      { wpx: 100 },
+      { wpx: 100 },
+      { wpx: 100 },
+      { wpx: 180 },
+      { wpx: 120 },
+      { wpx: 120 },
+      { wpx: 120 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -437,7 +453,7 @@ const Attendance = () => {
     }));
 
     axios
-      .post("https://103.38.50.149:5000/api/saveUserSwap", swaps)
+      .post("https://192.168.2.54:443/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -455,7 +471,7 @@ const Attendance = () => {
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("https://103.38.50.149:5000/api/getEmployees", {
+        .get("https://192.168.2.54:443/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,

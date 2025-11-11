@@ -72,7 +72,7 @@ const isAdmin = AdminFlag === 1;
     setErrorImages('');
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/carousel-images"
+        "https://192.168.2.54:443/api/carousel-images"
       );
       setCarouselImages(response.data || []);
     } catch (error) {

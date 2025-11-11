@@ -54,7 +54,7 @@ const formatDates = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+        const res = await axios.get("https://192.168.2.54:443/api/employees");
 
         if (Array.isArray(res.data)) {
           setEmployeeOptions(res.data); // keep objects [{ name, userid }]
@@ -82,7 +82,7 @@ const formatDates = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/employee-Jobreport",
+        "https://192.168.2.54:443/api/employee-Jobreport",
         {
           fromDate: formatDateforbackend(fromDate),
           toDate: formatDateforbackend(toDate),
@@ -119,126 +119,206 @@ const formatDates = (dateStr) => {
     }
   };
 
+  const downloadExcel = () => {
+    if (!Array.isArray(JobDataData) || JobDataData.length === 0) {
+      setError("No JobData data to export.");
+      return;
+    }
 
+    try {
+      // Calculate totals for numeric columns
+      const totalTarget = JobDataData.reduce(
+        (sum, item) => sum + (item.Target || 0),
+        0
+      );
+      const totalActual = JobDataData.reduce(
+        (sum, item) => sum + (item.Actual || 0),
+        0
+      );
+      const totalPerformance = JobDataData.reduce(
+        (sum, item) => sum + (item.Performance || 0),
+        0
+      );
+      const totalAttendance = JobDataData.reduce(
+        (sum, item) => sum + (item.Attendance || 0),
+        0
+      );
+      const totalPunctuality = JobDataData.reduce(
+        (sum, item) => sum + (item.Punctuality || 0),
+        0
+      );
+      const totalRejections = JobDataData.reduce(
+        (sum, item) => sum + (item.Rejections || 0),
+        0
+      );
+      const total5S = JobDataData.reduce(
+        (sum, item) => sum + (item["5S"] || 0),
+        0
+      );
+      const totalPPE = JobDataData.reduce(
+        (sum, item) => sum + (item.PPE || 0),
+        0
+      );
+      const totalDiscipline = JobDataData.reduce(
+        (sum, item) => sum + (item.Disclipline || 0),
+        0
+      );
+      const totalTotal = JobDataData.reduce(
+        (sum, item) => sum + (item.Total || 0),
+        0
+      );
 
+      const worksheetData = [
+        ["Employee Job Card Data"],
+        ["NAME:", employeeName, ""],
+        ["ID NO.", employeeId || "", "", "", ""],
+        [],
+        [
+          "SL NO.",
+          "DATE",
+          "SHIFT",
+          "STAGE",
+          "LINE",
+          "Target",
+          "Actual",
+          "Production Performance",
+          "Attendance",
+          "Punctuality",
+          "Rejections",
+          "5S",
+          "Safety & PPE Usage",
+          "Discipline",
+          "Total",
+        ],
+        ...JobDataData.map((item, index) => [
+          index + 1,
+          formatDates(item.Date),
+          item.SHIFTNAME || "",
+          item.STAGE || "",
+          item.LINE || "",
+          item.Target || 0,
+          item.Actual || 0,
+          item.Performance || 0,
+          item.Attendance || 0,
+          item.Punctuality || 0,
+          item.Rejections || 0,
+          item["5S"] || 0,
+          item.PPE || 0,
+          item.Disclipline || 0,
+          item.Total || 0,
+        ]),
+        // ✅ Add Total Row
+        [
+          "",
+          "",
+          "",
+          "",
+          "TOTAL",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          totalTotal,
+        ],
+      ];
 
-const downloadExcel = () => {
-  if (!Array.isArray(JobDataData) || JobDataData.length === 0) {
-    setError("No JobData data to export.");
-    return;
-  }
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
-  try {
-    // Calculate totals for numeric columns
-    const totalTarget = JobDataData.reduce((sum, item) => sum + (item.Target || 0), 0);
-    const totalActual = JobDataData.reduce((sum, item) => sum + (item.Actual || 0), 0);
-    const totalPerformance = JobDataData.reduce((sum, item) => sum + (item.Performance || 0), 0);
-    const totalAttendance = JobDataData.reduce((sum, item) => sum + (item.Attendance || 0), 0);
-    const totalPunctuality = JobDataData.reduce((sum, item) => sum + (item.Punctuality || 0), 0);
-    const totalRejections = JobDataData.reduce((sum, item) => sum + (item.Rejections || 0), 0);
-    const total5S = JobDataData.reduce((sum, item) => sum + (item["5S"] || 0), 0);
-    const totalPPE = JobDataData.reduce((sum, item) => sum + (item.PPE || 0), 0);
-    const totalDiscipline = JobDataData.reduce((sum, item) => sum + (item.Disclipline || 0), 0);
-    const totalTotal = JobDataData.reduce((sum, item) => sum + (item.Total || 0), 0);
+      // Merge title
+      worksheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }, // adjust merge based on last column
+      ];
 
-    const worksheetData = [
-      ["Employee Job Card Data"],
-      ["NAME:", employeeName, ""],
-      ["ID NO.", employeeId || "", "", "", ""],
-      [],
-      ["SL NO.","DATE","SHIFT","STAGE","LINE","Target","Actual","Production Performance","Attendance","Punctuality","Rejections","5S","Safety & PPE Usage","Discipline","Total"],
-      ...JobDataData.map((item, index) => [
-        index + 1,
-        formatDates(item.Date),
-        item.SHIFTNAME || "",
-        item.STAGE || "",
-        item.LINE || "",
-        item.Target || 0,
-        item.Actual || 0,
-        item.Performance || 0,
-        item.Attendance || 0,
-        item.Punctuality || 0,
-        item.Rejections || 0,
-        item["5S"] || 0,
-        item.PPE || 0,
-        item.Disclipline || 0,
-        item.Total || 0,
-      ]),
-      // ✅ Add Total Row
-      ["", "", "", "", "TOTAL",
-        "", "", "", "", "",
-        "", "", "", "", totalTotal
-      ]
-    ];
+      // Set column widths
+      worksheet["!cols"] = Array(15).fill({ wch: 15 });
 
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-
-    // Merge title
-    worksheet["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } } // adjust merge based on last column
-    ];
-
-    // Set column widths
-    worksheet["!cols"] = Array(15).fill({ wch: 15 });
-
-    // Apply styles
-    const range = XLSX.utils.decode_range(worksheet["!ref"]);
-    for(let R = range.s.r; R <= range.e.r; ++R) {
-      for(let C = range.s.c; C <= range.e.c; ++C) {
-        const cell_address = { c: C, r: R };
-        const cell_ref = XLSX.utils.encode_cell(cell_address);
-        const cell = worksheet[cell_ref];
-        if(cell) {
-          // Title row
-          if(R === 0) {
-            cell.s = {
-              font: { name: "Arial", sz: 14, bold: true },
-              fill: { fgColor: { rgb: "FFFF00" } },
-              alignment: { horizontal: "center", vertical: "center" }
-            };
-          }
-          // Header row
-          else if(R === 4) {
-            cell.s = {
-              font: { name: "Arial", sz: 10, bold: true },
-              fill: { fgColor: { rgb: "D9E1F2" } },
-              alignment: { horizontal: "center", vertical: "center" },
-              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-            };
-          }
-          // Total row
-          else if(R === range.e.r) {
-            cell.s = {
-              font: { name: "Arial", sz: 10, bold: true, color: { rgb: "FFFFFF" } },
-              fill: { fgColor: { rgb: "4472C4" } }, // Dark Blue background
-              alignment: { horizontal: "center", vertical: "center" },
-              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-            };
-          }
-          // Normal cells
-          else {
-            cell.s = {
-              font: { name: "Arial", sz: 10 },
-              alignment: { horizontal: "center", vertical: "center" },
-              border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-            };
+      // Apply styles
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell_address = { c: C, r: R };
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          const cell = worksheet[cell_ref];
+          if (cell) {
+            // Title row
+            if (R === 0) {
+              cell.s = {
+                font: { name: "Arial", sz: 14, bold: true },
+                fill: { fgColor: { rgb: "FFFF00" } },
+                alignment: { horizontal: "center", vertical: "center" },
+              };
+            }
+            // Header row
+            else if (R === 4) {
+              cell.s = {
+                font: { name: "Arial", sz: 10, bold: true },
+                fill: { fgColor: { rgb: "D9E1F2" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin" },
+                  bottom: { style: "thin" },
+                  left: { style: "thin" },
+                  right: { style: "thin" },
+                },
+              };
+            }
+            // Total row
+            else if (R === range.e.r) {
+              cell.s = {
+                font: {
+                  name: "Arial",
+                  sz: 10,
+                  bold: true,
+                  color: { rgb: "FFFFFF" },
+                },
+                fill: { fgColor: { rgb: "4472C4" } }, // Dark Blue background
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin" },
+                  bottom: { style: "thin" },
+                  left: { style: "thin" },
+                  right: { style: "thin" },
+                },
+              };
+            }
+            // Normal cells
+            else {
+              cell.s = {
+                font: { name: "Arial", sz: 10 },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin" },
+                  bottom: { style: "thin" },
+                  left: { style: "thin" },
+                  right: { style: "thin" },
+                },
+              };
+            }
           }
         }
       }
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Employee Job Card Data"
+      );
+
+      const fileName = `EmployeeJobCardDownload__${employeeName}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      setError("");
+    } catch (error) {
+      console.error("Error downloading Excel:", error);
+      setError("Failed to download Excel file. Please try again.");
     }
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Employee Job Card Data");
-
-    const fileName = `EmployeeJobCardDownload__${employeeName}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-
-    setError("");
-  } catch (error) {
-    console.error("Error downloading Excel:", error);
-    setError("Failed to download Excel file. Please try again.");
-  }
-};
+  };
 
 
 

@@ -50,49 +50,77 @@ const UserShiftUpload = () => {
   }
 
   const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) {
-      setMessage("No file selected.");
-      setSnackbarOpen(true);
-      return;
-    }
-    const reader = new FileReader();
+  const file = event.target.files[0];
+  if (!file) {
+    setMessage("No file selected.");
+    setSnackbarOpen(true);
+    return;
+  }
+  const reader = new FileReader();
 
-    reader.onload = (e) => {
-      const binaryStr = e.target.result;
-      const workbook = XLSX.read(binaryStr, { type: "binary" });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  reader.onload = (e) => {
+    const binaryStr = e.target.result;
+    const workbook = XLSX.read(binaryStr, { type: "binary" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-      const columns = jsonData[0].map((col, index) => ({
-        Header: col,
-        accessor: `col${index}`,
-      }));
-      const rows = jsonData.slice(1).map((row, rowIndex) =>
-        row.reduce(
-          (acc, cell, colIndex) => {
-            acc[`col${colIndex}`] = cell;
-            return acc;
-          },
-          { id: rowIndex }
-        )
-      );
-      setColumns(columns);
-      setData(rows);
+    // Extract headers (dates start from index 4 assuming fixed format)
+    const headers = jsonData[0];
+    // Rows without header row
+    const rows = jsonData.slice(1);
 
-      // Detect conflicts
-      const conflicts = findConflictingRows(rows);
-      setConflictRows(conflicts);
-      setShowConflictWarning(conflicts.length > 0);
+    // Transform wide format data to long array of shifts expected by backend
+    const transformedData = [];
 
-      setNotification("File uploaded successfully");
-      setShowTable(false);
-    };
+    rows.forEach((row, rowIndex) => {
+      const userid = row[0];
+      const userName = row[1]; // optional
+      const stageName = row[2];
+      const line = row[3];
+      // Dates start from col index 4 in your sample
+      for (let colIdx = 4; colIdx < row.length; colIdx++) {
+        const shiftId = row[colIdx];
+        const dateRaw = headers[colIdx];
+        if (shiftId && shiftId !== "") {
+          // Normalize date format (dd-MM-yyyy to yyyy-MM-dd)
+          const parts = dateRaw.split("-");
+          const normalizedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
 
-    reader.readAsBinaryString(file);
+          // Create shift object matching backend expected keys
+          transformedData.push({
+            userid: userid,
+            STAGE_NAME: stageName,
+            LINE: line,
+            Shift_date_from: normalizedDate,
+            Shift_date_to: normalizedDate,
+            SHIFT_ID: shiftId,
+          });
+        }
+      }
+    });
+
+    // Now set transformed data for use in UI and for sending to backend
+    setData(transformedData);
+
+    // Columns for display can also be updated as needed, e.g.:
+    setColumns([
+      { Header: "User ID", accessor: "userid" },
+      { Header: "Stage Name", accessor: "STAGE_NAME" },
+      { Header: "Line", accessor: "LINE" },
+      { Header: "Shift Date From", accessor: "Shift_date_from" },
+      { Header: "Shift Date To", accessor: "Shift_date_to" },
+      { Header: "Shift ID", accessor: "SHIFT_ID" },
+    ]);
+
+    setNotification("File uploaded and data transformed successfully");
+    setShowTable(true);
   };
 
+  reader.readAsBinaryString(file);
+};
+
+  
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => {
@@ -133,7 +161,7 @@ const UserShiftUpload = () => {
       const currentBatch = data.slice(i, i + batchSize);
       try {
         const response = await axios.post(
-          "https://103.38.50.149:5000/api/saveUserShifts",
+          "https://192.168.2.54:443/api/saveUserShifts",
           currentBatch,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -176,7 +204,7 @@ const UserShiftUpload = () => {
 
   const downloadTemplate = () => {
     const link = document.createElement("a");
-    link.href = "https://103.38.50.149:5000/download-template";
+    link.href = "https://192.168.2.54:443/download-template";
     link.download = "skill upload.xlsx";
     document.body.appendChild(link);
     link.click();

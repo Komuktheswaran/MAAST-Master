@@ -8,7 +8,7 @@ import '../styles/UserSkills.css';
 import emvLogo from '../pictures/emvlogo.png';
 import { Popover, Typography } from '@mui/material';
 
-const baseURL = 'https://103.38.50.149:5000/api';
+const baseURL = "https://192.168.2.54:443/api";
 
 const UserSkills = () => {
     const [departments, setDepartments] = useState([]);

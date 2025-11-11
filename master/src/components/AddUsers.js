@@ -29,7 +29,7 @@ const AddUsers = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/User-master"
+        "https://192.168.2.54:443/api/User-master"
       );
       const sorted = response.data.sort((a, b) =>
         a.user_id.localeCompare(b.user_id)
@@ -44,13 +44,13 @@ const AddUsers = () => {
     const { name, value } = e.target;
     setNewUser({ ...newUser, [name]: value });
   };
-const handleRoleChange = (e) => {
-  const role = e.target.value;
-  setNewUser((prev) => ({
-    ...prev,
-    Adminflag: role === "Admin" ? "1" : "0",
-  }));
-};
+  const handleRoleChange = (e) => {
+    const role = e.target.value;
+    setNewUser((prev) => ({
+      ...prev,
+      Adminflag: role === "Admin" ? "1" : "0",
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,7 +63,7 @@ const handleRoleChange = (e) => {
 
   const addUser = async () => {
     try {
-      await axios.post("https://103.38.50.149:5000/api/User-master", newUser);
+      await axios.post("https://192.168.2.54:443/api/User-master", newUser);
       setNotification("User added successfully");
       setSnackbarOpen(true);
       setNewUser({ user_id: "", password: "", Adminflag: "" });
@@ -78,7 +78,7 @@ const handleRoleChange = (e) => {
   const updateUser = async () => {
     try {
       await axios.put(
-        `https://103.38.50.149:5000/api/User-master/${editingUser.user_id}`,
+        `https://192.168.2.54:443/api/User-master/${editingUser.user_id}`,
         newUser
       );
       setNotification("User updated successfully");
@@ -95,7 +95,7 @@ const handleRoleChange = (e) => {
 
   const deleteUser = async (id) => {
     try {
-      await axios.delete(`https://103.38.50.149:5000/api/User-master/${id}`);
+      await axios.delete(`https://192.168.2.54:443/api/User-master/${id}`);
       setNotification("User deleted successfully");
       setSnackbarOpen(true);
       fetchData();

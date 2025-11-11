@@ -97,10 +97,13 @@ const LoginPage = () => {
       setError(''); 
       try {
 
-        const response = await axios.post('https://103.38.50.149:5000/api/login', {
-          userId,
-          password,
-        });
+        const response = await axios.post(
+          "https://192.168.2.54:443/api/login",
+          {
+            userId,
+            password,
+          }
+        );
 
         if (response.data.success)
           {
@@ -142,11 +145,14 @@ sessionStorage.setItem("AdminFlag", user.Adminflag);
     }
     console.log(userId, oldPassword, newPassword);
     try {
-      const response = await axios.post('https://103.38.50.149:5000/api/change-password', {
-        userId,
-        oldPassword,
-        newPassword,
-      });
+      const response = await axios.post(
+        "https://192.168.2.54:443/api/change-password",
+        {
+          userId,
+          oldPassword,
+          newPassword,
+        }
+      );
 
       const data = response.data;
 

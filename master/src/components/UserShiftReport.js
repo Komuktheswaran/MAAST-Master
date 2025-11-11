@@ -22,7 +22,7 @@ import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
 import "../styles/UserShiftReport.css";
 
-const baseURL = "https://103.38.50.149:5000/api";
+const baseURL = "https://192.168.2.54:443/api";
 
 const UserShiftReport = () => {
   const [userShifts, setUserShifts] = useState([]);
@@ -116,7 +116,7 @@ const handleUpdateLine = async (oldLineName, newLineName) => {
 
   try {
     console.log(`Updating line: ${oldLineName} => ${newLineName}`);
-    await axios.put(`https://103.38.50.149:5000/api/lines/${oldLineName}`, {
+    await axios.put(`https://192.168.2.54:443/api/lines/${oldLineName}`, {
       newLineName: newLineName
     });
     alert(`Line updated from "${oldLineName}" to "${newLineName}".`);
