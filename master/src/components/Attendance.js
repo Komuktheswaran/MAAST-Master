@@ -15,7 +15,8 @@ import {
   Legend, 
   CartesianGrid, 
   LabelList,
-  Cell
+  Cell,
+  Line
 } from "recharts";
 
 const Attendance = () => {
@@ -39,16 +40,32 @@ const Attendance = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showGraph, setShowGraph] = useState(false);
+  const [StoredLine, setStoredLine] = useState(null);
+    const AdminFlag = parseInt(sessionStorage.getItem("AdminFlag")) || 0;
+const isAdmin = AdminFlag === 1;
+
+  const [assignedLines, setAssignedLines] = useState([]);
+  const [isRestricted, setIsRestricted] = useState(false);
+// Load stored line selection (or multiple lines) from sessionStorage, adjust key accordingly
+const assignedLinesStr = sessionStorage.getItem("Line") || "";
+const assignedLinesArr = assignedLinesStr.split(",").map(l => l.trim()).filter(l => l);
+
+
 
   // Safe trim helper function
   const safeTrim = (value) => {
     return value && typeof value === 'string' ? value.trim() : value;
   };
 
+
+
   useEffect(() => {
     const fetchOptions = async () => {
       setLoadingShifts(true);
       setLoadingLines(true);
+      
+
+
       try {
         const shiftResponse = await axios.get(
           "https://192.168.2.54:443/api/shifts"
@@ -59,6 +76,16 @@ const Attendance = () => {
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
         setLineOptions(lineResponse.data || []);
+
+console.log('isAdmin set to:', isAdmin);
+
+
+        setAssignedLines(assignedLinesArr);
+  if (!isAdmin && assignedLinesArr.length > 0) {
+    // Set default selected lines to assigned lines for restricted users
+    setSelectedLines(assignedLinesArr);
+  }
+        
       } catch (error) {
         console.error("Error fetching options:", error);
         setShiftOptions([]);
@@ -69,7 +96,7 @@ const Attendance = () => {
       }
     };
     fetchOptions();
-  }, []);
+  }, [StoredLine, isAdmin]);
 
   const fetchAttendanceDetails = useCallback(async () => {
     if (selectedShifts.length === 0 || selectedLines.length === 0) {
@@ -79,6 +106,12 @@ const Attendance = () => {
     const formattedDate = formatDate(selectedDate);
     setLoadingDetails(true);
     try {
+
+      console.log('Fetching attendance for:', {
+        date: formattedDate,
+        shifts: selectedShifts,
+        lines: selectedLines,
+      });
       const response = await axios.get(
         "https://192.168.2.54:443/api/attendance",
         {
@@ -241,14 +274,30 @@ const Attendance = () => {
     }
   };
 
+
   const handleLineChange = (event) => {
-    const { value, checked } = event.target;
+  const isRestricted = StoredLine && StoredLine !== "ALL" && !isAdmin;
+
+  if (isRestricted) {
+    // block change if restricted
+    return;
+  }
+
+  const { value, checked } = event.target;
+
+  setSelectedLines((prevSelectedLines) => {
     if (checked) {
-      setSelectedLines([...selectedLines, value]);
+      if (!prevSelectedLines.includes(value)) {
+        return [...prevSelectedLines, value];
+      }
+      return prevSelectedLines; // no duplicate addition
     } else {
-      setSelectedLines(selectedLines.filter((line) => line !== value));
+      return prevSelectedLines.filter((line) => line !== value);
     }
-  };
+  });
+};
+
+
 
   const formatDate = (date) => {
     return DateTime.fromJSDate(date).toFormat("yyyy-MM-dd");
@@ -685,25 +734,52 @@ const Attendance = () => {
                   padding: "10px",
                   fontSize: "15px",
                 }}
-              >
-                {loadingLines ? (
-                  <Spinner animation="border" variant="primary" />
-                ) : (
-                  Array.isArray(lineOptions) && lineOptions.map((line, index) => (
-                    line && line.LINE && (
-                      <div key={index} style={{ marginBottom: "8px" }}>
-                        <input
-                          type="checkbox"
-                          value={safeTrim(line.LINE) || ""}
-                          onChange={handleLineChange}
-                          style={{ marginRight: "5px" }}
-                        />
-                        <label>{safeTrim(line.LINE) || "N/A"}</label>
-                      </div>
-                    )
-                  ))
-                )}
-              </div>
+              > 
+
+              {isRestricted && (
+  <div style={{ marginBottom: "10px", color: "red", fontWeight: "bold" }}>
+    Your line selection is restricted to: {StoredLine}
+  </div>
+)}
+
+              
+            
+{loadingLines ? (
+  <Spinner animation="border" variant="primary" />
+) : (
+  Array.isArray(lineOptions) && lineOptions.map((line, index) => {
+    const lineVal = safeTrim(line.LINE) || "N/A";
+
+    // Disable all checkboxes if user is restricted (not admin and has assigned lines)
+    const isDisabled = !isAdmin && assignedLines.length > 0;
+
+    // Checked if assigned for restricted, or normally selected for admin
+    const isChecked = isDisabled
+      ? assignedLines.includes(lineVal)
+      : selectedLines.includes(lineVal);
+
+    return (
+      <div key={index} style={{ marginBottom: "8px", color: isDisabled ? "grey" : "inherit" }}>
+        <input
+          type="checkbox"
+          value={lineVal}
+          disabled={isDisabled}
+          checked={isChecked}
+          onChange={handleLineChange}
+          style={{ marginRight: "5px" }}
+        />
+        <label>
+          {lineVal} {isDisabled && "(Locked)"}
+        </label>
+      </div>
+    );
+  })
+)}
+
+
+               </div>
+
+               
             </Col>
           </Row>
           

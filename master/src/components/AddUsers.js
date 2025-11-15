@@ -1,3 +1,10 @@
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
+} from "@mui/material";
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Container, Table, Button } from "react-bootstrap";
@@ -20,17 +27,44 @@ const AddUsers = () => {
   });
   const [notification, setNotification] = useState("");
   const [editingUser, setEditingUser] = useState(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false); 
+  const [lineOptions, setLineOptions] = useState([]);    
+  const [loadingLines, setLoadingLines] = useState(false);
+  const [selectedLines, setSelectedLines] = useState([]);
+
+const safeTrim = (value) => (value ? value.toString().trim() : "");
+
 
   useEffect(() => {
     fetchData();
+    fetchOptions();
   }, []);
-
+  
+  const handleLineChange = (event) => {
+    const { value, checked } = event.target;
+    if (checked) {
+      setSelectedLines([...selectedLines, value]);
+    } else {
+      setSelectedLines(selectedLines.filter((line) => line !== value));
+    }
+  };
+ const fetchOptions = async () => {
+      setLoadingLines(true);
+      try {
+        const lineResponse = await axios.get(
+          "https://192.168.2.54:443/api/lines"
+        );
+        setLineOptions(lineResponse.data || []);
+      } catch (error) {
+        console.error("Error fetching options:", error);
+        setLineOptions([]);
+      } finally {
+        setLoadingLines(false);
+      }
+    };
   const fetchData = async () => {
     try {
-      const response = await axios.get(
-        "https://192.168.2.54:443/api/User-master"
-      );
+      const response = await axios.get("https://192.168.2.54:443/api/User-master");
       const sorted = response.data.sort((a, b) =>
         a.user_id.localeCompare(b.user_id)
       );
@@ -44,54 +78,69 @@ const AddUsers = () => {
     const { name, value } = e.target;
     setNewUser({ ...newUser, [name]: value });
   };
-  const handleRoleChange = (e) => {
-    const role = e.target.value;
-    setNewUser((prev) => ({
-      ...prev,
-      Adminflag: role === "Admin" ? "1" : "0",
-    }));
+const handleRoleChange = (e) => {
+  const role = e.target.value;
+  setNewUser((prev) => ({
+    ...prev,
+    Adminflag: role === "Admin" ? "1" : "0",
+  }));
+};
+
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  const userPayload = {
+    ...newUser,
+    lines: newUser.Adminflag === "1" ? "ALL" : selectedLines, // ✅ Add lines
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (editingUser) {
-      await updateUser();
-    } else {
-      await addUser();
-    }
-  };
+  if (editingUser) {
+    await updateUser(userPayload);
+  } else {
+    await addUser(userPayload);
+  }
+};
 
-  const addUser = async () => {
-    try {
-      await axios.post("https://192.168.2.54:443/api/User-master", newUser);
-      setNotification("User added successfully");
-      setSnackbarOpen(true);
-      setNewUser({ user_id: "", password: "", Adminflag: "" });
-      fetchData();
-    } catch (error) {
-      console.error("Error adding User:", error);
-      setNotification("Error adding User");
-      setSnackbarOpen(true);
-    }
-  };
 
-  const updateUser = async () => {
-    try {
-      await axios.put(
-        `https://192.168.2.54:443/api/User-master/${editingUser.user_id}`,
-        newUser
-      );
-      setNotification("User updated successfully");
-      setSnackbarOpen(true);
-      setEditingUser(null);
-      setNewUser({ user_id: "", password: "", Adminflag: "" });
-      fetchData();
-    } catch (error) {
-      console.error("Error updating User:", error);
-      setNotification("Error updating User");
-      setSnackbarOpen(true);
-    }
-  };
+const addUser = async (userPayload) => {
+  try {
+    await axios.post("https://192.168.2.54:443/api/User-master", userPayload);
+    setNotification("User added successfully");
+    setSnackbarOpen(true);
+    setNewUser({ user_id: "", password: "", Adminflag: "" });
+    setSelectedLines([]);
+    fetchData();
+  } catch (error) {
+    console.error("Error adding User:", error);
+    setNotification("Error adding User");
+    setSnackbarOpen(true);
+  }
+};
+
+const updateUser = async (userPayload) => {
+  try {
+    await axios.put(
+      `https://192.168.2.54:443/api/User-master/${editingUser.user_id}`,
+      userPayload
+    );
+    setNotification("User updated successfully");
+    setSnackbarOpen(true);
+
+    // ✅ Reset form after update
+    setEditingUser(null);
+    setNewUser({ user_id: "", password: "", Adminflag: "" });
+    setSelectedLines([]);
+
+    // ✅ Refresh table
+    fetchData();
+  } catch (error) {
+    console.error("Error updating User:", error);
+    setNotification("Error updating User");
+    setSnackbarOpen(true);
+  }
+};
+
+
 
   const deleteUser = async (id) => {
     try {
@@ -112,6 +161,15 @@ const editUser = (user) => {
     password: user.password,
     Adminflag: user.Adminflag, // Keep as string
   });
+
+  // ✅ Set selected lines when editing
+  if (user.Adminflag === "1") {
+    setSelectedLines(["ALL"]);
+  } else {
+    const userLines = user.LINE ? user.LINE.split(",").map(l => l.trim()) : [];
+    setSelectedLines(userLines);
+  }
+
   setEditingUser(user);
 };
 
@@ -172,6 +230,31 @@ const cancelEdit = () => {
   <option value="Admin">Admin</option>
   <option value="Employee">Employee</option>
 </select>
+
+{/* Show line options only for Employees */}
+
+{newUser.Adminflag === "0" && (
+  <FormControl fullWidth margin="normal">
+    <InputLabel id="line-select-label">Select Line</InputLabel><br></br>
+   <Select
+  labelId="line-select-label"
+  multiple   // ✅ allow multiple selection
+  value={selectedLines}
+  onChange={(e) => setSelectedLines(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+  renderValue={(selected) => selected.join(", ")} // ✅ show selected as comma separated
+  required
+>
+  {lineOptions.map((line, index) => (
+    <MenuItem key={index} value={safeTrim(line.LINE) || ""}>
+      {safeTrim(line.LINE) || "NULL"}
+    </MenuItem>
+  ))}
+</Select>
+
+  </FormControl>
+)}
+
+
 
 
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>

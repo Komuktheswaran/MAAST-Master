@@ -114,6 +114,12 @@ const LoginPage = () => {
         localStorage.setItem("Token",response.data.token);
        // Store as string directly (no quotes)
 sessionStorage.setItem("AdminFlag", user.Adminflag);
+sessionStorage.setItem("Line", user.LINE);
+console.log('User data stored in sessionStorage:', {
+  authToken: response.data.token,
+  AdminFlag: user.Adminflag,
+  Line: user.LINE,
+});
 
 
 
