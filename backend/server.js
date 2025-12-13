@@ -565,6 +565,42 @@ app.delete("/api/stage-master/:id", async (req, res) => {
   }
 });
 
+app.get("/api/export-stage-master", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool
+      .request()
+      .query("SELECT * FROM Mx_StageMaster ORDER BY Stage_Serial");
+
+    const workbook = new excel.Workbook();
+    const worksheet = workbook.addWorksheet("Stage Master");
+
+    worksheet.columns = [
+      { header: "Stage ID", key: "Stage_id", width: 10 },
+      { header: "Stage Name", key: "Stage_name", width: 30 },
+      { header: "Stage Type", key: "Stage_Type", width: 20 },
+      { header: "Stage Serial", key: "Stage_Serial", width: 15 },
+    ];
+
+    worksheet.addRows(result.recordset);
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=" + "StageMaster.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error("Error creating excel file:", err);
+    res.status(500).send("Error creating excel file");
+  }
+});
+
 // app.delete("/api/stage-master/:id", async (req, res) => {
 
 //   const { id } = req.params;
@@ -936,7 +972,7 @@ app.get("/api/user-skills", async (req, res) => {
           SELECT P2.NAME, P3.STAGE_NAME, P4.Skill_Description, P1.USERID
           FROM Mx_UserSkills AS P1
           LEFT OUTER JOIN Mx_UserMst AS P2 ON P1.USERID = P2.USERID
-          LEFT OUTER JOIN MX_STAGEMASTER AS P3 ON P1.STAGE_ID = P3.STAGE_Serial
+          LEFT OUTER JOIN MX_STAGEMASTER AS P3 ON P1.STAGE_ID = P3.stage_id
           LEFT OUTER JOIN MX_SKILLMASTER AS P4 ON P1.SKILL_ID = P4.SKILL_ID order by P3.STAGE_NAME,P2.NAME
       `);
     res.json(result.recordset);
@@ -1080,7 +1116,8 @@ app.post("/api/saveUserShifts", async (req, res) => {
     }
 
     // ✅ NEW: Track unique combinations to detect duplicates BEFORE inserting
-    const uniqueKeys = new Set();
+    // ✅ NEW: Track unique combinations to handle overwrites (last one wins for same User + Date)
+    const uniqueShiftsMap = new Map();
     const validShifts = [];
 
     // ✅ Pre-validate ALL data first
@@ -1123,26 +1160,18 @@ app.post("/api/saveUserShifts", async (req, res) => {
       const stage_id = stageMap.get(stageNameNormalized);
 
       // ✅ Create unique key: date + userid + stage_id + shift_id + line
-      const uniqueKey = `${Shift_date_from}|${Shift_date_to}|${userid}|${stage_id}|${SHIFT_ID}|${LINE}`;
-
-      if (uniqueKeys.has(uniqueKey)) {
-        duplicates.push({
-          ...shift,
-          reason:
-            "Duplicate: Same user, date, stage, shift, and line combination already exists in this upload",
-        });
-        continue;
-      }
-      uniqueKeys.add(uniqueKey);
-
-      // ✅ Valid shift - add to processing queue
-      validShifts.push({
+      const uniqueKey = `${Shift_date_from}|${userid}`;
+      
+      uniqueShiftsMap.set(uniqueKey, {
         ...shift,
         Shift_date_from,
         Shift_date_to,
         stage_id,
       });
     }
+
+    // Convert Map values to array for processing
+    validShifts.push(...uniqueShiftsMap.values());
 
     // ✅ Process only valid shifts in batches
     for (let i = 0; i < validShifts.length; i += batchSize) {
@@ -1163,20 +1192,16 @@ app.post("/api/saveUserShifts", async (req, res) => {
 
       if (QUERY1) {
         try {
-          // Delete old records
+          // Delete old records - Match ONLY User + DateFrom to ensure overwrite
           const deleteQuery = `
             DELETE p1
             FROM Mx_UserShifts AS p1
             INNER JOIN (
-              SELECT SHIFT_FROM_DATE, SHIFT_TO_DATE, userid, P1.Stage_Id, SHIFT_ID, LINE
+              SELECT SHIFT_FROM_DATE, userid
               FROM (${QUERY1}) AS Q1
-              LEFT JOIN Mx_StageMaster AS P1
-              ON REPLACE(LOWER(Q1.STAGE_NAME), ' ', '') = REPLACE(LOWER(P1.Stage_name), ' ', '')
             ) AS q1
             ON p1.shift_date_from = q1.SHIFT_FROM_DATE
-            AND p1.shift_date_to = q1.SHIFT_TO_DATE
             AND p1.userid = q1.userid
-            AND p1.stage_id = q1.Stage_Id
           `;
 
           // Insert new records
@@ -1240,7 +1265,7 @@ app.get("/api/getUserShifts", async (req, res) => {
           SELECT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
           FROM Mx_UserShifts u
           LEFT JOIN MX_USERMST m ON u.userid = m.USERID
-          LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_Serial
+          LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
           ORDER BY SHIFT_ID, Stage_name, LINE
       `;
     if (date) {
@@ -1316,28 +1341,49 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
     }
 
     const query = `
-      SELECT 
-        Shift_date_from AS DATE,
-        SHIFT_ID AS SHIFT,
-        LINE,
-        COUNT(*) AS ALLOTTED,
-        SUM(CASE WHEN PUNCHDATE IS NOT NULL THEN 1 ELSE 0 END) AS PRESENT,
-        SUM(CASE WHEN PUNCHDATE IS NULL THEN 1 ELSE 0 END) AS ABSENT
-      FROM (
+      WITH ShiftInfo AS (
         SELECT 
           P1.USERID, 
           P1.Shift_date_from, 
           P1.SHIFT_ID, 
           P1.LINE,
-          (SELECT TOP 1 P5.Edatetime
-           FROM Mx_ATDEventTrn AS P5
-           WHERE P5.USERID = P1.USERID 
-             AND DATEADD(DAY, DATEDIFF(DAY, 0, P5.EDATETIME), 0) = P1.Shift_date_from
-           ORDER BY P5.Edatetime) AS PUNCHDATE
+          SM.SFTSTTime,
+          
+          -- Calculate ShiftStartDateTime
+          CAST(CONVERT(VARCHAR(10), P1.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
+          
+          -- Calculate ShiftEndDateTime (overnight check)
+          CASE WHEN SM.SFTEDTime < SM.SFTSTTime 
+               THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), P1.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
+               ELSE CAST(CONVERT(VARCHAR(10), P1.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
+          END AS ShiftEndDateTime
+          
         FROM Mx_UserShifts AS P1
         LEFT JOIN MX_USERMST AS P2 ON P1.USERID = P2.USERID
+        LEFT JOIN Mx_ShiftMst AS SM ON P1.SHIFT_ID = SM.SFTID
         WHERE ${whereClause}
-      ) AS ATT
+      ),
+      AttendanceStatus AS (
+        SELECT 
+            SI.*,
+            CASE WHEN EXISTS (
+                SELECT 1 
+                FROM Mx_ATDEventTrn E 
+                WHERE E.USERID = SI.USERID 
+                  AND E.EDateTime >= DATEADD(MINUTE, -45, SI.ShiftStartDateTime) 
+                  AND E.EDateTime <= SI.ShiftEndDateTime
+            ) THEN 1 ELSE 0 END AS IsPresent
+        FROM ShiftInfo SI
+      )
+      
+      SELECT 
+        Shift_date_from AS DATE,
+        SHIFT_ID AS SHIFT,
+        LINE,
+        COUNT(*) AS ALLOTTED,
+        SUM(IsPresent) AS PRESENT,
+        CAST(SUM(CASE WHEN IsPresent = 0 THEN 1 ELSE 0 END) AS INT) AS ABSENT
+      FROM AttendanceStatus
       GROUP BY Shift_date_from, SHIFT_ID, LINE
       ORDER BY Shift_date_from, SHIFT_ID, LINE;
     `;
@@ -1726,7 +1772,7 @@ LEFT JOIN Swaps S ON A.USERID = S.SWAP_USERID
     AND A.Original_LINE = S.LINE
 LEFT JOIN dbo.MX_USERMST AU ON A.USERID = AU.USERID
 LEFT JOIN dbo.MX_USERMST SU ON S.SWAP_USERID = SU.USERID
-LEFT JOIN dbo.Mx_STAGEMASTER ST ON ISNULL(S.STAGE_ID, A.Original_Stage_ID) = ST.Stage_Serial
+LEFT JOIN dbo.Mx_STAGEMASTER ST ON ISNULL(S.STAGE_ID, A.Original_Stage_ID) = ST.stage_id
 
 WHERE (@ShiftIds IS NULL OR A.SHIFT_ID IN (
     SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@ShiftIds, ',')
@@ -1774,36 +1820,52 @@ app.get("/api/attendance", async (req, res) => {
 
     const result = await pool.request().input("Date", sql.Date, new Date(date))
       .query(`
-        WITH Punches AS (
-    SELECT 
-        E.USERID,
-        MIN(E.EDateTime) AS PUNCHIN
-    FROM dbo.Mx_ATDEventTrn E
-    INNER JOIN dbo.MX_USERMST U ON E.USERID = U.USERID
-    WHERE CAST(E.EDateTime AS DATE) = @Date
-      AND ISNULL(U.UserIDEnbl, 0) = 1
-    GROUP BY E.USERID
-)
-
-SELECT 
-    ST.Stage_name,
-    A.LINE,
-    A.SHIFT_ID,
-    SM.SFTSTTime,
-    COUNT(*) AS ALLOT,
-    SUM(CASE WHEN P.PUNCHIN IS NOT NULL THEN 1 ELSE 0 END) AS PRESENT,
-    SUM(CASE WHEN P.PUNCHIN IS NULL THEN 1 ELSE 0 END) AS ABSENT
-FROM dbo.Mx_UserShifts A
-LEFT JOIN dbo.MX_USERMST B ON A.USERID = B.USERID
-LEFT JOIN dbo.Mx_STAGEMASTER ST ON A.stage_id = ST.Stage_Serial
-LEFT JOIN dbo.Mx_ShiftMst SM ON A.SHIFT_ID = SM.SFTID
-LEFT JOIN Punches P ON A.USERID = P.USERID
-WHERE A.Shift_date_from = @Date
-  AND ISNULL(B.UserIDEnbl, 0) = 1
-  AND A.SHIFT_ID IN (${shiftList.map((_, i) => `'${shiftList[i]}'`).join(",")})
-  AND A.LINE IN (${lineList.map((_, i) => `'${lineList[i]}'`).join(",")})
-GROUP BY ST.Stage_name, A.LINE, A.SHIFT_ID, SM.SFTSTTime
-ORDER BY ALLOT DESC;
+        WITH ShiftInfo AS (
+            SELECT 
+                A.USERID,
+                A.SHIFT_ID,
+                A.LINE,
+                A.stage_id,
+                SM.SFTSTTime,
+                -- Smart shift calculation
+                CAST(CONVERT(VARCHAR(10), A.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
+                CASE WHEN SM.SFTEDTime < SM.SFTSTTime
+                     THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), A.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
+                     ELSE CAST(CONVERT(VARCHAR(10), A.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
+                END AS ShiftEndDateTime
+            FROM dbo.Mx_UserShifts A
+            LEFT JOIN dbo.Mx_ShiftMst SM ON A.SHIFT_ID = SM.SFTID
+            LEFT JOIN dbo.MX_USERMST B ON A.USERID = B.USERID
+            WHERE A.Shift_date_from = @Date
+              AND ISNULL(B.UserIDEnbl, 0) = 1
+              AND A.SHIFT_ID IN (${shiftList.map((s) => `'${s}'`).join(",")})
+              AND A.LINE IN (${lineList.map((l) => `'${l}'`).join(",")})
+        ),
+        AttendanceStatus AS (
+            SELECT 
+                SI.*,
+                CASE WHEN EXISTS (
+                    SELECT 1 
+                    FROM dbo.Mx_ATDEventTrn E 
+                    WHERE E.USERID = SI.USERID 
+                      AND E.EDateTime >= DATEADD(MINUTE, -45, SI.ShiftStartDateTime)
+                      AND E.EDateTime <= SI.ShiftEndDateTime
+                ) THEN 1 ELSE 0 END AS IsPresent
+            FROM ShiftInfo SI
+        )
+        
+        SELECT 
+            ST.Stage_name,
+            A.LINE,
+            A.SHIFT_ID,
+            A.SFTSTTime,
+            COUNT(*) AS ALLOT,
+            SUM(A.IsPresent) AS PRESENT,
+            CAST(SUM(CASE WHEN A.IsPresent = 0 THEN 1 ELSE 0 END) AS INT) AS ABSENT
+        FROM AttendanceStatus A
+        LEFT JOIN dbo.Mx_STAGEMASTER ST ON A.stage_id = ST.stage_id
+        GROUP BY ST.Stage_name, A.LINE, A.SHIFT_ID, A.SFTSTTime
+        ORDER BY ALLOT DESC;
       `);
     console.log(result.recordset);
 
@@ -1981,13 +2043,13 @@ Q1.userid = P1.userid ORDER BY  P1.UPDATE_AT DESC,P1.SKILL_ID DESC) AS SKILL_DES
                     FROM Mx_UserShifts AS P1
                     LEFT JOIN [Mx_ShiftMst] AS P3 ON P1.SHIFT_ID = P3.SFTID
                     LEFT JOIN MX_USERMST AS P2 ON P1.USERID = P2.USERID
-                    LEFT JOIN Mx_STAGEMASTER AS P4 ON P1.stage_id = P4.Stage_Serial
+                    LEFT JOIN Mx_STAGEMASTER AS P4 ON P1.stage_id = P4.stage_id
                     LEFT JOIN Mx_CustomGroup1Mst AS P5 ON P2.CG1ID = P5.CG1ID
                     WHERE Shift_date_from = @date
                       AND SHIFT_ID = @shiftId
                 ) AS Q1
             ) AS Q1
-            LEFT JOIN Mx_STAGEMASTER AS P4 ON Q1.stageid = P4.Stage_Serial
+            LEFT JOIN Mx_STAGEMASTER AS P4 ON Q1.stageid = P4.stage_id
             WHERE ISNULL(PUNCHDATE, '') <> '' 
 AND USERID NOT IN
 (SELECT Swap_userid from Mx_Userswap where Shift_date = @date) AND NOT (Q1.LINE1 = @Line AND P4.STAGE_NAME != @Stage_name)
@@ -2514,7 +2576,7 @@ app.post("/api/employee-history", async (req, res) => {
     FROM Mx_UserShifts P1
     LEFT JOIN MX_USERMST P2 ON P1.USERID = P2.USERID
     LEFT JOIN Mx_ShiftMst P3 ON P1.SHIFT_ID = P3.SFTID
-    LEFT JOIN Mx_STAGEMASTER P4 ON P1.stage_id = P4.Stage_Serial
+    LEFT JOIN Mx_STAGEMASTER P4 ON P1.stage_id = P4.stage_id
     LEFT JOIN (
         -- Find ActualPunch using 45 min tolerance
         SELECT SW.USERID, SW.Shift_date_from,
@@ -2588,7 +2650,7 @@ app.post("/api/employee-history", async (req, res) => {
     FROM Mx_Userswap SW
     LEFT JOIN MX_USERMST P2 ON SW.Swap_userid = P2.USERID
     LEFT JOIN Mx_ShiftMst P3 ON SW.Shift_id = P3.SFTID
-    LEFT JOIN Mx_STAGEMASTER P4 ON SW.stage_id = P4.Stage_Serial
+    LEFT JOIN Mx_STAGEMASTER P4 ON SW.stage_id = P4.stage_id
     LEFT JOIN (
         SELECT SW2.Swap_userid, SW2.Shift_date,
                CASE 
@@ -3108,7 +3170,7 @@ WITH EmployeePunctuality AS (
     FROM Mx_UserShifts S
     INNER JOIN MX_USERMST U ON S.USERID = U.USERID
     INNER JOIN Mx_ShiftMst MS ON S.SHIFT_ID = MS.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.Stage_Serial
+    LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.stage_id
     CROSS APPLY (
         SELECT 
             ShiftStart = CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
@@ -3170,7 +3232,7 @@ WITH EmployeePunctuality AS (
     FROM Mx_Userswap SW
     INNER JOIN MX_USERMST U ON SW.Swap_userid = U.USERID
     INNER JOIN Mx_ShiftMst MS ON SW.Shift_id = MS.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.Stage_Serial
+    LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.stage_id
     CROSS APPLY (
         SELECT 
             ShiftStart = CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
@@ -3430,7 +3492,7 @@ WITH EmployeeJobreport AS (
     LEFT JOIN MX_USERMST U ON S.USERID = U.USERID
     LEFT JOIN Mx_UserJobCard J ON S.USERID = J.USERID AND J.Edatetime = S.Shift_date_from
     LEFT JOIN Mx_ShiftMst MS ON S.SHIFT_ID = MS.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.Stage_Serial
+    LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.stage_id
     OUTER APPLY (
         SELECT TOP 1 A.Edatetime AS ActualPunch
         FROM Mx_ATDEventTrn A
@@ -3472,7 +3534,7 @@ WITH EmployeeJobreport AS (
     LEFT JOIN MX_USERMST U ON SW.Swap_userid = U.USERID
     LEFT JOIN Mx_UserJobCard J ON SW.Swap_userid = J.USERID AND J.Edatetime = SW.Shift_date
     LEFT JOIN Mx_ShiftMst MS ON SW.Shift_id = MS.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.Stage_Serial
+    LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.stage_id
     OUTER APPLY (
         SELECT TOP 1 A.Edatetime AS ActualPunch
         FROM Mx_ATDEventTrn A

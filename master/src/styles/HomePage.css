@@ -21,7 +21,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
+  display: center;
   justify-content: center;
   align-items: center;
 }
@@ -39,6 +39,7 @@
   border-radius: 6px;
   z-index: 10;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 
@@ -59,32 +60,47 @@
 
 /* Ensure image fits properly */
 .carousel-image {
-  max-width: 100%;
-  max-height: 400px;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
+/* --- MODIFICATIONS FOR FULL-SCREEN AND RESPONSIVENESS --- */
 @media (max-width: 600px) {
+  .carousel-section {
+    height: 100vh; /* Adjust as needed */
+  }
+
+  .carouselslide {
+    height: 100vh;
+  }
+
+  /* CHANGED: Set image height to 100% to fill the 100vh parent (.carouselslide) */
   .carousel-image {
-    max-height: 250px;
+    height: 100%; 
   }
 }
-
 
 .carousel .slide {
   display: flex;
   justify-content: center;
   align-items: center;
   background-color: #d4edda;
-  height: 400px;
+  /* CHANGED: Use 100vh (viewport height) instead of fixed height (was 400px) */
+  height: 100vh; 
   transition: all 1s ease-in-out; /* Slide transition effect */
 }
 
 @media (max-width: 600px) {
   .carousel .slide {
-    height: 250px;
+    /* CHANGED: Use 100vh (viewport height) instead of fixed height (was 250px) */
+    height: 100vh; 
   }
 }
+/* -------------------------------------------------------- */
+
 
 /* Responsive AppBar and Drawer Menu */
 .drawer-menu-button {
@@ -171,13 +187,21 @@
   color: white;
 }
 
-.carouselslide{
-  background-color: #d4edda; 
-  width: 100%;
-  height: 400px;
+.carousel-section {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.carouselslide {
+  width: 100vw;
+  height: 100vh;
   display: flex;
   justify-content: center;
-   align-items: center;
+  align-items: center;
+  overflow: hidden;
 }
 
 /* Custom styling for h2 in carousel slide */

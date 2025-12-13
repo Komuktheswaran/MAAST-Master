@@ -751,7 +751,7 @@ const defaultCarouselContent = [
 
         {/* Carousel Section */}
         {location.pathname === "/home" && (
-          <Box sx={{ width: "100%", mt: 5 }}>
+          <Box className="carousel-section" sx={{ width: "100vw", height: "100vh", m: 0, p: 0 }}>
             {loadingImages ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <Typography variant="h6">Loading carousel images...</Typography>

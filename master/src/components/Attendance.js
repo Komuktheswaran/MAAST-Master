@@ -123,7 +123,14 @@ console.log('isAdmin set to:', isAdmin);
         }
       );
       setAttendanceDetails(response.data || []);
-      console.log(response.data);
+      console.log("=== ATTENDANCE SUMMARY DATA ===");
+      console.log("Full response:", response.data);
+      console.log("Total records:", response.data?.length);
+      if (response.data && response.data.length > 0) {
+        console.log("Sample record:", response.data[0]);
+        console.log("Fields in record:", Object.keys(response.data[0]));
+      }
+      console.log("===============================");
       setShowTable(true);
     } catch (error) {
       console.error("Error fetching attendance details:", error);
@@ -157,30 +164,40 @@ console.log('isAdmin set to:', isAdmin);
             },
           }
         );
+        console.log("=== SHOW ALL RESPONSE ===");
         console.log("Total button response:", response.data);
 
         const responseData = response.data || [];
+
+        // Log all unique STATUS values to debug
+        const uniqueStatuses = [...new Set(responseData.map(r => r.STATUS || r.status))];
+        console.log("Unique STATUS values in response:", uniqueStatuses);
+        console.log("Total records received:", responseData.length);
+        
+        // Count records by status
+        const statusCounts = responseData.reduce((acc, record) => {
+          const status = record.STATUS || record.status || "UNKNOWN";
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        }, {});
+        console.log("Status breakdown:", statusCounts);
+        console.log("Looking for type:", type);
+        console.log("========================");
 
         // Enhanced filtering with debug logs
         const filtered = responseData.filter((record) => {
           if (!record) return false;
 
-          const status = record.STATUS
-            ? String(record.STATUS).toLowerCase().trim()
-            : "";
-          console.log(
-            "Record status:",
-            record.STATUS,
-            "Normalized:",
-            status,
-            "Looking for:",
-            type
-          );
-
+          // Normalize the status field - handle various cases
+          const rawStatus = record.STATUS || record.status || "";
+          const status = String(rawStatus).toLowerCase().trim();
+          
           if (type === "present") {
-            return status === "present";
+            // Match: "present", "Present", "PRESENT", "P", "p"
+            return status === "present" || status === "p";
           } else if (type === "absent") {
-            return status === "absent";
+            // Match: "absent", "Absent", "ABSENT", "A", "a"
+            return status === "absent" || status === "a";
           }
           return false;
         });
@@ -188,6 +205,14 @@ console.log('isAdmin set to:', isAdmin);
         console.log(
           `Total records: ${responseData.length}, Filtered ${type} records: ${filtered.length}`
         );
+        
+        // Warn user if there's a mismatch
+        if (filtered.length === 0 && type === "present" && totals.present > 0) {
+          console.warn("⚠️ DATA MISMATCH: Summary shows", totals.present, "present records, but detail query returned 0 present records.");
+          console.warn("This suggests the /api/attendance and /api/attendance/showAll endpoints are querying different data.");
+          alert(`Data Mismatch Detected!\n\nThe summary shows ${totals.present} present employees, but no present records were found in the detailed data.\n\nThis may be due to:\n1. Night shift date/time boundary issues\n2. Different query logic between summary and detail endpoints\n3. Data synchronization issues\n\nPlease check the backend API logic.`);
+        }
+        
         setDetailedRecords(filtered);
         setShowAllDetails(false);
       } else {
@@ -219,16 +244,15 @@ console.log('isAdmin set to:', isAdmin);
             safeTrim(String(record.LINE || "")) ===
             safeTrim(String(line || ""));
 
-          // Enhanced status matching
-          const recordStatus = record.STATUS
-            ? String(record.STATUS).toLowerCase().trim()
-            : "";
+          // Enhanced status matching - handle various cases
+          const rawStatus = record.STATUS || record.status || "";
+          const recordStatus = String(rawStatus).toLowerCase().trim();
           let matchesType = false;
 
           if (type === "present") {
-            matchesType = recordStatus === "present";
+            matchesType = recordStatus === "present" || recordStatus === "p";
           } else if (type === "absent") {
-            matchesType = recordStatus === "absent";
+            matchesType = recordStatus === "absent" || recordStatus === "a";
           } else if (type === "allot") {
             matchesType = true; // For allot, show all records regardless of status
           }
@@ -239,7 +263,8 @@ console.log('isAdmin set to:', isAdmin);
           // Debug logging
           console.log("Filtering record:", {
             USERID: record.USERID,
-            status: recordStatus,
+            rawStatus: rawStatus,
+            normalizedStatus: recordStatus,
             matchesShift,
             matchesStage,
             matchesLine,
