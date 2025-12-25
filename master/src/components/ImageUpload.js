@@ -41,7 +41,7 @@ const ImageUpload = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "https://192.168.2.54:443/api/carousel-images"
+        "https://103.38.50.149:5000/api/carousel-images"
       );
       setImages(response.data);
     } catch (error) {
@@ -79,7 +79,7 @@ const ImageUpload = () => {
 
     try {
       await axios.post(
-        "https://192.168.2.54:443/api/carousel-images/upload",
+        "https://103.38.50.149:5000/api/carousel-images/upload",
         formData,
         {
           headers: {
@@ -105,7 +105,7 @@ const ImageUpload = () => {
     if (!window.confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      await axios.delete(`https://192.168.2.54:443/api/carousel-images/${id}`);
+      await axios.delete(`https://103.38.50.149:5000/api/carousel-images/${id}`);
       setSuccess('Image deleted successfully!');
       fetchImages();
     } catch (error) {
@@ -127,7 +127,7 @@ const ImageUpload = () => {
     try {
       const updatePromises = items.map((item, index) =>
         axios.put(
-          `https://192.168.2.54:443/api/carousel-images/${item.id}/order`,
+          `https://103.38.50.149:5000/api/carousel-images/${item.id}/order`,
           {
             displayOrder: index,
           }

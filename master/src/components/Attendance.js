@@ -68,10 +68,10 @@ const assignedLinesArr = assignedLinesStr.split(",").map(l => l.trim()).filter(l
 
       try {
         const shiftResponse = await axios.get(
-          "https://192.168.2.54:443/api/shifts"
+          "https://103.38.50.149:5000/api/shifts"
         );
         const lineResponse = await axios.get(
-          "https://192.168.2.54:443/api/lines"
+          "https://103.38.50.149:5000/api/lines"
         );
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
@@ -113,7 +113,7 @@ console.log('isAdmin set to:', isAdmin);
         lines: selectedLines,
       });
       const response = await axios.get(
-        "https://192.168.2.54:443/api/attendance",
+        "https://103.38.50.149:5000/api/attendance",
         {
           params: {
             date: formattedDate,
@@ -155,7 +155,7 @@ console.log('isAdmin set to:', isAdmin);
       ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "https://192.168.2.54:443/api/attendance/showAll",
+          "https://103.38.50.149:5000/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -218,7 +218,7 @@ console.log('isAdmin set to:', isAdmin);
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "https://192.168.2.54:443/api/attendance/showAll",
+          "https://103.38.50.149:5000/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -367,7 +367,7 @@ console.log('isAdmin set to:', isAdmin);
 
     try {
       const response = await axios.get(
-        "https://192.168.2.54:443/api/attendance/showAll",
+        "https://103.38.50.149:5000/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -527,7 +527,7 @@ console.log('isAdmin set to:', isAdmin);
     }));
 
     axios
-      .post("https://192.168.2.54:443/api/saveUserSwap", swaps)
+      .post("https://103.38.50.149:5000/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -545,7 +545,7 @@ console.log('isAdmin set to:', isAdmin);
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("https://192.168.2.54:443/api/getEmployees", {
+        .get("https://103.38.50.149:5000/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,

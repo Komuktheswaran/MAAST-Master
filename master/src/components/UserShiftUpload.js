@@ -63,10 +63,17 @@ const UserShiftUpload = () => {
     const workbook = XLSX.read(binaryStr, { type: "binary" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    // Use raw: false to get formatted strings, ensuring dates are strings like "dd-mm-yyyy"
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1, 
+      raw: false, 
+      dateNF: "dd-mm-yyyy" 
+    });
 
     // Extract headers (dates start from index 4 assuming fixed format)
     const headers = jsonData[0];
+    console.log("Headers detected:", headers); // DEBUG LOG
+
     // Rows without header row
     const rows = jsonData.slice(1);
 
@@ -84,21 +91,38 @@ const UserShiftUpload = () => {
         const dateRaw = headers[colIdx];
         if (shiftId && shiftId !== "") {
           // Normalize date format (dd-MM-yyyy to yyyy-MM-dd)
-          const parts = dateRaw.split("-");
-          const normalizedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          let normalizedDate = "";
+              if (typeof dateRaw === "string") {
+                 // Try parsing with likely formats
+                 let dt = DateTime.fromFormat(dateRaw, "d-M-yyyy");
+                 if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "dd-MM-yyyy");
+                 if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "d/M/yyyy");
+                 if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "dd/MM/yyyy");
+                 
+                 if (dt.isValid) {
+                     normalizedDate = dt.toFormat("yyyy-MM-dd");
+                 } else {
+                     console.warn("Invalid date format:", dateRaw);
+                 }
+              }
 
-          // Create shift object matching backend expected keys
-          transformedData.push({
-            userid: userid,
-            STAGE_NAME: stageName,
-            LINE: line,
-            Shift_date_from: normalizedDate,
-            Shift_date_to: normalizedDate,
-            SHIFT_ID: shiftId,
-          });
+          if (normalizedDate) {
+              // Create shift object matching backend expected keys
+              transformedData.push({
+                userid: userid,
+                STAGE_NAME: stageName,
+                LINE: line,
+                Shift_date_from: normalizedDate,
+                Shift_date_to: normalizedDate,
+                SHIFT_ID: shiftId,
+              });
+          }
         }
       }
     });
+
+    console.log("Transformed Data Count:", transformedData.length); // DEBUG LOG
+    console.log("Sample Transformed Data:", transformedData.slice(0, 3)); // DEBUG LOG
 
     // Now set transformed data for use in UI and for sending to backend
     setData(transformedData);
@@ -108,8 +132,16 @@ const UserShiftUpload = () => {
       { Header: "User ID", accessor: "userid" },
       { Header: "Stage Name", accessor: "STAGE_NAME" },
       { Header: "Line", accessor: "LINE" },
-      { Header: "Shift Date From", accessor: "Shift_date_from" },
-      { Header: "Shift Date To", accessor: "Shift_date_to" },
+      { 
+        Header: "Shift Date From", 
+        accessor: "Shift_date_from",
+        Cell: ({ value }) => value ? DateTime.fromFormat(value, "yyyy-MM-dd").toFormat("dd-MM-yyyy") : ""
+      },
+      { 
+        Header: "Shift Date To", 
+        accessor: "Shift_date_to",
+        Cell: ({ value }) => value ? DateTime.fromFormat(value, "yyyy-MM-dd").toFormat("dd-MM-yyyy") : ""
+      },
       { Header: "Shift ID", accessor: "SHIFT_ID" },
     ]);
 
@@ -161,7 +193,7 @@ const UserShiftUpload = () => {
       const currentBatch = data.slice(i, i + batchSize);
       try {
         const response = await axios.post(
-          "https://192.168.2.54:443/api/saveUserShifts",
+          "https://103.38.50.149:5000/api/saveUserShifts",
           currentBatch,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -202,14 +234,6 @@ const UserShiftUpload = () => {
     setTimeout(() => setMessage(""), 5000);
   };
 
-  const downloadTemplate = () => {
-    const link = document.createElement("a");
-    link.href = "https://192.168.2.54:443/download-template";
-    link.download = "skill upload.xlsx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   // Export conflicts as Excel
   const handleDownloadConflictReport = () => {
@@ -217,6 +241,11 @@ const UserShiftUpload = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Conflicts");
     XLSX.writeFile(wb, "ShiftConflicts.xlsx");
+  };
+
+  const downloadTemplate = () => {
+    // Trigger download from backend
+    window.location.href = "https://103.38.50.149:5000/api/download-sample-user-shift";
   };
 
   const tableInstance = useTable({ columns, data });

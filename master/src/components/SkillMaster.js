@@ -30,7 +30,7 @@ const SkillMaster = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://192.168.2.54:443/api/skill-master"
+        "https://103.38.50.149:5000/api/skill-master"
       );
       setSkills(response.data);
     } catch (error) {
@@ -59,7 +59,7 @@ const SkillMaster = () => {
   const addSkill = async () => {
     try {
       const response = await axios.post(
-        "https://192.168.2.54:443/api/skill-master",
+        "https://103.38.50.149:5000/api/skill-master",
         newSkill
       );
       setSkills([...skills, response.data]);
@@ -80,7 +80,7 @@ const SkillMaster = () => {
   const updateSkill = async () => {
     try {
       const response = await axios.put(
-        `https://192.168.2.54:443/api/skill-master/${editingSkill.Skill_id}`,
+        `https://103.38.50.149:5000/api/skill-master/${editingSkill.Skill_id}`,
         newSkill
       );
       const updatedSkills = skills.map(skill =>

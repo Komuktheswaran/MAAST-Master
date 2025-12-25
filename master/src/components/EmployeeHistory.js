@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Container,
   Row,
@@ -10,19 +10,22 @@ import {
   Alert,
 } from "react-bootstrap";
 import axios from "axios";
-import { DateTime } from "luxon";
+
 import * as XLSX from "xlsx";
+import Select from "react-select";
 
 const EmployeeHistory = () => {
   const [fromDate, setFromDate] = useState(new Date());
   const [toDate, setToDate] = useState(new Date());
   const [employeeName, setEmployeeName] = useState("");
-  const [employeeOptions, setEmployeeOptions] = useState([]);
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [employeeId,setEmployeeid]=useState()
-  const [Pagination,setPagination]=useState([])
+  const [employeeId, setEmployeeId] = useState(null); // Changed to camelCase and null initial
+  const [allEmployees, setAllEmployees] = useState([]); // Store all employees
+  const [employeeOptions, setEmployeeOptions] = useState([]); // Filtered options for react-select
+  const [employeeIdInput, setEmployeeIdInput] = useState(""); // Input for react-select search
+  const [Pagination,setPagination]=useState([]);
 const formatDate = (date) => {
   if (!date) return ""; // avoid invalid value
   const d = new Date(date);
@@ -60,10 +63,16 @@ const formatDatefordisplay = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://192.168.2.54:443/api/employees");
+        const res = await axios.get("https://103.38.50.149:5000/api/employees");
 
         if (Array.isArray(res.data)) {
-          setEmployeeOptions(res.data); // keep objects [{ name, userid }]
+          const formatted = res.data.map((emp) => ({
+            value: emp.userid,
+            label: `${emp.userid} - ${emp.name}`,
+            name: emp.name, // Store name for later use
+          }));
+          setAllEmployees(formatted);
+          setEmployeeOptions([]); // Start empty
         }
       } catch (err) {
         console.error("Error fetching employee list:", err);
@@ -72,6 +81,20 @@ const formatDatefordisplay = (dateStr) => {
 
     fetchEmployees();
   }, []);
+
+  // Filter options based on input
+  useEffect(() => {
+    if (employeeIdInput.length >= 5) {
+      const filtered = allEmployees.filter(emp => 
+        emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
+      );
+      setEmployeeOptions(filtered);
+    } else {
+        // Option to clear or show limited, user requested "wait for 5 digits"
+        setEmployeeOptions([]); 
+    }
+  }, [employeeIdInput, allEmployees]);
+
   const fetchHistory = async () => {
     if (!fromDate || !toDate) {
       setError("Please select both From and To dates.");
@@ -87,7 +110,7 @@ const formatDatefordisplay = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://192.168.2.54:443/api/employee-history",
+        "https://103.38.50.149:5000/api/employee-history",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),
@@ -188,6 +211,9 @@ const downloadExcel = () => {
     setFromDate(new Date());
     setToDate(new Date());
     setEmployeeName("");
+    setEmployeeId(null); // Reset employeeId
+    setEmployeeIdInput(""); // Reset search input
+    setEmployeeOptions([]); // Clear filtered options
     setHistoryData([]);
     setError("");
   };
@@ -205,29 +231,19 @@ const downloadExcel = () => {
       <Row className="mb-3">
 
         <Col md={4}>
-        <Form.Label>Employee *</Form.Label>
-<Form.Select
-  className="form-select"
-  value={employeeId}
-  onChange={(e) => {
-    const selectedIndex = e.target.selectedIndex;
-    const selectedEmp = employeeOptions[selectedIndex - 1]; // because index 0 is "Select Employee"
-    setEmployeeid(e.target.value);
-    if (selectedEmp) {
-      setEmployeeName(selectedEmp.name);
-    }
-  }}
->
-  <option value="">Select Employee</option>
-  {employeeOptions.map((emp, idx) => (
-    <option key={idx} value={emp.userid}>
-      {emp.userid} ({emp.name})
-    </option>
-  ))}
-</Form.Select>
-
-
-
+            <label className="form-label">Select Employee</label>
+            <Select
+              options={employeeOptions}
+              value={employeeOptions.find((opt) => opt.value === employeeId) || null}
+              onChange={(selected) => {
+                setEmployeeId(selected ? selected.value : null);
+                setEmployeeName(selected ? selected.name : "");
+              }}
+              onInputChange={(val) => setEmployeeIdInput(val)}
+              placeholder="Search (Enter 5 digits)"
+              isClearable
+              noOptionsMessage={() => "Enter at least 5 digits to search"}
+            />
         </Col>
 
         <Col md={4}>

@@ -102,7 +102,7 @@ const UserSkillsUpload = () => {
   //       console.log(jsonstring);
 
   //       try {
-  //         const response = await axios.post('https://192.168.2.54:443/api/saveUserShifts', jsonstring, {
+  //         const response = await axios.post('https://103.38.50.149:5000/api/saveUserShifts', jsonstring, {
   //           headers: {
   //             'Content-Type': 'application/json'
   //           }
@@ -168,7 +168,7 @@ const UserSkillsUpload = () => {
     try {
       for (let i = 0; i < batches.length; i++) {
         const response = await axios.post(
-          "https://192.168.2.54:443/api/saveUserSkills",
+          "https://103.38.50.149:5000/api/saveUserSkills",
           batches[i],
           {
             headers: { "Content-Type": "application/json" },
@@ -249,7 +249,7 @@ const UserSkillsUpload = () => {
 
         try {
           const response = await axios.post(
-            "https://192.168.2.54:443/api/saveUserSkills",
+            "https://103.38.50.149:5000/api/saveUserSkills",
             shiftsBatch,
             {
               headers: { "Content-Type": "application/json" },
@@ -298,7 +298,7 @@ const UserSkillsUpload = () => {
       setTimeout(() => setMessage(""), 5000);
     };
 
-    link.href = "https://192.168.2.54:443/download-template-us";
+    link.href = "https://103.38.50.149:5000/download-template-us";
     link.download = "sample_template.xlsx";
     document.body.appendChild(link);
     link.click();

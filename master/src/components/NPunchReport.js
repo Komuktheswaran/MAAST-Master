@@ -1,42 +1,63 @@
 // src/components/NPunchReport.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Container, Row, Col, Button, Form, Spinner, Alert, Table,
 } from "react-bootstrap";
 import axios from "axios";
-import * as XLSX from "xlsx"; // SheetJS
+import * as XLSX from "xlsx";
+import Select from "react-select"; // SheetJS
 import { Modal, ListGroup } from "react-bootstrap";
 
-const API_BASE_URL = "https://192.168.2.54:443";
-const EMPLOYEE_API_URL = "https://192.168.2.54:443/api/employees";
+const API_BASE_URL = "https://103.38.50.149:5000";
+const EMPLOYEE_API_URL = "https://103.38.50.149:5000/api/employees";
 
 const NPunchReport = () => {
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [employees, setEmployees] = useState([]);
+
   const [userid, setUserid] = useState("");
   const [name, setName] = useState("");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [employeeIdInput, setEmployeeIdInput] = useState("");
   const [selectedPunches, setSelectedPunches] = useState(null);   // null = modal closed
   const [modalDate, setModalDate] = useState('');      // show which day we're viewing
 
   // Load employees once
   useEffect(() => {
-    const load = async () => {
+    const fetchEmployees = async () => {
       try {
-        setLoading(true);
-        const res = await axios.get(EMPLOYEE_API_URL, { timeout: 15000 });
-        setEmployees(Array.isArray(res.data) ? res.data : []);
-      } catch {
-        setErr("Failed to load employees");
-      } finally {
-        setLoading(false);
+        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+
+        if (Array.isArray(res.data)) {
+           const formatted = res.data.map((emp) => ({
+            value: emp.userid,
+            label: `${emp.userid} - ${emp.name}`,
+            name: emp.name
+          }));
+          setAllEmployees(formatted);
+          setEmployeeOptions([]); 
+        }
+      } catch (err) {
+        console.error("Error fetching employee list:", err);
       }
     };
-    load();
+
+    fetchEmployees();
   }, []);
+  useEffect(() => {
+    if (employeeIdInput.length >= 5) {
+      const filtered = allEmployees.filter(emp => 
+        emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
+      );
+      setEmployeeOptions(filtered);
+    } else {
+      setEmployeeOptions([]); 
+    }
+  }, [employeeIdInput, allEmployees]);
 
   const prettyDate = (d) => {
     if (!d) return "-";
@@ -126,14 +147,7 @@ const fmtTimeShort = (dt) => {
     return "-";
   };
 
-  const onSelectEmployee = (e) => {
-    const u = e.target.value;
-    setUserid(u);
-    const found = employees.find((x) => String(x.userid) === String(u));
-    setName(found ? found.name : "");
-    setReports([]);
-    setErr("");
-  };
+
 
   // Validate row data
   const validateRowData = (row) => {
@@ -302,16 +316,22 @@ const fmtTimeShort = (dt) => {
       )}
 
       <Row className="mb-3">
-        <Col md={4}>
-          <Form.Label>Employee</Form.Label>
-          <Form.Select value={userid} onChange={onSelectEmployee} disabled={loading}>
-            <option value="">Select employee</option>
-            {employees.map((emp) => (
-              <option key={emp.userid} value={emp.userid}>
-                {emp.userid} ({emp.name})
-              </option>
-            ))}
-          </Form.Select>
+        <Col md={3}>
+            <label className="form-label">Select Employee</label>
+            <Select
+              options={employeeOptions}
+              value={employeeOptions.find((opt) => opt.value === userid) || null}
+              onChange={(selected) => {
+                  setUserid(selected ? selected.value : "");
+                  setName(selected ? selected.name : "");
+                  setReports([]); // Clear reports on employee change
+                  setErr(""); // Clear error on employee change
+              }}
+              onInputChange={(val) => setEmployeeIdInput(val)}
+              placeholder="Search (5 digits)"
+              isClearable
+              noOptionsMessage={() => "Enter 5 digits"}
+            />
         </Col>
         <Col md={3}>
           <Form.Label>From Date</Form.Label>

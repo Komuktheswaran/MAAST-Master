@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Container,
   Row,
@@ -10,16 +10,18 @@ import {
   Alert,
 } from "react-bootstrap";
 import axios from "axios";
-import { DateTime } from "luxon";
 import * as XLSX from "xlsx";
+import Select from 'react-select'; // Import react-select
 
 const EmployeePunctuality = () => {
   const [employeeName, setEmployeeName] = useState("");
-  const [employeeOptions, setEmployeeOptions] = useState([]);
-  const [PunctualityData, setPunctualityData] = useState([]);
+  const [allEmployees, setAllEmployees] = useState([]); // Stores all employees fetched initially
+  const [employeeOptions, setEmployeeOptions] = useState([]); // Options for the Select component
+  const [punctualityData, setPunctualityData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [employeeId,setEmployeeid]=useState()
+  const [employeeIdInput, setEmployeeIdInput] = useState(""); // Tracks input for employee search
   
     const [fromDate, setFromDate] = useState(new Date());
     const [toDate, setToDate] = useState(new Date());
@@ -49,18 +51,34 @@ const formatDates = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://192.168.2.54:443/api/employees");
-
+        const res = await axios.get("https://103.38.50.149:5000/api/employees");
         if (Array.isArray(res.data)) {
-          setEmployeeOptions(res.data); // keep objects [{ name, userid }]
+           const formatted = res.data.map((emp) => ({
+            value: emp.userid, // Use userid as value
+            label: `${emp.userid} - ${emp.name}`, // Display userid and name
+            name: emp.name // Store name for later use
+          }));
+          setAllEmployees(formatted);
+          setEmployeeOptions([]); // Initially no options until user types
         }
       } catch (err) {
-        console.error("Error fetching employee list:", err);
+        console.error("Error fetching employees:", err);
       }
     };
-
     fetchEmployees();
   }, []);
+
+  useEffect(() => {
+    if (employeeIdInput.length >= 5) { // Updated to 5 as requested
+      const filtered = allEmployees.filter(emp => 
+        emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
+      );
+      setEmployeeOptions(filtered);
+    } else {
+        setEmployeeOptions([]); // Clear options if input is too short
+    }
+  }, [employeeIdInput, allEmployees]);
+
   const fetchPunctuality = async () => {
     if (!employeeId) {
       setError("Please select an employee.");
@@ -72,7 +90,7 @@ const formatDates = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://192.168.2.54:443/api/employee-punctuality",
+        "https://103.38.50.149:5000/api/employee-punctuality",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),
@@ -110,7 +128,7 @@ const formatDates = (dateStr) => {
 
 
 const downloadExcel = () => {
-  if (!Array.isArray(PunctualityData) || PunctualityData.length === 0) {
+  if (!Array.isArray(punctualityData) || punctualityData.length === 0) {
     setError("No Punctuality data to export.");
     return;
   }
@@ -122,7 +140,7 @@ const downloadExcel = () => {
       ["ID NO.", employeeId || "", "","", "TO"], // You can pass employeeId
       [], // Empty row
       ["SL NO.", "DATE", "SHIFT NAME","SHIFT TIME", "IN-PUNCH TIME", "ACTUAL PUNCH",  "PUNCTUALITY"], // Table Header
-      ...PunctualityData.map((item, index) => [
+      ...punctualityData.map((item, index) => [
         index + 1,
         formatDates(item.DATE)
          ,
@@ -168,8 +186,12 @@ const downloadExcel = () => {
 
   const resetFilters = () => {
     setEmployeeName("");
+    setEmployeeid(""); // Clear selected employee ID
+    setEmployeeIdInput(""); // Clear search input
     setPunctualityData([]);
     setError("");
+    setFromDate(new Date());
+    setToDate(new Date());
   };
 
   return (
@@ -186,28 +208,19 @@ const downloadExcel = () => {
      
        
         <Col md={4}>
-        <Form.Label>Employee *</Form.Label>
-<Form.Select
-  className="form-select"
-  value={employeeId}
-  onChange={(e) => {
-    const selectedIndex = e.target.selectedIndex;
-    const selectedEmp = employeeOptions[selectedIndex - 1]; // because index 0 is "Select Employee"
-    setEmployeeid(e.target.value);
-    if (selectedEmp) {
-      setEmployeeName(selectedEmp.name);
-    }
-  }}
->
-  <option value="">Select Employee</option>
-  {employeeOptions.map((emp, idx) => (
-    <option key={idx} value={emp.userid}>
-      {emp.userid} ({emp.name})
-    </option>
-  ))}
-</Form.Select>
-
-
+          <Form.Label>Employee *</Form.Label>
+          <Select
+            options={employeeOptions}
+            value={employeeOptions.find(option => option.value === employeeId)} // Set selected value
+            onChange={(selected) => {
+              setEmployeeid(selected ? selected.value : "");
+              setEmployeeName(selected ? selected.name : ""); // Set employee name
+            }}
+            onInputChange={(val) => setEmployeeIdInput(val)}
+            placeholder="Search (Enter at least 5 characters)"
+            isClearable
+            noOptionsMessage={() => employeeIdInput.length < 5 ? "Enter at least 5 characters to search" : "No matching employees"}
+          />
         </Col>
 
         <Col md={4}>
@@ -262,7 +275,7 @@ const downloadExcel = () => {
           </Button>
         </div>
 
-        {PunctualityData.length > 0 && (
+        {punctualityData.length > 0 && (
           <Button variant="success" onClick={downloadExcel}>
             📥 Download Excel
           </Button>
@@ -274,7 +287,7 @@ const downloadExcel = () => {
           <Spinner animation="border" />
           <p className="mt-2">Loading employee ...</p>
         </div>
-      ) : PunctualityData.length > 0 ? (
+      ) : punctualityData.length > 0 ? (
         <>
           <Table striped bordered hover responsive>
             <thead className="table-dark">
@@ -289,7 +302,7 @@ const downloadExcel = () => {
               </tr>
             </thead>
             <tbody>
-              {PunctualityData.map((item, index) => (
+              {punctualityData.map((item, index) => (
                 <tr key={index}>
                   <td>{index + 1}</td>
                  <td>{formatDates(item.DATE)}</td>

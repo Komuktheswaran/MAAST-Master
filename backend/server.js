@@ -1093,6 +1093,12 @@ app.post("/api/saveUserShifts", async (req, res) => {
       FROM Mx_StageMaster
     `);
 
+    // Fetch Shift Master for validation
+    const shiftResult = await request.query(`
+      SELECT SFTID FROM Mx_ShiftMst
+    `);
+    const validShiftIds = new Set(shiftResult.recordset.map(s => s.SFTID));
+
     const stageMap = new Map();
     stageResult.recordset.forEach((stage) => {
       stageMap.set(
@@ -1150,6 +1156,15 @@ app.post("/api/saveUserShifts", async (req, res) => {
         });
         continue;
       }
+
+      // Validate SHIFT_ID
+      if (SHIFT_ID && SHIFT_ID !== "WO" && !validShiftIds.has(SHIFT_ID)) {
+        invalidStages.push({
+           ...shift,
+           reason: `Invalid SHIFT_ID: ${SHIFT_ID}`
+        });
+        continue;
+      } 
 
       const stageNameNormalized = STAGE_NAME.toLowerCase().replace(/\s+/g, "");
       if (!stageMap.has(stageNameNormalized)) {
@@ -1256,6 +1271,115 @@ app.post("/api/saveUserShifts", async (req, res) => {
   }
 });
 
+// Endpoint to download dynamic sample template with Stage Master data
+app.get("/api/download-sample-user-shift", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    // Fetch active stages
+    const stageResult = await pool.request().query("SELECT Stage_name, Stage_id, Stage_Type FROM Mx_StageMaster ORDER BY Stage_Serial");
+    const shiftResult = await pool.request().query("SELECT SFTID, SFTName, SFTSTTime, SFTEDTime FROM Mx_ShiftMst ORDER BY SFTID");
+
+    const workbook = new excel.Workbook();
+
+    // Sheet 1: Template
+    const worksheet = workbook.addWorksheet("Upload Template");
+    worksheet.columns = [
+      { header: "User ID", key: "userid", width: 15 },
+      { header: "User Name (Optional)", key: "username", width: 20 },
+      { header: "Stage Name", key: "stagename", width: 30 }, 
+      { header: "Line", key: "line", width: 10 },
+      // Dynamic date columns placeholders
+      { header: "01-12-2025", key: "d1", width: 15 },
+      { header: "02-12-2025", key: "d2", width: 15 },
+    ];
+
+    // Sheet 2: Stages Reference
+    const stagesSheet = workbook.addWorksheet("Stages");
+    // stagesSheet.state = 'hidden'; // Requested to be visible
+    
+    const stageNames = [];
+    if (stageResult.recordset) {
+       stageResult.recordset.forEach(stage => {
+           stagesSheet.addRow([stage.Stage_name]);
+           stageNames.push(stage.Stage_name);
+       });
+    }
+
+    // Add a single sample record as requested
+    worksheet.addRow({
+        userid: "100009", 
+        username: "Ranjith M C", 
+        stagename: stageNames.length > 0 ? stageNames[0] : "Stage A", 
+        line: "L1", 
+        d1: "S1", 
+        d2: "S1"
+    });
+
+    // Data Validation for Stage Name (Column C, which is index 3)
+    // We apply it to a reasonable number of rows, e.g., 2 to 1000
+    const stageColumnLetter = 'C';
+    const totalStages = stageNames.length;
+    
+    if (totalStages > 0) {
+        // Define the range for the list in the Stages sheet (e.g., Stages!$A$1:$A$50)
+        const listFormula = `'Stages'!$A$1:$A$${totalStages}`;
+
+        for (let i = 2; i <= 1000; i++) {
+            worksheet.getCell(`${stageColumnLetter}${i}`).dataValidation = {
+                type: 'list',
+                allowBlank: true,
+                formulae: [listFormula],
+                showErrorMessage: true,
+                errorStyle: 'error',
+                errorTitle: 'Invalid Stage',
+                error: 'Please select a valid stage from the list.'
+            };
+        }
+    }
+
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=UserShiftUpload_Template.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("Error generating sample template:", error);
+    res.status(500).send("Error generating sample template");
+  }
+});
+
+
+// Get all Stages for dropdown
+app.get("/api/stages_list", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool.request().query("SELECT Stage_id, Stage_name FROM Mx_StageMaster ORDER BY Stage_name");
+    res.json(result.recordset);
+  } catch (error) {
+    console.error("Error fetching stages:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+// Get all Shifts for dropdown
+app.get("/api/shifts_list", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool.request().query("SELECT SFTID, SFTName FROM Mx_ShiftMst ORDER BY SFTID");
+    res.json(result.recordset);
+  } catch (error) {
+    console.error("Error fetching shifts:", error);
+    res.status(500).send("Server error");
+  }
+});
+
 // Fetch user shifts with optional date filter
 app.get("/api/getUserShifts", async (req, res) => {
   const { date } = req.query;
@@ -1268,8 +1392,43 @@ app.get("/api/getUserShifts", async (req, res) => {
           LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
           ORDER BY SHIFT_ID, Stage_name, LINE
       `;
-    if (date) {
-      query += ` WHERE u.Shift_date_from = '${date}' OR u.Shift_date_to = '${date}'`;
+    
+    // Server-side filtering logic
+    const { shifts, stages, lines, fromDate, toDate } = req.query;
+    let conditions = [];
+
+    if (fromDate && toDate) {
+      conditions.push(`(u.Shift_date_from >= '${fromDate}' AND u.Shift_date_from <= '${toDate}')`);
+    } else if (fromDate) {
+       conditions.push(`(u.Shift_date_from >= '${fromDate}')`);
+    } else if (toDate) {
+       conditions.push(`(u.Shift_date_from <= '${toDate}')`);
+    }
+
+    if (shifts && shifts.trim() !== "") {
+        const shiftList = shifts.split(",").map(s => s.trim()).filter(Boolean).map(s => `'${s}'`).join(",");
+        if (shiftList) conditions.push(`u.SHIFT_ID IN (${shiftList})`);
+    }
+
+    if (stages && stages.trim() !== "") {
+        const stageList = stages.split(",").map(s => s.trim()).filter(Boolean).map(s => `'${s}'`).join(",");
+        if (stageList) conditions.push(`s.Stage_name IN (${stageList})`);
+    }
+
+    if (lines && lines.trim() !== "") {
+        const lineList = lines.split(",").map(s => s.trim()).filter(Boolean).map(s => `'${s}'`).join(",");
+        if (lineList) conditions.push(`u.LINE IN (${lineList})`);
+    }
+
+    if (conditions.length > 0) {
+        query = `
+          SELECT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
+          FROM Mx_UserShifts u
+          LEFT JOIN MX_USERMST m ON u.userid = m.USERID
+          LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
+          WHERE ${conditions.join(" AND ")}
+          ORDER BY SHIFT_ID, Stage_name, LINE
+        `;
     }
     let result = await pool.request().query(query);
     res.json(result.recordset);
@@ -3478,7 +3637,7 @@ WITH EmployeeJobreport AS (
         CASE WHEN ATD.ActualPunch IS NOT NULL THEN 'Present' ELSE 'Absent' END AS ATTENDANCE_Status,
         CASE 
             WHEN ATD.ActualPunch IS NULL THEN 'No Punch'
-            WHEN ATD.ActualPunch <= DATEADD(MINUTE, 10, CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME))
+            WHEN ATD.ActualPunch <= DATEADD(MINUTE, 10, Shifts.ShiftStart)
                 THEN 'On Time'
             ELSE 'Late'
         END AS Jobreport,
@@ -3493,12 +3652,19 @@ WITH EmployeeJobreport AS (
     LEFT JOIN Mx_UserJobCard J ON S.USERID = J.USERID AND J.Edatetime = S.Shift_date_from
     LEFT JOIN Mx_ShiftMst MS ON S.SHIFT_ID = MS.SFTID
     LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.stage_id
+    CROSS APPLY (
+        SELECT 
+            ShiftStart = CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
+            ShiftEnd = CASE WHEN MS.SFTEDTime < MS.SFTSTTime
+                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
+                            ELSE CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
+                       END
+    ) AS Shifts
     OUTER APPLY (
         SELECT TOP 1 A.Edatetime AS ActualPunch
         FROM Mx_ATDEventTrn A
         WHERE A.USERID = S.USERID
-        AND A.Edatetime BETWEEN DATEADD(MINUTE, -45, CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME))
-                            AND DATEADD(MINUTE, 600, CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
+        AND A.Edatetime BETWEEN DATEADD(MINUTE, -45, Shifts.ShiftStart) AND Shifts.ShiftEnd
         ORDER BY A.Edatetime
     ) ATD
     WHERE S.USERID = @EmployeeId 
@@ -3520,7 +3686,7 @@ WITH EmployeeJobreport AS (
         CASE WHEN ATD.ActualPunch IS NOT NULL THEN 'Present' ELSE 'Absent' END AS ATTENDANCE_Status,
         CASE 
             WHEN ATD.ActualPunch IS NULL THEN 'No Punch'
-            WHEN ATD.ActualPunch <= DATEADD(MINUTE, 10, CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME))
+            WHEN ATD.ActualPunch <= DATEADD(MINUTE, 10, Shifts.ShiftStart)
                 THEN 'On Time'
             ELSE 'Late'
         END AS Jobreport,
@@ -3535,12 +3701,19 @@ WITH EmployeeJobreport AS (
     LEFT JOIN Mx_UserJobCard J ON SW.Swap_userid = J.USERID AND J.Edatetime = SW.Shift_date
     LEFT JOIN Mx_ShiftMst MS ON SW.Shift_id = MS.SFTID
     LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.stage_id
+    CROSS APPLY (
+        SELECT 
+            ShiftStart = CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
+            ShiftEnd = CASE WHEN MS.SFTEDTime < MS.SFTSTTime
+                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
+                            ELSE CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
+                       END
+    ) AS Shifts
     OUTER APPLY (
         SELECT TOP 1 A.Edatetime AS ActualPunch
         FROM Mx_ATDEventTrn A
         WHERE A.USERID = SW.Swap_userid
-        AND A.Edatetime BETWEEN DATEADD(MINUTE, -45, CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME))
-                            AND DATEADD(MINUTE, 600, CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
+        AND A.Edatetime BETWEEN DATEADD(MINUTE, -45, Shifts.ShiftStart) AND Shifts.ShiftEnd
         ORDER BY A.Edatetime
     ) ATD
     WHERE SW.Swap_userid = @EmployeeId
@@ -3603,9 +3776,8 @@ SELECT
 
     Attendance,
     CASE 
-        WHEN ActualPunch IS NULL OR ActualPunch = '00:00' THEN 0
-        WHEN ActualPunch > ScheduledStart THEN 0 
-        ELSE 5 
+        WHEN Jobreport = 'On Time' THEN 5 
+        ELSE 0 
     END AS Punctuality,
     
     Job_5S AS [5S],
@@ -3625,9 +3797,8 @@ SELECT
           END
         + Attendance
         + CASE 
-            WHEN ActualPunch IS NULL OR ActualPunch = '00:00' THEN 0
-        WHEN ActualPunch > ScheduledStart THEN 0 
-            ELSE 5 
+            WHEN Jobreport = 'On Time' THEN 5 
+            ELSE 0 
           END
     ) AS Total
 FROM EmployeeJobreport
