@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Container,
   Row,
@@ -12,19 +12,25 @@ import {
 import axios from "axios";
 
 import * as XLSX from "xlsx";
+import { DateTime } from 'luxon';
 import Select from "react-select";
+import '../styles/UserShiftUpload.css';
+import emvLogo from '../pictures/emvlogo.png';
 
 const EmployeeJobCardDownload = () => {
   const [employeeName, setEmployeeName] = useState("");
   const [JobDataData, setJobDataData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [error, setError] = useState("");
   const [allEmployees, setAllEmployees] = useState([]);
-  const [employeeOptions, setEmployeeOptions] = useState([]);
   const [employeeIdInput, setEmployeeIdInput] = useState("");
+  const [debouncedInput, setDebouncedInput] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [fromDate, setFromDate] = useState("");
-const [toDate, setToDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const MAX_OPTIONS = 100; // Limit displayed options for performance
 
 
 
@@ -40,52 +46,110 @@ function formatDateforbackend(date) {
 
 
 const formatDates = (dateStr) => {
-  if (!dateStr || typeof dateStr !== "string" || dateStr.trim() === "") {
-    return "N/A";
+  if (!dateStr) return dateStr;
+  
+  // Try parsing strictly as dd-MM-yyyy first (common in your data)
+  let dt = DateTime.fromFormat(dateStr, 'dd-MM-yyyy');
+  
+  if (!dt.isValid) {
+      // Try parsing as ISO yyyy-MM-dd
+      dt = DateTime.fromISO(dateStr);
+  }
+  
+  if (!dt.isValid) {
+      // Try parsing as JS Date (last resort)
+      const jsDate = new Date(dateStr);
+      if (!isNaN(jsDate.getTime())) {
+          return DateTime.fromJSDate(jsDate).toFormat('dd-MM-yyyy');
+      }
+      return "N/A";
   }
 
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) {
-    return "N/A";
-  }
-
-  const [day, month, year] = parts;
-  return `${day}-${month}-${year}`; // dd-mm-yyyy
+  return dt.toFormat('dd-MM-yyyy');
 };
 
+  // Fetch employees on mount
   useEffect(() => {
-    // Fetch employee list for dropdown
     const fetchEmployees = async () => {
+      setLoadingEmployees(true);
       try {
-        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+        const res = await axios.get("http192.168.2.54/api/employees");
 
         if (Array.isArray(res.data)) {
-           const formatted = res.data.map((emp) => ({
-            value: emp.userid,
-            label: `${emp.userid} - ${emp.name}`,
-            name: emp.name
-          }));
+          const formatted = res.data
+            .map((emp) => ({
+              value: emp.userid,
+              label: `${emp.userid} - ${emp.name}`,
+              name: emp.name
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
           setAllEmployees(formatted);
-          setEmployeeOptions([]); 
         }
       } catch (err) {
         console.error("Error fetching employee list:", err);
+        setError("Failed to load employees. Please refresh the page.");
+      } finally {
+        setLoadingEmployees(false);
       }
     };
 
     fetchEmployees();
   }, []);
 
+  // Debounce search input to prevent lag
   useEffect(() => {
-    if (employeeIdInput.length >= 5) {
-      const filtered = allEmployees.filter(emp => 
-        emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
-      );
-      setEmployeeOptions(filtered);
-    } else {
-      setEmployeeOptions([]); 
+    const timer = setTimeout(() => {
+      setDebouncedInput(employeeIdInput);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [employeeIdInput]);
+
+  // Memoized filtered employee options (optimized for performance)
+  const employeeOptions = useMemo(() => {
+    // Don't show options until user starts typing (prevents rendering thousands of items)
+    if (!debouncedInput || debouncedInput.trim() === "") {
+      return [];
     }
-  }, [employeeIdInput, allEmployees]);
+    
+    const searchLower = debouncedInput.toLowerCase();
+    const filtered = [];
+    
+    // Limit results for performance - stop once we hit MAX_OPTIONS
+    for (let i = 0; i < allEmployees.length && filtered.length < MAX_OPTIONS; i++) {
+      if (allEmployees[i].label.toLowerCase().includes(searchLower)) {
+        filtered.push(allEmployees[i]);
+      }
+    }
+    
+    return filtered;
+  }, [debouncedInput, allEmployees]);
+
+  // Memoized selected employee - search in all employees, not just filtered
+  const selectedEmployee = useMemo(() => {
+    if (!employeeId) return null;
+    return allEmployees.find((opt) => opt.value === employeeId) || null;
+  }, [allEmployees, employeeId]);
+
+  // Optimized handlers with useCallback
+  const handleEmployeeChange = useCallback((selected) => {
+    setEmployeeId(selected ? selected.value : "");
+    setEmployeeName(selected ? selected.name : "");
+  }, []);
+
+  const handleSearchInputChange = useCallback((val) => {
+    setEmployeeIdInput(val);
+  }, []);
+
+  // Custom message for better UX
+  const noOptionsMessage = useCallback(() => {
+    if (!debouncedInput || debouncedInput.trim() === "") {
+      return "Type to search employees...";
+    }
+    return employeeOptions.length >= MAX_OPTIONS 
+      ? `Showing first ${MAX_OPTIONS} results. Type more to refine search.`
+      : "No employees found";
+  }, [debouncedInput, employeeOptions.length]);
 
   const fetchJobData = async () => {
     if (!employeeId) {
@@ -93,7 +157,7 @@ const formatDates = (dateStr) => {
       return;
     }
     if (!fromDate || !toDate) {
-      setError("Please select an Month.");
+      setError("Please select From Date and To Date.");
       return;
     }
 
@@ -102,7 +166,7 @@ const formatDates = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/employee-Jobreport",
+        "http192.168.2.54/api/employee-Jobreport",
         {
           fromDate: formatDateforbackend(fromDate),
           toDate: formatDateforbackend(toDate),
@@ -110,9 +174,16 @@ const formatDates = (dateStr) => {
         },
         { timeout: 330000 }
       );
+      console.log(response.data);
 
       if (response.data && Array.isArray(response.data.records)) {
-        setJobDataData(response.data.records);
+        // Sort by RawDate (YYYY-MM-DD) which is safer than Date (DD/MM/YYYY)
+        const sortedRecords = response.data.records.sort((a, b) => {
+            const dateA = new Date(a.RawDate || a.Date.split('/').reverse().join('-'));
+            const dateB = new Date(b.RawDate || b.Date.split('/').reverse().join('-'));
+            return dateA - dateB;
+        });
+        setJobDataData(sortedRecords);
 
         if (response.data.records.length === 0) {
           setError("No JobData found for the selected filters.");
@@ -146,47 +217,113 @@ const formatDates = (dateStr) => {
     }
 
     try {
+      // Sort data by Date
+      // Sort data by Date (using sortedData from state should be enough, but ensuring here too)
+      const sortedData = [...JobDataData].sort((a, b) => {
+         const dateA = new Date(a.RawDate || a.Date.split('/').reverse().join('-'));
+         const dateB = new Date(b.RawDate || b.Date.split('/').reverse().join('-'));
+         return dateA - dateB;
+      });
+      const count = sortedData.length || 1; // Avoid division by zero
+
       // Calculate totals for numeric columns
-      const totalTarget = JobDataData.reduce(
+      const totalTarget = sortedData.reduce(
         (sum, item) => sum + (item.Target || 0),
         0
       );
-      const totalActual = JobDataData.reduce(
+      const totalActual = sortedData.reduce(
         (sum, item) => sum + (item.Actual || 0),
         0
       );
-      const totalPerformance = JobDataData.reduce(
-        (sum, item) => sum + (item.Performance || 0),
-        0
-      );
-      const totalAttendance = JobDataData.reduce(
-        (sum, item) => sum + (item.Attendance || 0),
-        0
-      );
-      const totalPunctuality = JobDataData.reduce(
-        (sum, item) => sum + (item.Punctuality || 0),
-        0
-      );
-      const totalRejections = JobDataData.reduce(
+      
+      const totalRejections = sortedData.reduce(
         (sum, item) => sum + (item.Rejections || 0),
         0
       );
-      const total5S = JobDataData.reduce(
+      
+      const totalPerformancePoints = sortedData.reduce(
+        (sum, item) => sum + (item.Performance || 0),
+        0
+      );
+
+      // Percentage Formula for Performance: (Total Points / (Count * 50)) * 100
+      const performancePercentage = count > 0 
+        ? ((totalPerformancePoints / (count * 50)) * 100).toFixed(2) + "%" 
+        : "0%";
+
+      // Calculate Totals for Attendance and Punctuality for Percentage Formula
+      const totalAttendancePoints = sortedData.reduce((sum, item) => sum + (item.Attendance === 5 ? 5 : (item.Attendance || 0)), 0);
+      const totalPunctualityPoints = sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0);
+
+      const attendancePercentage = count > 0 ? ((totalAttendancePoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
+      const punctualityPercentage = count > 0 ? ((totalPunctualityPoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
+      
+      // Calculate Totals for Rejections, 5S, PPE, Discipline for Percentage Formula
+      // Formula: (Total Points / (Count * 10)) * 100
+      // Note: totalRejections was already calculated above
+      const total5S = sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0);
+      const totalPPE = sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0);
+      const totalDiscipline = sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0);
+
+      const rejectionsPercentage = count > 0 ? ((totalRejections / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+      const fiveSPercentage = count > 0 ? ((total5S / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+      const ppePercentage = count > 0 ? ((totalPPE / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+      const disciplinePercentage = count > 0 ? ((totalDiscipline / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+      
+      // Calculate AVERAGES for score columns (as per Excel formula)
+
+      // Target/Actual can stay as Sum if needed, or Average? Excel had 'None' for Target.
+      // But usually Target/Actual are Summed over a period.
+      // User request specifically mentioned: "production performance, attendance, punchuality, rejections, 5S,safety &PPE usage, Discipline, total"
+      // So Target/Actual might remain Sum. 
+      // Checking Excel analysis: Index 6 (Actual) had 'TOTAL' text. Index 5 (Target) 'None'.
+      // I'll keep them as Sum for now as it makes sense for quantity.
+      
+      const avgPerformance = (sortedData.reduce(
+        (sum, item) => sum + (item.Performance || 0),
+        0
+      ) / count).toFixed(2);
+
+      const avgAttendance = (JobDataData.reduce(
+        (sum, item) => sum + (item.Attendance || 0),
+        0
+      ) / count).toFixed(2);
+
+      const avgPunctuality = (JobDataData.reduce(
+        (sum, item) => sum + (item.Punctuality || 0),
+        0
+      ) / count).toFixed(2);
+
+      const avgRejections = (JobDataData.reduce(
+        (sum, item) => sum + (item.Rejections || 0),
+        0
+      ) / count).toFixed(2);
+
+      const avg5S = (JobDataData.reduce(
         (sum, item) => sum + (item["5S"] || 0),
         0
-      );
-      const totalPPE = JobDataData.reduce(
+      ) / count).toFixed(2);
+
+      const avgPPE = (JobDataData.reduce(
         (sum, item) => sum + (item.PPE || 0),
         0
-      );
-      const totalDiscipline = JobDataData.reduce(
+      ) / count).toFixed(2);
+
+      const avgDiscipline = (JobDataData.reduce(
         (sum, item) => sum + (item.Disclipline || 0),
         0
-      );
-      const totalTotal = JobDataData.reduce(
-        (sum, item) => sum + (item.Total || 0),
-        0
-      );
+      ) / count).toFixed(2);
+
+      // Final Total is Sum of the Averages
+      const totalTotal = (
+          parseFloat(avgPerformance) +
+          parseFloat(avgAttendance) +
+          parseFloat(avgPunctuality) +
+          parseFloat(avgRejections) +
+          parseFloat(avg5S) +
+          parseFloat(avgPPE) +
+          parseFloat(avgDiscipline)
+      ).toFixed(2);
 
       const worksheetData = [
         ["Employee Job Card Data"],
@@ -212,14 +349,16 @@ const formatDates = (dateStr) => {
         ],
         ...JobDataData.map((item, index) => [
           index + 1,
-          formatDates(item.Date),
+          item.Date,
           item.SHIFTNAME || "",
           item.STAGE || "",
           item.LINE || "",
           item.Target || 0,
           item.Actual || 0,
           item.Performance || 0,
-          item.Attendance || 0,
+          (item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) 
+            ? 5   // Value is 5, formatting will add "(Auth)"
+            : (item.Attendance || 0),
           item.Punctuality || 0,
           item.Rejections || 0,
           item["5S"] || 0,
@@ -234,20 +373,60 @@ const formatDates = (dateStr) => {
           "",
           "",
           "TOTAL",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
+          totalTarget,
+          totalActual,
+          avgPerformance,
+          avgAttendance,
+          avgPunctuality,
+          avgRejections,
+          avg5S,
+          avgPPE,
+          avgDiscipline,
           totalTotal,
+        ],
+        // ✅ Add Percentage Row
+        [
+          "",
+          "",
+          "",
+          "",
+          "PERCENTAGE",
+          "",
+          "",
+          performancePercentage,
+          attendancePercentage,  // Index 8
+          punctualityPercentage, // Index 9
+          rejectionsPercentage,  // Index 10
+          fiveSPercentage,       // Index 11
+          ppePercentage,         // Index 12
+          disciplinePercentage,  // Index 13
+          "",
         ],
       ];
 
       const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Inject Formulas
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+      // Data starts at Row index 5 (Excel Row 6) because Header is at index 4
+      const dataStartRow = 5; 
+      const dataEndRow = range.e.r - 2; // Last data row (before Total and Percentage rows)
+
+      for (let R = dataStartRow; R <= dataEndRow; ++R) {
+        // Column O (Index 14) is Total. Range H (7) to N (13) are metrics.
+        // Excel rows are 1-based, so R + 1
+        const rowNum = R + 1;
+        const totalCellRef = XLSX.utils.encode_cell({ c: 14, r: R });
+        // Formula: SUM(H{row}:N{row})
+        worksheet[totalCellRef] = { f: `SUM(H${rowNum}:N${rowNum})`, t: 'n' }; 
+      }
+
+      // Summary Total Row (Average of Totals)
+      // The "Total" summary cell is at [Range.e.r-1][14] (Column O)
+      const summaryTotalRowIndex = range.e.r - 1;
+      const summaryTotalCellRef = XLSX.utils.encode_cell({ c: 14, r: summaryTotalRowIndex });
+      // Formula: AVERAGE(O6:O{LastDataRow})
+      worksheet[summaryTotalCellRef] = { f: `AVERAGE(O${dataStartRow + 1}:O${dataEndRow + 1})`, t: 'n' };
 
       // Merge title
       worksheet["!merges"] = [
@@ -258,13 +437,33 @@ const formatDates = (dateStr) => {
       worksheet["!cols"] = Array(15).fill({ wch: 15 });
 
       // Apply styles
-      const range = XLSX.utils.decode_range(worksheet["!ref"]);
       for (let R = range.s.r; R <= range.e.r; ++R) {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cell_address = { c: C, r: R };
           const cell_ref = XLSX.utils.encode_cell(cell_address);
-          const cell = worksheet[cell_ref];
+          let cell = worksheet[cell_ref];
+          
+          // Ensure cell exists for styling even if empty
+          if (!cell) {
+              cell = { v: "" };
+              worksheet[cell_ref] = cell;
+          }
+
           if (cell) {
+            // Apply Custom Format for Authorized Leave
+            // Data rows are from index 5 to dataEndRow. 
+            // R corresponds to Excel row (0-based index in loop)
+            // JobDataData index = R - 5
+            if (R >= 5 && R <= dataEndRow && C === 8) { // Column 8 is Attendance (I)
+                const dataIndex = R - 5;
+                if (dataIndex >= 0 && dataIndex < JobDataData.length) {
+                    const item = JobDataData[dataIndex];
+                    if (item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) {
+                        cell.z = '0 " (Auth)"'; // Custom Number Format
+                    }
+                }
+            }
+
             // Title row
             if (R === 0) {
               cell.s = {
@@ -287,8 +486,8 @@ const formatDates = (dateStr) => {
                 },
               };
             }
-            // Total row
-            else if (R === range.e.r) {
+            // Total row & Percentage row
+            else if (R === range.e.r || R === range.e.r - 1) {
               cell.s = {
                 font: {
                   name: "Arial",
@@ -349,8 +548,21 @@ const formatDates = (dateStr) => {
   };
 
   return (
-    <Container className="mt-4">
-      <h2 className="mb-3">Employee Job Card Data</h2>
+    <Container 
+      fluid
+      className="container-fluid"
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+        paddingTop: "20px",
+        maxWidth: "100%",
+      }}
+    >
+      <h2 className="title mb-3">Employee Job Card Data</h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -358,6 +570,14 @@ const formatDates = (dateStr) => {
         </Alert>
       )}
 
+      {loadingEmployees ? (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3">Loading employees...</p>
+        </div>
+      ) : (
+        <>
+      <div className="glass-card p-4 mb-4">
       <Row className="mb-3">
      
        
@@ -365,34 +585,37 @@ const formatDates = (dateStr) => {
             <label className="form-label">Select Employee</label>
             <Select
               options={employeeOptions}
-              value={employeeOptions.find((opt) => opt.value === employeeId) || null}
-              onChange={(selected) => {
-                  setEmployeeId(selected ? selected.value : "");
-                  setEmployeeName(selected ? selected.name : "");
-              }}
-              onInputChange={(val) => setEmployeeIdInput(val)}
-              placeholder="Search (5 digits)"
+              value={selectedEmployee}
+              onChange={handleEmployeeChange}
+              onInputChange={handleSearchInputChange}
+              placeholder="Type to search employee..."
               isClearable
-              noOptionsMessage={() => "Enter 5 digits"}
+              isLoading={loadingEmployees}
+              isDisabled={loadingEmployees}
+              noOptionsMessage={noOptionsMessage}
+              filterOption={null}
+              menuIsOpen={employeeIdInput.length > 0 ? undefined : false}
             />
         </Col>
 
-        <Col md={4}>
-          <Form.Label>Select Month *</Form.Label>
+        <Col md={3}>
+          <Form.Label>From Date *</Form.Label>
+          <Form.Control
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+          />
+        </Col>
 
-<Form.Control
-  type="month"
-  className="form-control"
-  value={fromDate ? fromDate.slice(0, 7) : ""}
-  onChange={(e) => {
-    const [year, month] = e.target.value.split("-");
-    const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-${new Date(year, month, 0).getDate()}`; 
-    setFromDate(startDate); // yyyy-mm-dd
-    setToDate(endDate);     // yyyy-mm-dd
-  }}
-  max={new Date().toISOString().slice(0, 7)}
-/>
+        <Col md={3}>
+          <Form.Label>To Date *</Form.Label>
+          <Form.Control
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+          />
 
 
         </Col>
@@ -430,6 +653,7 @@ const formatDates = (dateStr) => {
           </Button>
         )}
       </div>
+      </div>
 
       {loading ? (
         <div className="text-center py-4">
@@ -438,8 +662,9 @@ const formatDates = (dateStr) => {
         </div>
       ) : JobDataData.length > 0 ? (
         <>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
+          <div className="glass-card p-4">
+          <Table striped bordered hover responsive className="glass-table">
+            <thead>
               <tr>
                 <th>S.No</th>
                 <th>Date</th>
@@ -462,14 +687,18 @@ const formatDates = (dateStr) => {
               {JobDataData.map((item, index) => (
                 <tr key={index}>
                   <td>{index + 1}</td>
-            <td>{formatDates(item.Date)}</td>
+            <td>{item.Date || item.Edatetime || item.DisplayDate}</td>
             <td>{item.SHIFTNAME || "N/A"}</td>
             <td>{item.STAGE || "N/A"}</td>
             <td>{item.LINE || "N/A"}</td>
             <td>{item.Target || 0}</td>
             <td>{item.Actual || 0}</td>
             <td>{item.Performance || 0}</td>
-            <td>{item.Attendance || 0}</td>
+            <td>
+              {(item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) 
+                ? "5 (Auth)" 
+                : (item.Attendance || 0)}
+            </td>
             <td>{item.Punctuality || 0}</td>
             <td>{item.Rejections || 0}</td>
             <td>{item["5S"] || 0}</td>
@@ -478,8 +707,90 @@ const formatDates = (dateStr) => {
             <td>{item.Total || 0}</td>
                 </tr>
               ))}
+
+              {/* Calculations for Web View */}
+              {(() => {
+                  const sortedData = JobDataData;
+                  const count = sortedData.length || 1;
+                  
+                  const totalTarget = sortedData.reduce((sum, item) => sum + (item.Target || 0), 0);
+                  const totalActual = sortedData.reduce((sum, item) => sum + (item.Actual || 0), 0);
+                  
+                  // Score Averages
+                  const avgPerformance = (sortedData.reduce((sum, item) => sum + (item.Performance || 0), 0) / count).toFixed(2);
+                  const avgAttendance = (sortedData.reduce((sum, item) => sum + ((item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) ? 5 : (item.Attendance || 0)), 0) / count).toFixed(2);
+                  const avgPunctuality = (sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0) / count).toFixed(2);
+                  const avgRejections = (sortedData.reduce((sum, item) => sum + (item.Rejections || 0), 0) / count).toFixed(2);
+                  const avg5S = (sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0) / count).toFixed(2);
+                  const avgPPE = (sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0) / count).toFixed(2);
+                  const avgDiscipline = (sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0) / count).toFixed(2);
+                  
+                  // Total of Averages
+                  const totalTotal = (
+                    parseFloat(avgPerformance) + parseFloat(avgAttendance) + parseFloat(avgPunctuality) + 
+                    parseFloat(avgRejections) + parseFloat(avg5S) + parseFloat(avgPPE) + parseFloat(avgDiscipline)
+                  ).toFixed(2);
+
+                  // Percentage Calculations
+                  const totalPerformancePoints = sortedData.reduce((sum, item) => sum + (item.Performance || 0), 0);
+                  const performancePercentage = count > 0 ? ((totalPerformancePoints / (count * 50)) * 100).toFixed(2) + "%" : "0%";
+
+                  const totalAttendancePoints = sortedData.reduce((sum, item) => sum + ((item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) ? 5 : (item.Attendance || 0)), 0);
+                  const attendancePercentage = count > 0 ? ((totalAttendancePoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
+
+                  const totalPunctualityPoints = sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0);
+                  const punctualityPercentage = count > 0 ? ((totalPunctualityPoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
+                  
+                  // For Rejection, 5S, PPE, Discipline: Formula is (Total / (Count * 10)) * 100
+                  const totalRejectionsPoints = sortedData.reduce((sum, item) => sum + (item.Rejections || 0), 0);
+                  const rejectionsPercentage = count > 0 ? ((totalRejectionsPoints / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+
+                  const total5S = sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0);
+                  const fiveSPercentage = count > 0 ? ((total5S / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+
+                  const totalPPE = sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0);
+                  const ppePercentage = count > 0 ? ((totalPPE / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+
+                  const totalDiscipline = sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0);
+                  const disciplinePercentage = count > 0 ? ((totalDiscipline / (count * 10)) * 100).toFixed(2) + "%" : "0%";
+
+                  return (
+                      <>
+                          {/* Total Row */}
+                          <tr className="text-center fw-bold" style={{ backgroundColor: '#f8f9fa' }}>
+                              <td colSpan="5" className="text-end">TOTAL</td>
+                              <td>{totalTarget}</td>
+                              <td>{totalActual}</td>
+                              <td>{avgPerformance}</td>
+                              <td>{avgAttendance}</td>
+                              <td>{avgPunctuality}</td>
+                              <td>{avgRejections}</td>
+                              <td>{avg5S}</td>
+                              <td>{avgPPE}</td>
+                              <td>{avgDiscipline}</td>
+                              <td>{totalTotal}</td>
+                          </tr>
+                          
+                          {/* Percentage Row */}
+                          <tr className="text-center fw-bold" style={{ backgroundColor: '#f8f9fa' }}>
+                              <td colSpan="5" className="text-end">PERCENTAGE</td>
+                              <td></td>
+                              <td></td>
+                              <td>{performancePercentage}</td>
+                              <td>{attendancePercentage}</td>
+                              <td>{punctualityPercentage}</td>
+                              <td>{rejectionsPercentage}</td>
+                              <td>{fiveSPercentage}</td>
+                              <td>{ppePercentage}</td>
+                              <td>{disciplinePercentage}</td>
+                              <td></td>
+                          </tr>
+                      </>
+                  );
+              })()}
             </tbody>
           </Table>
+          </div>
         </>
       ) : (
         <div className="text-center py-4">
@@ -487,6 +798,8 @@ const formatDates = (dateStr) => {
             No Employee  data found. Please select your filters 
           </p>
         </div>
+      )}
+        </>
       )}
     </Container>
   );

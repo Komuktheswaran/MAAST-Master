@@ -20,6 +20,7 @@ import {
 import MuiAlert from "@mui/material/Alert";
 import CloseIcon from "@mui/icons-material/Close";
 import "../styles/UserShiftUpload.css"; // Custom CSS
+import emvLogo from "../pictures/emvlogo.png";
 
 const UserShiftUpload = () => {
   const [data, setData] = useState([]);
@@ -193,7 +194,7 @@ const UserShiftUpload = () => {
       const currentBatch = data.slice(i, i + batchSize);
       try {
         const response = await axios.post(
-          "https://103.38.50.149:5000/api/saveUserShifts",
+          "http192.168.2.54/api/saveUserShifts",
           currentBatch,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -245,7 +246,7 @@ const UserShiftUpload = () => {
 
   const downloadTemplate = () => {
     // Trigger download from backend
-    window.location.href = "https://103.38.50.149:5000/api/download-sample-user-shift";
+    window.location.href = "http192.168.2.54/api/download-sample-user-shift";
   };
 
   const tableInstance = useTable({ columns, data });
@@ -259,7 +260,20 @@ const UserShiftUpload = () => {
       ];
 
   return (
-    <Container maxWidth="lg" style={{ maxWidth: "100%" }}>
+    <Container
+      fluid
+      className="container-fluid"
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+        paddingTop: "20px",
+        maxWidth: "100%",
+      }}
+    >
       <h2 className="title">User Shift Upload</h2>
       <div className="file-upload">
         <input
@@ -277,6 +291,8 @@ const UserShiftUpload = () => {
           message={notification}
         />
       )}
+
+      <div className="glass-card p-4 mb-4">
 
       {data.length > 0 && (
         <div className="d-flex justify-content-between mb-3">
@@ -311,6 +327,7 @@ const UserShiftUpload = () => {
         <Button variant="contained" onClick={downloadTemplate}>
           <FaFileDownload className="icon" /> Download Sample Template
         </Button>
+      </div>
       </div>
 
       {/* Conflict/Warning Banner */}
@@ -419,23 +436,16 @@ const UserShiftUpload = () => {
 
       {message && <div className="message">{message}</div>}
       {showTable && data.length > 0 && (
-        <table className="data-table" {...tableInstance.getTableProps()}>
-          <thead>
-            {tableInstance.headerGroups.map((headerGroup) => (
-              <tr {...headerGroup.getHeaderGroupProps()} key={headerGroup.id}>
-                {headerGroup.headers.map((column) => (
-                  <th
-                    {...column.getHeaderProps()}
-                    key={column.id}
-                    style={{
-                      backgroundColor: "#484c61ff",
-                      color: "white",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                      padding: "10px",
-                      borderBottom: "2px solid #ddd",
-                    }}
-                  >
+      <div className="glass-card p-4">
+          <table className="glass-table" {...tableInstance.getTableProps()}>
+            <thead>
+              {tableInstance.headerGroups.map((headerGroup) => (
+                <tr {...headerGroup.getHeaderGroupProps()} key={headerGroup.id}>
+                  {headerGroup.headers.map((column) => (
+                    <th
+                      {...column.getHeaderProps()}
+                      key={column.id}
+                    >
                     {column.render("Header")}
                   </th>
                 ))}
@@ -457,6 +467,7 @@ const UserShiftUpload = () => {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </Container>
   );

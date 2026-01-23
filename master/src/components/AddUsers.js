@@ -52,7 +52,7 @@ const safeTrim = (value) => (value ? value.toString().trim() : "");
       setLoadingLines(true);
       try {
         const lineResponse = await axios.get(
-          "https://103.38.50.149:5000/api/lines"
+          "http192.168.2.54/api/lines"
         );
         setLineOptions(lineResponse.data || []);
       } catch (error) {
@@ -64,7 +64,7 @@ const safeTrim = (value) => (value ? value.toString().trim() : "");
     };
   const fetchData = async () => {
     try {
-      const response = await axios.get("https://103.38.50.149:5000/api/User-master");
+      const response = await axios.get("http192.168.2.54/api/User-master");
       const sorted = response.data.sort((a, b) =>
         a.user_id.localeCompare(b.user_id)
       );
@@ -104,7 +104,7 @@ const handleRoleChange = (e) => {
 
 const addUser = async (userPayload) => {
   try {
-    await axios.post("https://103.38.50.149:5000/api/User-master", userPayload);
+    await axios.post("http192.168.2.54/api/User-master", userPayload);
     setNotification("User added successfully");
     setSnackbarOpen(true);
     setNewUser({ user_id: "", password: "", Adminflag: "" });
@@ -120,7 +120,7 @@ const addUser = async (userPayload) => {
 const updateUser = async (userPayload) => {
   try {
     await axios.put(
-      `https://103.38.50.149:5000/api/User-master/${editingUser.user_id}`,
+      `http192.168.2.54/api/User-master/${editingUser.user_id}`,
       userPayload
     );
     setNotification("User updated successfully");
@@ -144,7 +144,7 @@ const updateUser = async (userPayload) => {
 
   const deleteUser = async (id) => {
     try {
-      await axios.delete(`https://103.38.50.149:5000/api/User-master/${id}`);
+      await axios.delete(`http192.168.2.54/api/User-master/${id}`);
       setNotification("User deleted successfully");
       setSnackbarOpen(true);
       fetchData();
@@ -199,6 +199,7 @@ const cancelEdit = () => {
         User Master
       </Typography>
 
+      <div className="glass-card p-4 mb-4">
       <form onSubmit={handleSubmit} className="form-container">
         <TextField
           label="User ID"
@@ -208,6 +209,8 @@ const cancelEdit = () => {
           required
           fullWidth
           margin="normal"
+          className="glass-input-mui"
+          InputProps={{ className: "glass-input" }}
         />
         <TextField
           label="Password"
@@ -218,12 +221,14 @@ const cancelEdit = () => {
           required
           fullWidth
           margin="normal"
+          className="glass-input-mui"
+          InputProps={{ className: "glass-input" }}
         />
 
      <select
   value={newUser.Adminflag === "1" ? "Admin" : newUser.Adminflag === "0" ? "Employee" : ""}
   onChange={handleRoleChange}
-  className="form-select"
+  className="form-select glass-input my-3"
   required
 >
   <option value="">Select Role</option>
@@ -243,6 +248,7 @@ const cancelEdit = () => {
   onChange={(e) => setSelectedLines(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
   renderValue={(selected) => selected.join(", ")} // ✅ show selected as comma separated
   required
+  className="glass-input"
 >
   {lineOptions.map((line, index) => (
     <MenuItem key={index} value={safeTrim(line.LINE) || ""}>
@@ -253,9 +259,6 @@ const cancelEdit = () => {
 
   </FormControl>
 )}
-
-
-
 
         <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
           <Button type="submit" variant="primary">
@@ -268,8 +271,9 @@ const cancelEdit = () => {
           )}
         </div>
       </form>
+      </div>
 
-      <Table striped bordered hover responsive>
+      <Table striped bordered hover responsive className="glass-table">
         <thead>
           <tr>
             <th>S.No</th>

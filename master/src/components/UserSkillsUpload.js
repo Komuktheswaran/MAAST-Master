@@ -5,6 +5,7 @@ import axios from 'axios';
 import { FaFileDownload, FaEye, FaEyeSlash, FaSave } from 'react-icons/fa';
 import { Container, Button, CircularProgress, Snackbar } from '@mui/material'; // Import Material-UI components
 import '../styles/UserShiftUpload.css'; // Import the CSS file
+import emvLogo from '../pictures/emvlogo.png';
 
 const UserSkillsUpload = () => {
   const [data, setData] = useState([]);
@@ -102,7 +103,7 @@ const UserSkillsUpload = () => {
   //       console.log(jsonstring);
 
   //       try {
-  //         const response = await axios.post('https://103.38.50.149:5000/api/saveUserShifts', jsonstring, {
+  //         const response = await axios.post('http192.168.2.54/api/saveUserShifts', jsonstring, {
   //           headers: {
   //             'Content-Type': 'application/json'
   //           }
@@ -168,7 +169,7 @@ const UserSkillsUpload = () => {
     try {
       for (let i = 0; i < batches.length; i++) {
         const response = await axios.post(
-          "https://103.38.50.149:5000/api/saveUserSkills",
+          "http192.168.2.54/api/saveUserSkills",
           batches[i],
           {
             headers: { "Content-Type": "application/json" },
@@ -249,7 +250,7 @@ const UserSkillsUpload = () => {
 
         try {
           const response = await axios.post(
-            "https://103.38.50.149:5000/api/saveUserSkills",
+            "http192.168.2.54/api/saveUserSkills",
             shiftsBatch,
             {
               headers: { "Content-Type": "application/json" },
@@ -298,7 +299,7 @@ const UserSkillsUpload = () => {
       setTimeout(() => setMessage(""), 5000);
     };
 
-    link.href = "https://103.38.50.149:5000/download-template-us";
+    link.href = "http192.168.2.54/download-template-us";
     link.download = "sample_template.xlsx";
     document.body.appendChild(link);
     link.click();
@@ -308,7 +309,20 @@ const UserSkillsUpload = () => {
   const tableInstance = useTable({ columns, data });
 
   return (
-    <Container maxWidth="lg" style={{ maxWidth: "100%" }}>
+    <Container
+      fluid
+      className="container-fluid"
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+        paddingTop: "20px",
+        maxWidth: "100%",
+      }}
+    >
       <h2 className="title">User Skills Upload</h2>
       <div className="file-upload">
         <input
@@ -326,6 +340,8 @@ const UserSkillsUpload = () => {
           message={notification}
         />
       )}
+      
+      <div className="glass-card p-4 mb-4">
       {data.length > 0 && (
         <div className="d-flex justify-content-between mb-3">
           <Button variant="contained" onClick={() => setShowTable(!showTable)}>
@@ -360,10 +376,11 @@ const UserSkillsUpload = () => {
           <FaFileDownload className="icon" /> Download Sample Template
         </Button>
       </div>
+      </div>
 
       {message && <div className="message">{message}</div>}
       {showTable && data.length > 0 && (
-        <table className="data-table" {...tableInstance.getTableProps()}>
+        <table className="glass-table" {...tableInstance.getTableProps()}>
           <thead>
             {tableInstance.headerGroups.map((headerGroup) => (
               <tr {...headerGroup.getHeaderGroupProps()} key={headerGroup.id}>

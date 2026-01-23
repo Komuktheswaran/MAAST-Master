@@ -8,7 +8,7 @@ import '../styles/UserSkills.css';
 import emvLogo from '../pictures/emvlogo.png';
 import { Popover, Typography } from '@mui/material';
 
-const baseURL = "https://103.38.50.149:5000/api";
+const baseURL = "http192.168.2.54/api";
 
 const UserSkills = () => {
     const [departments, setDepartments] = useState([]);
@@ -22,14 +22,30 @@ const UserSkills = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [userSkills, setUserSkills] = useState([]);
-    const [sortedUserSkills, setSortedUserSkills] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchUserskill, setsearchUserskill] = useState('');
     const [notification, setNotification] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [debouncedSearchUserSkill, setDebouncedSearchUserSkill] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
     const [anchorEl, setAnchorEl] = useState(null);
     const [popoverContent, setPopoverContent] = useState('');
     const isOpen = Boolean(anchorEl);
+
+    // Debounce Logic
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearchUserSkill(searchUserskill);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchUserskill]);
 
     useEffect(() => {
         fetchDepartments();
@@ -38,21 +54,7 @@ const UserSkills = () => {
         fetchUserSkills();
     }, []);
 
-    useEffect(() => {
-        let sortedArray = [...userSkills];
-        if (sortConfig.key) {
-            sortedArray.sort((a, b) => {
-                if (a[sortConfig.key] < b[sortConfig.key]) {
-                    return sortConfig.direction === 'asc' ? -1 : 1;
-                }
-                if (a[sortConfig.key] > b[sortConfig.key]) {
-                    return sortConfig.direction === 'asc' ? 1 : -1;
-                }
-                return 0;
-            });
-        }
-        setSortedUserSkills(sortedArray);
-    }, [sortConfig, userSkills]);
+
 
     const fetchDepartments = async () => {
         try {
@@ -174,15 +176,35 @@ const UserSkills = () => {
         }
     };
 
-    const filteredUserSkills = sortedUserSkills.filter((skill) =>
-        (skill.NAME ? skill.NAME.toLowerCase() : '').includes(searchUserskill.toLowerCase()) ||
-        (skill.USERID ? skill.USERID.toString() : '').includes(searchUserskill.toLowerCase()) ||
-        (skill.STAGE_NAME ? skill.STAGE_NAME.toLowerCase() : '').includes(searchUserskill.toLowerCase()) ||
-        (skill.Skill_Description ? skill.Skill_Description.toLowerCase() : '').includes(searchUserskill.toLowerCase())
-    );
+    // Optimized Sorting with useMemo
+    const sortedUserSkills = React.useMemo(() => {
+        let sortedArray = [...userSkills];
+        if (sortConfig.key) {
+            sortedArray.sort((a, b) => {
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortedArray;
+    }, [userSkills, sortConfig]);
 
-    // Group skills by user ID
-    const getGroupedUserSkills = () => {
+    // Optimized Filtering with useMemo
+    const filteredUserSkills = React.useMemo(() => {
+        return sortedUserSkills.filter((skill) =>
+            (skill.NAME ? skill.NAME.toLowerCase() : '').includes(debouncedSearchUserSkill.toLowerCase()) ||
+            (skill.USERID ? skill.USERID.toString() : '').includes(debouncedSearchUserSkill.toLowerCase()) ||
+            (skill.STAGE_NAME ? skill.STAGE_NAME.toLowerCase() : '').includes(debouncedSearchUserSkill.toLowerCase()) ||
+            (skill.Skill_Description ? skill.Skill_Description.toLowerCase() : '').includes(debouncedSearchUserSkill.toLowerCase())
+        );
+    }, [sortedUserSkills, debouncedSearchUserSkill]);
+
+    // Memoize Grouped Skills to prevent re-calculation on every render
+    const groupedUserSkills = React.useMemo(() => {
         const grouped = {};
         
         filteredUserSkills.forEach(skill => {
@@ -197,18 +219,17 @@ const UserSkills = () => {
             grouped[skill.USERID].skills.push({
                 stageName: skill.STAGE_NAME,
                 description: skill.Skill_Description,
-                rating: skill.RATING || skill.Skill_Description || '' // Using description as rating if rating field not available
+                rating: skill.RATING || skill.Skill_Description || '' 
             });
         });
         
         return Object.values(grouped);
-    };
+    }, [filteredUserSkills]);
 
-    // Calculate maximum number of skills any user has
-    const getMaxSkillsCount = () => {
-        const grouped = getGroupedUserSkills();
-        return Math.max(...grouped.map(user => user.skills.length), 1);
-    };
+    // Memoize Max Skills Count
+    const maxSkillsCount = React.useMemo(() => {
+        return Math.max(...groupedUserSkills.map(user => user.skills.length), 1);
+    }, [groupedUserSkills]);
 
     // Get color for different stages (matching your image colors)
     const getStageColor = (stageName) => {
@@ -298,7 +319,8 @@ const UserSkills = () => {
     };
 
     const filteredEmployees = employees.filter((emp) =>
-        emp.name.toLowerCase().includes(searchTerm.toLowerCase())
+        emp.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        String(emp.userid).toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     );
 
     const handleSort = (key) => {
@@ -352,10 +374,10 @@ const UserSkills = () => {
                     <h3>Employees</h3>
                     <Form.Control
                         type="text"
-                        placeholder="Search employees"
+                        placeholder="Search by Name or User ID"
                         value={searchTerm}
                         onChange={handleSearchChange}
-                        className="mb-3"
+                        className="mb-3 glass-input"
                     />
                     <div className="checkbox-list">
                         {filteredEmployees.map((emp) => (
@@ -375,7 +397,7 @@ const UserSkills = () => {
                 <Col md={6}>
                     <h3>Selected Employees</h3>
                     <div className="selected-employees">
-                        <Table striped bordered hover>
+                        <Table striped bordered hover className="glass-table">
                             <thead className="thead-dark">
                                 <tr>
                                     <th>Employee ID</th>
@@ -411,7 +433,7 @@ const UserSkills = () => {
                         </Button>
                     </div>
                     <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <Table striped bordered hover responsive className="table-container">
+                        <Table striped bordered hover responsive className="table-container glass-table">
                             <thead className="thead-dark">
                                 <tr>
                                     <th>Stage Name</th>
@@ -477,9 +499,10 @@ const UserSkills = () => {
                             <Form.Group>
                                 <Form.Control
                                     type="text"
-                                    placeholder="Search for User Skills details"
+                                    placeholder="Search by User ID, Name, Stage, or Skill"
                                     value={searchUserskill}
                                     onChange={handleSearchUser}
+                                    className="glass-input"
                                 />
                             </Form.Group>
                             <Button variant="success" onClick={handleDownload}>
@@ -488,7 +511,7 @@ const UserSkills = () => {
                         </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
-                        <Table striped bordered hover responsive className="table-container grouped-skills-table">
+                        <Table striped bordered hover responsive className="table-container grouped-skills-table glass-table">
                             <thead>
                                 <tr>
                                     <th onClick={() => handleSort('USERID')}>
@@ -500,7 +523,7 @@ const UserSkills = () => {
                                         <SortIcon columnKey="NAME" />
                                     </th>
                                     {/* Dynamically generate column headers */}
-                                    {Array.from({ length: getMaxSkillsCount() }, (_, index) => (
+                                    {Array.from({ length: maxSkillsCount }, (_, index) => (
                                         <React.Fragment key={`header-${index}`}>
                                             <th>Stage {index + 1}</th>
                                             <th>Description {index + 1}</th>
@@ -511,13 +534,13 @@ const UserSkills = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {getGroupedUserSkills().map((userGroup) => (
+                                {groupedUserSkills.map((userGroup) => (
                                     <tr key={userGroup.userId}>
                                         <td>{userGroup.userId}</td>
                                         <td>{userGroup.name}</td>
                                         
                                         {/* Dynamically generate skill columns */}
-                                        {Array.from({ length: getMaxSkillsCount() }, (_, index) => (
+                                        {Array.from({ length: maxSkillsCount }, (_, index) => (
                                             <React.Fragment key={`skill-${index}`}>
                                                 <td style={{ 
                                                     backgroundColor: userGroup.skills[index] ? getStageColor(userGroup.skills[index].stageName) : '#f8f9fa',

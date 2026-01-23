@@ -7,9 +7,11 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import Select from "react-select"; // SheetJS
 import { Modal, ListGroup } from "react-bootstrap";
+import '../styles/UserShiftUpload.css';
+import emvLogo from '../pictures/emvlogo.png';
 
-const API_BASE_URL = "https://103.38.50.149:5000";
-const EMPLOYEE_API_URL = "https://103.38.50.149:5000/api/employees";
+const API_BASE_URL = "http192.168.2.54";
+const EMPLOYEE_API_URL = "http192.168.2.54/api/employees";
 
 const NPunchReport = () => {
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -30,7 +32,7 @@ const NPunchReport = () => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+        const res = await axios.get("http192.168.2.54/api/employees");
 
         if (Array.isArray(res.data)) {
            const formatted = res.data.map((emp) => ({
@@ -49,7 +51,7 @@ const NPunchReport = () => {
     fetchEmployees();
   }, []);
   useEffect(() => {
-    if (employeeIdInput.length >= 5) {
+    if (employeeIdInput.length > 0) {
       const filtered = allEmployees.filter(emp => 
         emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
       );
@@ -306,8 +308,21 @@ const fmtTimeShort = (dt) => {
   const closePunches = () => setSelectedPunches(null);
 
   return (
-    <Container className="mt-4">
-      <h2 className="mb-3">N‑PUNCH REPORT</h2>
+    <Container 
+      fluid
+      className="container-fluid"
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+        paddingTop: "20px",
+        maxWidth: "100%",
+      }}
+    >
+      <h2 className="title mb-3">N‑PUNCH REPORT</h2>
 
       {err && (
         <Alert variant="danger" onClose={() => setErr("")} dismissible>
@@ -315,6 +330,7 @@ const fmtTimeShort = (dt) => {
         </Alert>
       )}
 
+      <div className="glass-card p-4 mb-4">
       <Row className="mb-3">
         <Col md={3}>
             <label className="form-label">Select Employee</label>
@@ -328,9 +344,9 @@ const fmtTimeShort = (dt) => {
                   setErr(""); // Clear error on employee change
               }}
               onInputChange={(val) => setEmployeeIdInput(val)}
-              placeholder="Search (5 digits)"
+              placeholder="Search Employee..."
               isClearable
-              noOptionsMessage={() => "Enter 5 digits"}
+              noOptionsMessage={() => "No matching employees"}
             />
         </Col>
         <Col md={3}>
@@ -399,9 +415,10 @@ const fmtTimeShort = (dt) => {
           </div>
         </Col>
       </Row>
+      </div>
 
       {userid && (
-        <div className="mb-3">
+        <div className="glass-card p-4 mb-3">
           <div><strong>Employee:</strong> {name ? `${name} (${userid})` : "-"}</div>
           <div><strong>Date Range:</strong> {prettyDateShort(fromDate)} to {prettyDateShort(toDate)}</div>
           {reports && reports.length > 0 && (
@@ -411,9 +428,9 @@ const fmtTimeShort = (dt) => {
       )}
 
       {reports && reports.length > 0 && (
-        <div className="mt-4">
-          <Table striped bordered hover responsive className="small">
-            <thead className="table-dark">
+        <div className="mt-4 glass-card p-4">
+          <Table striped bordered hover responsive className="glass-table small">
+            <thead>
               <tr>
                 <th style={{ minWidth: '100px' }}>Date</th>
                 <th style={{ minWidth: '80px' }}>Shift ID</th>
@@ -497,6 +514,7 @@ const fmtTimeShort = (dt) => {
             </Row>
           </div>
         </div>
+
       )}
 
       <Modal show={selectedPunches !== null} onHide={closePunches} centered>

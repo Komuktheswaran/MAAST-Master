@@ -6,6 +6,7 @@ import { DateTime } from 'luxon';
 import { FaFileDownload, FaEye, FaEyeSlash, FaSave } from 'react-icons/fa';
 import { Container, Button, CircularProgress, Snackbar } from '@mui/material'; // Import Material-UI components
 import '../styles/UserShiftUpload.css'; // Import the CSS file
+import emvLogo from '../pictures/emvlogo.png';
 // import { maxWidth } from '@mui/system';
 
 const EmployeeJobCardUpload = () => {
@@ -133,7 +134,7 @@ const formatDatefordisplay = (dateStr) => {
  const handleJobCardUpload = async () => {
   setLoading(true);
   try {
-    const response = await axios.post('https://103.38.50.149:5000/api/jobcard-upload', data, {
+    const response = await axios.post('http192.168.2.54/api/jobcard-upload', data, {
 
       headers: { 'Content-Type': 'application/json' }
     });
@@ -150,7 +151,7 @@ const formatDatefordisplay = (dateStr) => {
 
   const downloadTemplate = () => {
     const link = document.createElement('a');
-    link.href = 'https://103.38.50.149:5000/download-templatejob';
+    link.href = 'http192.168.2.54/download-templatejob';
     link.download = 'EmployeeJobCardSampleData.xlsx';
     document.body.appendChild(link);
     link.click();
@@ -160,7 +161,20 @@ const formatDatefordisplay = (dateStr) => {
   const tableInstance = useTable({ columns, data });
 
   return (
-    <Container maxWidth="lg" style={{ maxWidth: '100%' }}>
+    <Container 
+      fluid
+      className="container-fluid"
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+        paddingTop: "20px",
+        maxWidth: "100%",
+      }}
+    >
       <h2 className="title">Employee Job Card Upload</h2>
       <div className="file-upload">
         <input className="input-file" type="file" accept=".xlsx" onChange={handleFileUpload} />
@@ -173,6 +187,7 @@ const formatDatefordisplay = (dateStr) => {
           message={notification}
         />
       )}
+      <div className="glass-card p-4 mb-4">
       {data.length > 0 && (
         <div className="d-flex justify-content-between mb-3">
           <Button variant="contained" onClick={() => setShowTable(!showTable)}>
@@ -188,22 +203,17 @@ const formatDatefordisplay = (dateStr) => {
           <FaFileDownload className="icon" /> Download Sample Template
         </Button>
       </div>
+      </div>
 
       {message && <div className="message">{message}</div>}
       {showTable && data.length > 0 && (
-         <table className="data-table" {...tableInstance.getTableProps()}>
+        <div className="glass-card p-4">
+         <table className="glass-table" {...tableInstance.getTableProps()}>
           <thead>
             {tableInstance.headerGroups.map((headerGroup) => (
               <tr {...headerGroup.getHeaderGroupProps()} key={headerGroup.id}>
                 {headerGroup.headers.map((column) => (
-                  <th {...column.getHeaderProps()} key={column.id}  style={{
-    backgroundColor: '#484c61ff', // Blue background
-    color: 'white',            // White text
-    fontWeight: 'bold',
-    textAlign: 'center',
-    padding: '10px',
-    borderBottom: '2px solid #ddd'
-  }}>
+                  <th {...column.getHeaderProps()} key={column.id}>
                     {column.render('Header')}
                   </th>
                 ))}
@@ -225,6 +235,7 @@ const formatDatefordisplay = (dateStr) => {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </Container>
   );

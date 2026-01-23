@@ -41,6 +41,9 @@ const Attendance = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showGraph, setShowGraph] = useState(false);
   const [StoredLine, setStoredLine] = useState(null);
+  const [unassignedEmployees, setUnassignedEmployees] = useState([]);
+  const [showUnassigned, setShowUnassigned] = useState(false);
+  const [loadingUnassigned, setLoadingUnassigned] = useState(false);
     const AdminFlag = parseInt(sessionStorage.getItem("AdminFlag")) || 0;
 const isAdmin = AdminFlag === 1;
 
@@ -68,10 +71,10 @@ const assignedLinesArr = assignedLinesStr.split(",").map(l => l.trim()).filter(l
 
       try {
         const shiftResponse = await axios.get(
-          "https://103.38.50.149:5000/api/shifts"
+          "http192.168.2.54/api/shifts"
         );
         const lineResponse = await axios.get(
-          "https://103.38.50.149:5000/api/lines"
+          "http192.168.2.54/api/lines"
         );
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
@@ -98,6 +101,8 @@ console.log('isAdmin set to:', isAdmin);
     fetchOptions();
   }, [StoredLine, isAdmin]);
 
+  const [unassignedCount, setUnassignedCount] = useState(0);
+
   const fetchAttendanceDetails = useCallback(async () => {
     if (selectedShifts.length === 0 || selectedLines.length === 0) {
       return;
@@ -112,20 +117,35 @@ console.log('isAdmin set to:', isAdmin);
         shifts: selectedShifts,
         lines: selectedLines,
       });
-      const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance",
-        {
+      
+      const [response, unassignedRes] = await Promise.all([
+        axios.get("http192.168.2.54/api/attendance", {
           params: {
             date: formattedDate,
             shifts: selectedShifts.join(","),
             lines: selectedLines.join(","),
           },
-        }
-      );
+        }),
+        axios.get("http192.168.2.54/api/attendance/unassignedManpower", {
+           params: {
+             date: formattedDate,
+             shifts: "S1,S2,S3", 
+             lines: "1A,1B,2A,2B,3A,3B,4A,4B,5A,5B",
+           },
+        })
+      ]);
+
       setAttendanceDetails(response.data || []);
+      
+      // Process Unassigned Count
+      const unassignedData = unassignedRes.data || [];
+      const noShiftCount = unassignedData.length;
+      setUnassignedCount(noShiftCount);
+
       console.log("=== ATTENDANCE SUMMARY DATA ===");
       console.log("Full response:", response.data);
       console.log("Total records:", response.data?.length);
+      console.log("Unassigned count (All):", noShiftCount);
       if (response.data && response.data.length > 0) {
         console.log("Sample record:", response.data[0]);
         console.log("Fields in record:", Object.keys(response.data[0]));
@@ -135,6 +155,7 @@ console.log('isAdmin set to:', isAdmin);
     } catch (error) {
       console.error("Error fetching attendance details:", error);
       setAttendanceDetails([]);
+      setUnassignedCount(0);
     } finally {
       setLoadingDetails(false);
     }
@@ -155,7 +176,7 @@ console.log('isAdmin set to:', isAdmin);
       ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "https://103.38.50.149:5000/api/attendance/showAll",
+          "http192.168.2.54/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -218,7 +239,7 @@ console.log('isAdmin set to:', isAdmin);
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "https://103.38.50.149:5000/api/attendance/showAll",
+          "http192.168.2.54/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -367,7 +388,7 @@ console.log('isAdmin set to:', isAdmin);
 
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance/showAll",
+        "http192.168.2.54/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -376,14 +397,56 @@ console.log('isAdmin set to:', isAdmin);
           },
         }
       );
-
-      setDetailedRecords(response.data || []);
-      console.log("showall", response.data);
+      
+      // Filter to only show Present and Absent records
+      const responseData = response.data || [];
+      const filteredRecords = responseData.filter((record) => {
+        if (!record) return false;
+        const status = String(record.STATUS || record.status || "").toLowerCase().trim();
+        return status === "present" || status === "p" || status === "absent" || status === "a";
+      });
+      
+      setDetailedRecords(filteredRecords);
+      console.log("showall (filtered to Present/Absent only)", filteredRecords);
     } catch (error) {
       console.error("Error fetching all records:", error);
       setDetailedRecords([]);
     } finally {
       setLoadingRecords(false);
+    }
+  };
+
+  const handleShowUnassignedManpower = async () => {
+    const formattedDate = formatDate(selectedDate);
+    setLoadingUnassigned(true);
+    setShowUnassigned(true);
+    setShowTable(true);
+    setShowAllDetails(false);
+    setDetailType("unassigned");
+
+    try {
+      // Use the existing showAll endpoint with all shifts and lines
+      const response = await axios.get(
+        "http192.168.2.54/api/attendance/unassignedManpower",
+        {
+          params: {
+            date: formattedDate
+          },
+        }
+      );
+      console.log("Unassigned Manpower Response:", response.data);
+
+      // Show all employees returned by the API (removed filter)
+      const responseData = response.data || [];
+      const noShiftEmployees = responseData;
+
+      setUnassignedEmployees(noShiftEmployees);
+      console.log("Unassigned Manpower Employees (All):", noShiftEmployees);
+    } catch (error) {
+      console.error("Error fetching unassigned manpower:", error);
+      setUnassignedEmployees([]);
+    } finally {
+      setLoadingUnassigned(false);
     }
   };
 
@@ -403,7 +466,7 @@ console.log('isAdmin set to:', isAdmin);
       },
       { allot: 0, present: 0, absent: 0 }
     );
-    return totals;
+    return { ...totals, unassigned: unassignedCount };
   };
 
   const totals = calculateTotals();
@@ -419,9 +482,8 @@ console.log('isAdmin set to:', isAdmin);
       Allot: record?.ALLOT || 0,
       Present: record?.PRESENT || 0,
       Absent: record?.ABSENT || 0,
-      "First Punch In": record?.FirstPunchIn
-        ? DateTime.fromISO(record.FirstPunchIn).toFormat("dd-MM-yyyy HH:mm:ss")
-        : "No Punch",
+      "First Punch In": record?.FirstPunchIn || "No Punch",
+
       "Punctuality Status": record?.PunctualityStatus || "N/A",
     }));
 
@@ -472,9 +534,10 @@ console.log('isAdmin set to:', isAdmin);
       "Shift ID": record?.SHIFT_ID || "N/A",
       Line: record?.LINE || "N/A",
       Status: record?.STATUS || "N/A",
-      "Punch Time": record?.PUNCHIN
-        ? DateTime.fromISO(record.PUNCHIN).toFormat("dd-MM-yyyy HH:mm:ss")
-        : "No Punch",
+      "Punch in Time": record?.PUNCHIN
+        || "No Punch",
+        "Punch out Time": record?.PUNCHOUT
+        || "No Punch",
       "Shift Start Time": record?.SFTSTTime || "N/A",
       "Punctuality Status": record?.PunctualityStatus || "N/A",
       "Swap User": record?.SWAPUSERNAME || "No Swap",
@@ -527,7 +590,7 @@ console.log('isAdmin set to:', isAdmin);
     }));
 
     axios
-      .post("https://103.38.50.149:5000/api/saveUserSwap", swaps)
+      .post("http192.168.2.54/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -545,7 +608,7 @@ console.log('isAdmin set to:', isAdmin);
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("https://103.38.50.149:5000/api/getEmployees", {
+        .get("http192.168.2.54/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,
@@ -568,9 +631,18 @@ console.log('isAdmin set to:', isAdmin);
     setSwapPopup(true);
   };
 
+  /* Debounced Search Query for Swap Popup */
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const handler = setTimeout(() => {
+        setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const filteredEmployees = Array.isArray(swapEmployees) ? swapEmployees.filter((swapdetail) => {
     if (!swapdetail) return false;
-    const query = searchQuery.toLowerCase();
+    const query = debouncedSearchQuery.toLowerCase();
     return (
       (swapdetail.USERID && swapdetail.USERID.toLowerCase().includes(query)) ||
       (swapdetail.NAME && swapdetail.NAME.toLowerCase().includes(query)) ||
@@ -649,9 +721,9 @@ console.log('isAdmin set to:', isAdmin);
                 placeholder="Search by User ID, Name, Stage Name, or Skill"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
+                className="search-input glass-input"
               />
-              <Table striped bordered hover responsive>
+              <Table striped bordered hover responsive className="glass-table">
                 <thead>
                   <tr>
                     <th>Select</th>
@@ -700,6 +772,7 @@ console.log('isAdmin set to:', isAdmin);
               value={formatDate(selectedDate)}
               onChange={handleDateChange}
               style={{ width: "auto", marginRight: "10px", fontSize: "15px" }}
+              className="glass-input"
             />
           </div>
 
@@ -744,12 +817,21 @@ console.log('isAdmin set to:', isAdmin);
             <Col md={6} className="mb-3">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h3>Select Lines</h3>
-                <Button
-                  onClick={handleButtonClick}
-                  style={{ fontSize: "14px" }}
-                >
-                  Show Records
-                </Button>
+                <div className="d-flex gap-2">
+                  <Button
+                    onClick={handleButtonClick}
+                    style={{ fontSize: "14px" }}
+                  >
+                    Show Records
+                  </Button>
+                  <Button
+                    variant="warning"
+                    onClick={handleShowUnassignedManpower}
+                    style={{ fontSize: "13px" }}
+                  >
+                    Present (Manpower without shift allocation)
+                  </Button>
+                </div>
               </div>
               <div
                 style={{
@@ -859,7 +941,7 @@ console.log('isAdmin set to:', isAdmin);
                   {loadingDetails ? (
                     <Spinner animation="border" />
                   ) : (
-                    <Table striped bordered hover responsive>
+                    <Table striped bordered hover responsive className="glass-table">
                       <thead style={{ fontSize: "15px" }}>
                         <tr>
                           <th>S.No</th>
@@ -967,7 +1049,7 @@ console.log('isAdmin set to:', isAdmin);
 
                 {/* GRAPH SECTION */}
                 {showGraph &&
-                  (totals.allot > 0 || totals.present > 0 || totals.absent > 0) && (
+                  (totals.allot > 0 || totals.present > 0 || totals.absent > 0 || totals.unassigned > 0) && (
                     <div className="d-flex justify-content-center mt-4">
                       <div className="fixed-barchart">
                         <BarChart
@@ -977,6 +1059,7 @@ console.log('isAdmin set to:', isAdmin);
                             { name: "allot", value: totals.allot },
                             { name: "present", value: totals.present },
                             { name: "absent", value: totals.absent },
+                            { name: "unassigned", value: totals.unassigned },
                           ]}
                           margin={{ top: 40, right: 30, left: 20, bottom: 60 }}
                         >
@@ -994,6 +1077,7 @@ console.log('isAdmin set to:', isAdmin);
                             <Cell fill="#0d6efd" />
                             <Cell fill="#228B22" />
                             <Cell fill="#dc3545" />
+                            <Cell fill="#FFA500" />
                           </Bar>
                         </BarChart>
                       </div>
@@ -1001,11 +1085,14 @@ console.log('isAdmin set to:', isAdmin);
                   )}
               </Col>
               
+              {/* Dynamic Details Panel - Shows all types of details */}
               {(showAllDetails || detailType) && (
                 <Col md={6} className="mb-3">
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <h2>
-                      {detailType === "showAll"
+                      {detailType === "unassigned"
+                        ? "Present (Manpower without shift allocation)"
+                        : detailType === "showAll"
                         ? "Show All Details"
                         : detailType
                         ? `${
@@ -1028,14 +1115,63 @@ console.log('isAdmin set to:', isAdmin);
                   )}
 
                   <div className="scrollable-table">
-                    {loadingRecords ? (
+                    {loadingRecords || loadingUnassigned ? (
                       <Spinner animation="border" />
-                    ) : !Array.isArray(detailedRecords) || detailedRecords.length === 0 ? (
-                      <div className="text-center p-3">
-                        <p>No {detailType} records found for the selected criteria.</p>
-                      </div>
+                    ) : detailType === "unassigned" ? (
+                      // Unassigned Manpower Table
+                      !Array.isArray(unassignedEmployees) || unassignedEmployees.length === 0 ? (
+                        <div className="text-center p-3">
+                          <p>No unassigned or wrong shift employees found.</p>
+                        </div>
+                      ) : (
+                        <Table striped bordered hover responsive className="glass-table">
+                          <thead style={{ fontSize: "15px" }}>
+                            <tr>
+                              <th>S.No</th>
+                              <th>Employee ID</th>
+                              <th>Name</th>
+                              <th>Punch In</th>
+                              <th>Punch Out</th>
+                              <th>Total Punches</th>
+                              <th>Worked Hours</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody style={{ fontSize: "15px" }}>
+                            {unassignedEmployees.map((record, index) => (
+                              record && (
+                                <tr key={index}>
+                                  <td>{index + 1}</td>
+                                  <td>{record.USERID || "N/A"}</td>
+                                  <td>{record.NAME || "N/A"}</td>
+                                  <td>{formatPunchTime(record.PUNCHIN) || "No Punch In"}</td>
+                                  <td>{formatPunchTime(record.PUNCHOUT) || "No Punch Out"}</td>
+                                  <td style={{ textAlign: "center" }}>
+                                    {record.TotalPunches || 0}
+                                  </td>
+                                  <td style={{ textAlign: "center", fontWeight: "bold" }}>
+                                    {record.WorkedMinutes ? (record.WorkedMinutes / 60).toFixed(2) : "0.00"} hrs
+                                  </td>
+                                  <td style={{
+                                    color: record.IsWrongShift ? "red" : "orange",
+                                    fontWeight: "bold"
+                                  }}>
+                                    {record.STATUS || "N/A"}
+                                  </td>
+                                </tr>
+                              )
+                            ))}
+                          </tbody>
+                        </Table>
+                      )
                     ) : (
-                      <Table striped bordered hover responsive>
+                      // Regular Details Table (Present, Absent, Show All, Allot)
+                      !Array.isArray(detailedRecords) || detailedRecords.length === 0 ? (
+                        <div className="text-center p-3">
+                          <p>No {detailType} records found for the selected criteria.</p>
+                        </div>
+                      ) : (
+                      <Table striped bordered hover responsive className="glass-table">
                         <thead style={{ fontSize: "15px" }}>
                           <tr>
                             <th>S.No</th>
@@ -1044,11 +1180,13 @@ console.log('isAdmin set to:', isAdmin);
                             <th>Stage Name</th>
                             <th>Shift ID</th>
                             {detailType === "present" && <th>Punch Time</th>}
+                            {detailType === "present" && <th>Punch Out</th>}
                             {detailType === "present" && <th>Shift Start</th>}
                             {detailType === "present" && <th>Status</th>}
                             {detailType === "showAll" && <th>Line</th>}
                             {detailType === "showAll" && <th>Status</th>}
                             {detailType === "showAll" && <th>Punch Time</th>}
+                            {detailType === "showAll" && <th>Punch Out</th>}
                             {(detailType === "absent" || detailType === "present") && <th>Line</th>}
                             {(detailType === "absent" || detailType === "present") && <th>Swap Action</th>}
                             {(detailType === "absent" || detailType === "present") && <th>Selected Swap</th>}
@@ -1068,6 +1206,7 @@ console.log('isAdmin set to:', isAdmin);
                                 {detailType === "present" && (
                                   <>
                                     <td>{record.PUNCHIN}</td>
+                                    <td>{record.PUNCHOUT || "No Punch Out"}</td>
                                     <td>{record.StartTime || "N/A"}</td>
                                     <td style={{
                                       color: getPunctualityColor(record.PunctualityStatus),
@@ -1088,6 +1227,7 @@ console.log('isAdmin set to:', isAdmin);
                                       {record.STATUS || "N/A"}
                                     </td>
                                     <td>{record.PUNCHIN}</td>
+                                    <td>{record.PUNCHOUT || "No Punch Out"}</td>
                                   </>
                                 )}
                                 
@@ -1123,7 +1263,8 @@ console.log('isAdmin set to:', isAdmin);
                           ))}
                         </tbody>
                       </Table>
-                    )}
+                    )
+                  )}
                   </div>
                 </Col>
               )}

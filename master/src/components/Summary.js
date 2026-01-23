@@ -12,6 +12,8 @@ import {
 import axios from "axios";
 import { DateTime } from "luxon";
 import * as XLSX from "xlsx";
+import emvLogo from '../pictures/emvlogo.png';
+import '../styles/UserSkills.css';
 
 // Custom Dropdown with Checkboxes Component
 const MultiSelectDropdown = ({
@@ -166,8 +168,8 @@ const Summary = () => {
         console.log("Fetching dropdown options...");
 
         const [shiftRes, lineRes] = await Promise.all([
-          axios.get("https://103.38.50.149:5000/api/shifts"),
-          axios.get("https://103.38.50.149:5000/api/lines"),
+          axios.get("http192.168.2.54/api/shifts"),
+          axios.get("http192.168.2.54/api/lines"),
         ]);
 
         console.log("Shift options response:", shiftRes.data);
@@ -238,7 +240,7 @@ const Summary = () => {
       console.log("Sending request with params:", params);
 
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance/overall-summary",
+        "http192.168.2.54/api/attendance/overall-summary",
         { params, timeout: 60000 }
       );
 
@@ -314,8 +316,10 @@ const Summary = () => {
   };
 
   return (
-    <Container className="mt-4">
-      <h2 className="mb-3">Filtered Attendance Summary</h2>
+    <Container fluid
+      className="container-fluid"
+      style={{ backgroundImage: `url(${emvLogo})`, backgroundSize: 'auto', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', minHeight: '100vh', opacity: '0.9' }}>
+      <h2 className="mb-4 text-center" style={{ paddingTop: '20px' }}>Filtered Attendance Summary</h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -323,12 +327,14 @@ const Summary = () => {
         </Alert>
       )}
 
+      <div className="glass-card p-4 mb-4">
       {/* ✅ Updated Form with From Date and To Date */}
       <Row className="mb-3">
         <Col md={3}>
           <Form.Label>From Date *</Form.Label>
           <Form.Control
             type="date"
+            className="form-control glass-input"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             max={toDate}
@@ -339,6 +345,7 @@ const Summary = () => {
           <Form.Label>To Date *</Form.Label>
           <Form.Control
             type="date"
+            className="form-control glass-input"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             min={fromDate}
@@ -375,7 +382,7 @@ const Summary = () => {
             placeholder="Select Line"
             labelKey="LINE"
             valueKey="LINE"
-          />
+            />
           {selectedLines.length > 0 && (
             <small className="text-muted mt-1 d-block">
               <strong>Selected:</strong>{" "}
@@ -387,7 +394,7 @@ const Summary = () => {
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <Button onClick={handleSubmit} disabled={loading} className="me-2">
+          <Button onClick={handleSubmit} disabled={loading} className="me-2 btn-primary">
             {loading ? (
               <>
                 <Spinner
@@ -415,6 +422,7 @@ const Summary = () => {
           </Button>
         )}
       </div>
+      </div>
 
       {loading ? (
         <div className="text-center py-4">
@@ -423,7 +431,7 @@ const Summary = () => {
         </div>
       ) : summaryData.length > 0 ? (
         <>
-          <div className="mb-2">
+          <div className="mb-2 glass-card p-2">
             <small className="text-muted">
               Found {summaryData.length} record(s) from {fromDate} to {toDate}
               {!selectedShifts.includes("ALL") &&
@@ -437,8 +445,8 @@ const Summary = () => {
             </small>
           </div>
 
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
+          <Table striped bordered hover responsive className="glass-table">
+            <thead className="thead-dark">
               <tr>
                 <th>Date</th>
                 <th>Shift</th>
@@ -480,9 +488,9 @@ const Summary = () => {
           </Table>
 
           {summaryData.length > 0 && (
-            <div className="mt-3">
+            <div className="mt-3 glass-card p-3">
               <h5>Summary Totals:</h5>
-              <Table bordered size="sm" className="w-auto">
+              <Table bordered size="sm" className="w-auto glass-table">
                 <tbody>
                   <tr>
                     <td>
@@ -545,8 +553,8 @@ const Summary = () => {
           )}
         </>
       ) : (
-        <div className="text-center py-4">
-          <p className="text-muted">
+        <div className="text-center py-4 glass-card">
+          <p className="text-muted mb-0">
             No attendance data found. Please select your filters and click "Show
             Summary" to view data.
           </p>

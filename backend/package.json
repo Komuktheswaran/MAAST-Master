@@ -18,7 +18,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
-  "name": "backend",
+  "name": "master-master-backend",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {

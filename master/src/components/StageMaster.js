@@ -39,7 +39,7 @@ const StageMaster = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/stage-master"
+        "http192.168.2.54/api/stage-master"
       );
       const sorted = response.data.sort(
         (a, b) => a.Stage_Serial - b.Stage_Serial
@@ -53,7 +53,7 @@ const StageMaster = () => {
   const fetchStageTypes = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/stage-master/types"
+        "http192.168.2.54/api/stage-master/types"
       );
       setStageTypes(response.data);
     } catch (error) {
@@ -79,7 +79,7 @@ const StageMaster = () => {
   const addStage = async () => {
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/stage-master",
+        "http192.168.2.54/api/stage-master",
         newStage
       );
       setStages([...stages, response.data]);
@@ -101,7 +101,7 @@ const StageMaster = () => {
   const updateStage = async () => {
     try {
       await axios.put(
-        `https://103.38.50.149:5000/api/stage-master/${editingStage.Stage_id}`,
+        `http192.168.2.54/api/stage-master/${editingStage.Stage_id}`,
         newStage
       );
       setNewStage({ Stage_name: "", Stage_Type: "", Stage_Serial: "" });
@@ -119,7 +119,7 @@ const StageMaster = () => {
   const deleteStage = async (Stage_id) => {
     try {
       await axios.delete(
-        `https://103.38.50.149:5000/api/stage-master/${Stage_id}`
+        `http192.168.2.54/api/stage-master/${Stage_id}`
       );
       setStages(stages.filter((stage) => stage.Stage_id !== Stage_id));
       fetchData();
@@ -187,6 +187,7 @@ const StageMaster = () => {
         Stage Master
       </Typography>
 
+      <div className="glass-card p-4 mb-4">
       <form onSubmit={handleSubmit} className="form-container">
         <TextField
           label="S.No"
@@ -194,7 +195,8 @@ const StageMaster = () => {
           type="number"
           value={newStage.Stage_Serial}
           onChange={handleChange}
-          className="form-input"
+          className="form-input glass-input-mui"
+          InputProps={{ className: "glass-input" }}
           required
           fullWidth
           margin="normal"
@@ -205,7 +207,8 @@ const StageMaster = () => {
           name="Stage_name"
           value={newStage.Stage_name}
           onChange={handleChange}
-          className="form-input"
+          className="form-input glass-input-mui"
+          InputProps={{ className: "glass-input" }}
           required
           fullWidth
           margin="normal"
@@ -215,7 +218,7 @@ const StageMaster = () => {
           name="Stage_Type"
           value={newStage.Stage_Type}
           onChange={handleChange}
-          className="form-select"
+          className="form-select glass-input my-3"
           fullWidth
           required
         >
@@ -291,6 +294,8 @@ const StageMaster = () => {
               onChange={(e) => setNewStageType(e.target.value)}
               fullWidth
               margin="normal"
+              className="glass-input-mui"
+              InputProps={{ className: "glass-input" }}
             />
             <Button
               variant="contained"
@@ -303,13 +308,14 @@ const StageMaster = () => {
           </div>
         )}
       </form>
+      </div>
 
       <Table
         striped
         bordered
         hover
         responsive
-        className="table-container tableStyle"
+        className="table-container tableStyle glass-table"
       >
         <thead>
           <tr>

@@ -12,6 +12,8 @@ import {
 import axios from "axios";
 import * as XLSX from "xlsx";
 import Select from 'react-select'; // Import react-select
+import emvLogo from '../pictures/emvlogo.png';
+import '../styles/UserSkills.css';
 
 const EmployeePunctuality = () => {
   const [employeeName, setEmployeeName] = useState("");
@@ -51,7 +53,7 @@ const formatDates = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+        const res = await axios.get("http192.168.2.54/api/employees");
         if (Array.isArray(res.data)) {
            const formatted = res.data.map((emp) => ({
             value: emp.userid, // Use userid as value
@@ -69,13 +71,13 @@ const formatDates = (dateStr) => {
   }, []);
 
   useEffect(() => {
-    if (employeeIdInput.length >= 5) { // Updated to 5 as requested
+    if (employeeIdInput.length > 0) {
       const filtered = allEmployees.filter(emp => 
         emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
       );
       setEmployeeOptions(filtered);
     } else {
-        setEmployeeOptions([]); // Clear options if input is too short
+        setEmployeeOptions([]); // Clear options if input is empty
     }
   }, [employeeIdInput, allEmployees]);
 
@@ -90,7 +92,7 @@ const formatDates = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/employee-punctuality",
+        "http192.168.2.54/api/employee-punctuality",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),
@@ -195,8 +197,10 @@ const downloadExcel = () => {
   };
 
   return (
-    <Container className="mt-4">
-      <h2 className="mb-3">Employee Punctuality</h2>
+    <Container fluid
+      className="container-fluid"
+      style={{ backgroundImage: `url(${emvLogo})`, backgroundSize: 'auto', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', minHeight: '100vh', opacity: '0.9' }}>
+      <h2 className="mb-4 text-center" style={{ paddingTop: '20px' }}>Employee Punctuality</h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -204,11 +208,12 @@ const downloadExcel = () => {
         </Alert>
       )}
 
+      <div className="glass-card p-4 mb-4">
       <Row className="mb-3">
      
        
         <Col md={4}>
-          <Form.Label>Employee *</Form.Label>
+          <label className="form-label">Employee</label>
           <Select
             options={employeeOptions}
             value={employeeOptions.find(option => option.value === employeeId)} // Set selected value
@@ -217,9 +222,24 @@ const downloadExcel = () => {
               setEmployeeName(selected ? selected.name : ""); // Set employee name
             }}
             onInputChange={(val) => setEmployeeIdInput(val)}
-            placeholder="Search (Enter at least 5 characters)"
+            placeholder="Search Employee..."
             isClearable
-            noOptionsMessage={() => employeeIdInput.length < 5 ? "Enter at least 5 characters to search" : "No matching employees"}
+            noOptionsMessage={() => "No matching employees"}
+            classNamePrefix="react-select"
+            styles={{
+                control: (base) => ({
+                    ...base,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    color: 'black'
+                }),
+                menu: (base) => ({
+                    ...base,
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(10px)',
+                })
+            }}
           />
         </Col>
 
@@ -227,7 +247,7 @@ const downloadExcel = () => {
           <Form.Label>From Date *</Form.Label>
           <Form.Control
             type="date"
-            className="form-control"
+            className="form-control glass-input"
             value={formatDate(fromDate)}
             onChange={(e) => setFromDate(new Date(e.target.value))}
             max={formatDate(new Date())}
@@ -238,7 +258,7 @@ const downloadExcel = () => {
           <Form.Label>To Date *</Form.Label>
           <Form.Control
             type="date"
-            className="form-control"
+            className="form-control glass-input"
             value={formatDate(toDate)}
             onChange={(e) => setToDate(new Date(e.target.value))}
             max={formatDate(new Date())}
@@ -253,7 +273,7 @@ const downloadExcel = () => {
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <Button onClick={fetchPunctuality} disabled={loading} className="me-2">
+          <Button onClick={fetchPunctuality} disabled={loading} className="me-2 btn-primary">
             {loading ? (
               <>
                 <Spinner
@@ -281,6 +301,7 @@ const downloadExcel = () => {
           </Button>
         )}
       </div>
+      </div>
 
       {loading ? (
         <div className="text-center py-4">
@@ -289,8 +310,8 @@ const downloadExcel = () => {
         </div>
       ) : punctualityData.length > 0 ? (
         <>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
+          <Table striped bordered hover responsive className="glass-table">
+            <thead className="thead-dark">
               <tr>
                 <th>S.No</th>
                 <th>Date</th>
@@ -321,7 +342,7 @@ const downloadExcel = () => {
           </Table>
         </>
       ) : (
-        <div className="text-center py-4">
+        <div className="text-center py-4 glass-card">
           <p className="text-muted">
             No employee Punctuality data found. Please select your filters and click
             "Show Punctuality" to view data.

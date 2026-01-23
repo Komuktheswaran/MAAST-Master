@@ -19,6 +19,7 @@ import NPunchReport from './components/NPunchReport';
 import EmployeePunctuality from './components/EmployeePunctuality';
 import EmployeeJobCardUpload from './components/EmployeeJobCardUpload';
 import EmployeeJobCardDownload from './components/EmployeeJobCardDownload';
+import LeaveManagement from './components/LeaveManagement';
 
 
 const darkDrawerTheme = createTheme({
@@ -59,8 +60,6 @@ const AppContent = () => {
         <Route path="/user-shift-report" element={<ProtectedRoute element={<UserShiftReport />} />} />
         <Route path="/summary" element={<ProtectedRoute element={<Summary />} />} />
         <Route path="/attendance" element={<ProtectedRoute element={<Attendance />} />} />
-        <Route path="/attendance" element={<ProtectedRoute element={<Attendance />} />} />
-        <Route path="/attendance" element={<ProtectedRoute element={<Attendance />} />} />
         <Route path="/summary" element={<ProtectedRoute element={<Summary />} />}/>
         <Route path="/" element={<Navigate to="/login" />} />        
         <Route path="/image-upload" element={<ImageUpload />} />
@@ -69,6 +68,7 @@ const AppContent = () => {
         <Route path="/employee-jobcarddownload" element={<ProtectedRoute element={<EmployeeJobCardDownload />} />} />        
         <Route path="/NPunchReport" element={<ProtectedRoute element={<NPunchReport />} />} />
         <Route path="/employee-Punctuality" element={<ProtectedRoute element={< EmployeePunctuality/>} />} />
+        <Route path="/leave-management" element={<ProtectedRoute element={<LeaveManagement />} />} />
       </Routes>
     </div>
   );

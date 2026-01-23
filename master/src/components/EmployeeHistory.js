@@ -13,6 +13,8 @@ import axios from "axios";
 
 import * as XLSX from "xlsx";
 import Select from "react-select";
+import emvLogo from '../pictures/emvlogo.png';
+import '../styles/UserSkills.css'; // Ensure we have access to glass styles
 
 const EmployeeHistory = () => {
   const [fromDate, setFromDate] = useState(new Date());
@@ -63,7 +65,7 @@ const formatDatefordisplay = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://103.38.50.149:5000/api/employees");
+        const res = await axios.get("http192.168.2.54/api/employees");
 
         if (Array.isArray(res.data)) {
           const formatted = res.data.map((emp) => ({
@@ -84,7 +86,7 @@ const formatDatefordisplay = (dateStr) => {
 
   // Filter options based on input
   useEffect(() => {
-    if (employeeIdInput.length >= 5) {
+    if (employeeIdInput.length > 0) {
       const filtered = allEmployees.filter(emp => 
         emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
       );
@@ -110,7 +112,7 @@ const formatDatefordisplay = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/employee-history",
+        "http192.168.2.54/api/employee-history",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),
@@ -219,8 +221,10 @@ const downloadExcel = () => {
   };
 
   return (
-    <Container className="mt-4">
-      <h2 className="mb-3">Employee History</h2>
+    <Container fluid
+      className="container-fluid"
+      style={{ backgroundImage: `url(${emvLogo})`, backgroundSize: 'auto', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', minHeight: '100vh', opacity: '0.9' }}>
+      <h2 className="mb-4 text-center" style={{ paddingTop: '20px' }}>Employee History</h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -228,21 +232,37 @@ const downloadExcel = () => {
         </Alert>
       )}
 
+      <div className="glass-card p-4 mb-4">
       <Row className="mb-3">
 
         <Col md={4}>
             <label className="form-label">Select Employee</label>
             <Select
               options={employeeOptions}
-              value={employeeOptions.find((opt) => opt.value === employeeId) || null}
+              value={allEmployees.find((opt) => opt.value === employeeId) || null}
               onChange={(selected) => {
                 setEmployeeId(selected ? selected.value : null);
                 setEmployeeName(selected ? selected.name : "");
               }}
               onInputChange={(val) => setEmployeeIdInput(val)}
-              placeholder="Search (Enter 5 digits)"
+              placeholder="Search Employee..."
               isClearable
-              noOptionsMessage={() => "Enter at least 5 digits to search"}
+              noOptionsMessage={() => "No matching employees"}
+              classNamePrefix="react-select"
+              styles={{
+                  control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      color: 'black'
+                  }),
+                  menu: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      backdropFilter: 'blur(10px)',
+                  })
+              }}
             />
         </Col>
 
@@ -250,7 +270,7 @@ const downloadExcel = () => {
           <Form.Label>From Date *</Form.Label>
           <Form.Control
             type="date"
-            className="form-control"
+            className="form-control glass-input"
             value={formatDate(fromDate)}
             onChange={(e) => setFromDate(new Date(e.target.value))}
             max={formatDate(new Date())}
@@ -261,7 +281,7 @@ const downloadExcel = () => {
           <Form.Label>To Date *</Form.Label>
           <Form.Control
             type="date"
-            className="form-control"
+            className="form-control glass-input"
             value={formatDate(toDate)}
             onChange={(e) => setToDate(new Date(e.target.value))}
             max={formatDate(new Date())}
@@ -273,7 +293,7 @@ const downloadExcel = () => {
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <Button onClick={fetchHistory} disabled={loading} className="me-2">
+          <Button onClick={fetchHistory} disabled={loading} className="me-2 btn-primary">
             {loading ? (
               <>
                 <Spinner
@@ -301,6 +321,7 @@ const downloadExcel = () => {
           </Button>
         )}
       </div>
+      </div>
 
       {loading ? (
         <div className="text-center py-4">
@@ -309,8 +330,8 @@ const downloadExcel = () => {
         </div>
       ) : historyData.length > 0 ? (
         <>
-          <Table striped bordered hover responsive>
-            <thead className="table-dark">
+          <Table striped bordered hover responsive className="glass-table">
+            <thead className="thead-dark">
               <tr>
                 <th>S.No</th>
                 <th>Date</th>
@@ -338,8 +359,8 @@ const downloadExcel = () => {
           </Table>
         </>
       ) : (
-        <div className="text-center py-4">
-          <p className="text-muted">
+        <div className="text-center py-4 glass-card">
+          <p className="text-muted mb-0">
             No employee history data found. Please select your filters and click
             "Show History" to view data.
           </p>

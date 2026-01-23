@@ -30,7 +30,7 @@ const SkillMaster = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/skill-master"
+        "http192.168.2.54/api/skill-master"
       );
       setSkills(response.data);
     } catch (error) {
@@ -59,7 +59,7 @@ const SkillMaster = () => {
   const addSkill = async () => {
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/skill-master",
+        "http192.168.2.54/api/skill-master",
         newSkill
       );
       setSkills([...skills, response.data]);
@@ -80,7 +80,7 @@ const SkillMaster = () => {
   const updateSkill = async () => {
     try {
       const response = await axios.put(
-        `https://103.38.50.149:5000/api/skill-master/${editingSkill.Skill_id}`,
+        `http192.168.2.54/api/skill-master/${editingSkill.Skill_id}`,
         newSkill
       );
       const updatedSkills = skills.map(skill =>
@@ -129,13 +129,15 @@ const SkillMaster = () => {
         Skill Master
       </Typography>
 
+      <div className="glass-card p-4 mb-4">
       <form onSubmit={handleSubmit} className="form-container">
         <TextField
           label="Skill Description"
           name="Skill_Description"
           value={newSkill.Skill_Description}
           onChange={handleChange}
-          className="form-input"
+          className="form-input glass-input-mui"
+          InputProps={{ className: "glass-input" }}
           required
           fullWidth
           margin="normal"
@@ -144,7 +146,7 @@ const SkillMaster = () => {
           name="Skill_Rating"
           value={newSkill.Skill_Rating}
           onChange={handleChange}
-          className="form-select"
+          className="form-select glass-input my-3"
           displayEmpty
           fullWidth
           required
@@ -180,14 +182,15 @@ const SkillMaster = () => {
                 placeholder="Search Skill Name..."
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="search-bar"
+                className="search-bar glass-input"
               />
             </InputGroup>
           )}
         </div>
       </form>
+      </div>
       
-      <Table striped bordered hover responsive className="table-container">
+      <Table striped bordered hover responsive className="table-container glass-table">
         <thead>
           <tr>
             <th>Skill ID</th>

@@ -72,7 +72,7 @@ const isAdmin = AdminFlag === 1;
     setErrorImages('');
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/carousel-images"
+        "http192.168.2.54/api/carousel-images"
       );
       setCarouselImages(response.data || []);
     } catch (error) {
@@ -507,6 +507,15 @@ const defaultCarouselContent = [
                       to="/summary"
                     >
                       Summary Report
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseAttMenu();
+                      }}
+                      component={Link}
+                      to="/leave-management"
+                    >
+                      Leave Management
                     </MenuItem>
                  
                       </>

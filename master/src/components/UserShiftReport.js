@@ -13,24 +13,40 @@ import {
   InputGroup,
   Card,
   Accordion,
+  Modal,
 } from "react-bootstrap";
 import { IconButton } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { FaSort, FaDownload } from "react-icons/fa";
+import { FaSort, FaDownload, FaInfoCircle } from "react-icons/fa";
 import moment from "moment";
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
 import "../styles/UserShiftReport.css";
+import emvLogo from '../pictures/emvlogo.png';
 
-const baseURL = "https://103.38.50.149:5000/api";
+const baseURL = "http192.168.2.54/api";
 
 const UserShiftReport = () => {
   const [userShifts, setUserShifts] = useState([]);
+  const [showShiftInfo, setShowShiftInfo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState("");
   const [searchUserShift, setSearchUserShift] = useState("");
+  const [debouncedSearchUserShift, setDebouncedSearchUserShift] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [showShiftDetails, setShowShiftDetails] = useState(false);
+const [shiftMasterDetails, setShiftMasterDetails] = useState([]);
+const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
+
+
+  // Debounce Logic
+  useEffect(() => {
+    const handler = setTimeout(() => {
+        setDebouncedSearchUserShift(searchUserShift);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchUserShift]);
   const pageSize = 100;
 
   // Filter States
@@ -119,8 +135,8 @@ const UserShiftReport = () => {
   const getFilteredAndSortedData = () => {
     let filtered = userShifts;
 
-    if (searchUserShift) {
-      const lowerSearch = searchUserShift.toLowerCase();
+    if (debouncedSearchUserShift) {
+      const lowerSearch = debouncedSearchUserShift.toLowerCase();
       filtered = filtered.filter((shift) =>
         Object.values(shift).some(
           (val) => val && val.toString().toLowerCase().includes(lowerSearch)
@@ -194,6 +210,20 @@ const UserShiftReport = () => {
     return <FaSort />;
   };
 
+  const fetchShiftMasterDetails = async () => {
+  setLoadingShiftDetails(true);
+  try {
+    const response = await axios.get(`${baseURL}/shifts_master_details`);
+    setShiftMasterDetails(response.data);
+    setShowShiftDetails(true);
+  } catch (error) {
+    console.error("Error fetching shift master details:", error);
+    setNotification("Error loading shift details. Please try again.");
+  } finally {
+    setLoadingShiftDetails(false);
+  }
+};
+
   const highlightText = (text, highlight) => {
     if (!highlight.trim()) return text;
     const regex = new RegExp(`(${highlight})`, "gi");
@@ -209,7 +239,20 @@ const UserShiftReport = () => {
   };
 
   return (
-    <Container fluid>
+    <Container 
+      fluid
+      className="container-fluid"
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+        paddingTop: "20px",
+        maxWidth: "100%",
+      }}
+    >
       <Row className="mt-4">
         <Col md={12}>
           <div className="d-flex justify-content-between align-items-center mb-4">
@@ -221,12 +264,13 @@ const UserShiftReport = () => {
                   placeholder="Search in loaded data..."
                   value={searchUserShift}
                   onChange={handleSearchUser}
+                  className="glass-input"
                 />
               </InputGroup>
             </div>
           </div>
 
-          <Card className="mb-4 shadow-sm">
+          <Card className="mb-4 glass-card">
             <Card.Body>
               <Row className="align-items-end g-3 mb-3">
                  <Col md={3}>
@@ -235,6 +279,7 @@ const UserShiftReport = () => {
                       type="date"
                       value={selectedFromDate}
                       onChange={(e) => setSelectedFromDate(e.target.value)}
+                      className="glass-input"
                     />
                  </Col>
                  <Col md={3}>
@@ -243,6 +288,7 @@ const UserShiftReport = () => {
                       type="date"
                       value={selectedToDate}
                       onChange={(e) => setSelectedToDate(e.target.value)}
+                      className="glass-input"
                     />
                  </Col>
                  <Col md={2}>
@@ -252,7 +298,24 @@ const UserShiftReport = () => {
                  </Col>
               </Row>
 
-              <h5 className="mb-3">Filters (Shifts, Stages, Lines)</h5>
+<div className="d-flex align-items-center mb-3">
+  <h5 className="mb-0 me-2">Filters (Shifts, Stages, Lines)</h5>
+  <Button 
+    variant="link" 
+    size="sm" 
+    onClick={fetchShiftMasterDetails}
+    disabled={loadingShiftDetails}
+    className="p-0 text-info"
+    title="View Shift Master Details"
+  >
+    {loadingShiftDetails ? (
+      <Spinner animation="border" size="sm" />
+    ) : (
+      <FaInfoCircle size={20} />
+    )}
+  </Button>
+</div>
+
               <Row>
                 <Col md={4}>
                   <h6>Shifts</h6>
@@ -261,7 +324,7 @@ const UserShiftReport = () => {
                           <Form.Check 
                               key={shift.SFTID}
                               type="checkbox"
-                              label={shift.SFTName || shift.SFTID}
+                              label={shift.SFTID}
                               checked={selectedShiftIds.includes(shift.SFTID)}
                               onChange={() => {
                                   setSelectedShiftIds(prev => prev.includes(shift.SFTID) ? prev.filter(id => id !== shift.SFTID) : [...prev, shift.SFTID])
@@ -323,12 +386,17 @@ const UserShiftReport = () => {
                         <FaDownload /> Download Excel
                     </Button>
                 </div>
-                <Table striped bordered hover responsive>
+                <Table striped bordered hover responsive className="glass-table">
                     <thead>
                     <tr>
                         <th onClick={() => handleSort("userid")}>User ID <SortIcon columnKey="userid" /></th>
                         <th onClick={() => handleSort("user_name")}>User Name <SortIcon columnKey="user_name" /></th>
-                        <th onClick={() => handleSort("SHIFT_ID")}>Shift ID <SortIcon columnKey="SHIFT_ID" /></th>
+                        <th onClick={() => handleSort("SHIFT_ID")}>
+                          Shift ID <SortIcon columnKey="SHIFT_ID" /> 
+                          <Button variant="link" size="sm" onClick={() => setShowShiftInfo(true)} className="p-0 ms-1 text-info">
+                            <FaInfoCircle />
+                          </Button>
+                        </th>
                         <th onClick={() => handleSort("Stage_name")}>Stage Name <SortIcon columnKey="Stage_name" /></th>
                         <th onClick={() => handleSort("Shift_date_from")}>From Date <SortIcon columnKey="Shift_date_from" /></th>
                         <th onClick={() => handleSort("Shift_date_to")}>To Date <SortIcon columnKey="Shift_date_to" /></th>
@@ -374,6 +442,82 @@ const UserShiftReport = () => {
 
         </Col>
       </Row>
+
+      {/* Shift Info Modal */}
+      <Modal show={showShiftInfo} onHide={() => setShowShiftInfo(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Shift Master Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Table striped bordered hover responsive className="glass-table">
+            <thead>
+              <tr>
+                <th>Shift ID</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Shift Break</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shiftOptions.map((shift, index) => (
+                <tr key={index}>
+                  <td>{shift.SFTID}</td>
+                  <td>{shift.SFTSTTime}</td>
+                  <td>{shift.SFTEDTime}</td>
+                  <td>{shift.BreakDuration || 0} mins</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowShiftInfo(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Shift Details Modal */}
+      <Modal show={showShiftDetails} onHide={() => setShowShiftDetails(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Shift Master Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="table-responsive">
+            <Table bordered hover striped className="glass-table">
+              <thead>
+                <tr>
+                  <th>Shift ID</th>
+                  <th>Shift Name</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shiftMasterDetails.length > 0 ? (
+                  shiftMasterDetails.map((shift, index) => (
+                    <tr key={index}>
+                      <td>{shift.SFTID}</td>
+                      <td>{shift.SFTName}</td>
+                      <td>{moment(shift.SFTSTTime).isValid() ? moment(shift.SFTSTTime).format("HH:mm:ss") : shift.SFTSTTime}</td>
+                      <td>{moment(shift.SFTEDTime).isValid() ? moment(shift.SFTEDTime).format("HH:mm:ss") : shift.SFTEDTime}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="text-center">No Shift Details Found</td>
+                  </tr>
+                )}
+              </tbody>
+            </Table>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowShiftDetails(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

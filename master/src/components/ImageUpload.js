@@ -41,7 +41,7 @@ const ImageUpload = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/carousel-images"
+        "http192.168.2.54/api/carousel-images"
       );
       setImages(response.data);
     } catch (error) {
@@ -57,8 +57,8 @@ const ImageUpload = () => {
     if (!file) return;
 
     // Validate file size (5MB limit)
-    if (file.size > 1 * 1024 * 1024) {
-      setError("File size must be less than 1MB");
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File size must be less than 10MB");
       return;
     }
 
@@ -79,7 +79,7 @@ const ImageUpload = () => {
 
     try {
       await axios.post(
-        "https://103.38.50.149:5000/api/carousel-images/upload",
+        "http192.168.2.54/api/carousel-images/upload",
         formData,
         {
           headers: {
@@ -105,7 +105,7 @@ const ImageUpload = () => {
     if (!window.confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      await axios.delete(`https://103.38.50.149:5000/api/carousel-images/${id}`);
+      await axios.delete(`http192.168.2.54/api/carousel-images/${id}`);
       setSuccess('Image deleted successfully!');
       fetchImages();
     } catch (error) {
@@ -127,7 +127,7 @@ const ImageUpload = () => {
     try {
       const updatePromises = items.map((item, index) =>
         axios.put(
-          `https://103.38.50.149:5000/api/carousel-images/${item.id}/order`,
+          `http192.168.2.54/api/carousel-images/${item.id}/order`,
           {
             displayOrder: index,
           }
@@ -203,7 +203,7 @@ const ImageUpload = () => {
           </Box>
           
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Supported formats: JPEG, PNG, GIF, WebP (Max size: 1MB)
+            Supported formats: JPEG, PNG, GIF, WebP (Max size: 10MB)
           </Typography>
         </CardContent>
       </Card>
