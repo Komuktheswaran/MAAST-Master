@@ -1472,7 +1472,6 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
   console.log("Received parameters:", { fromDate, toDate, shifts, lines });
 
   try {
-    // Validate date parameters
     if (!fromDate || !toDate) {
       return res.status(400).json({
         error: "Both fromDate and toDate parameters are required",
@@ -1482,9 +1481,7 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
     const pool = await sql.connect(config);
     const request = pool.request();
 
-    let whereClause = `
-      ISNULL(P2.UserIDEnbl, 0) = 1 
-    `;
+    let whereClause = `ISNULL(P2.UserIDEnbl, 0) = 1`;
 
     // Add date range filter
     whereClause += ` AND P1.Shift_date_from >= @fromDate AND P1.Shift_date_from <= @toDate`;
@@ -1493,15 +1490,10 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 
     // Handle multiple shifts
     if (shifts && shifts.trim() !== "") {
-      const shiftArray = shifts
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s !== "");
+      const shiftArray = shifts.split(",").map((s) => s.trim()).filter((s) => s !== "");
       if (shiftArray.length > 0) {
-        const shiftPlaceholders = shiftArray
-          .map((_, index) => `@shift${index}`)
-          .join(",");
-        whereClause += ` AND P1.SHIFT_ID IN (${shiftPlaceholders})`;
+        const shiftPlaceholders = shiftArray.map((_, index) => `@shift${index}`).join(",");
+        whereClause += ` AND RTRIM(P1.SHIFT_ID) IN (${shiftPlaceholders})`;  // ADD RTRIM
 
         shiftArray.forEach((shift, index) => {
           request.input(`shift${index}`, sql.VarChar, shift);
@@ -1511,15 +1503,10 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 
     // Handle multiple lines
     if (lines && lines.trim() !== "") {
-      const lineArray = lines
-        .split(",")
-        .map((l) => l.trim())
-        .filter((l) => l !== "");
+      const lineArray = lines.split(",").map((l) => l.trim()).filter((l) => l !== "");
       if (lineArray.length > 0) {
-        const linePlaceholders = lineArray
-          .map((_, index) => `@line${index}`)
-          .join(",");
-        whereClause += ` AND P1.LINE IN (${linePlaceholders})`;
+        const linePlaceholders = lineArray.map((_, index) => `@line${index}`).join(",");
+        whereClause += ` AND RTRIM(P1.LINE) IN (${linePlaceholders})`;  // ADD RTRIM
 
         lineArray.forEach((line, index) => {
           request.input(`line${index}`, sql.VarChar, line);
@@ -1529,30 +1516,33 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 
     const query = `
       WITH ShiftInfo AS (
-        SELECT 
+        SELECT DISTINCT  -- ✅ ADD DISTINCT HERE
           P1.USERID, 
           P1.Shift_date_from, 
-          P1.SHIFT_ID, 
-          P1.LINE,
+          RTRIM(P1.SHIFT_ID) AS SHIFT_ID,  -- ✅ TRIM SHIFT_ID
+          RTRIM(P1.LINE) AS LINE,          -- ✅ TRIM LINE
           SM.SFTSTTime,
           
-          -- Calculate ShiftStartDateTime
           CAST(CONVERT(VARCHAR(10), P1.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
           
-          -- Calculate ShiftEndDateTime (overnight check)
           CASE WHEN SM.SFTEDTime < SM.SFTSTTime 
                THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), P1.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
                ELSE CAST(CONVERT(VARCHAR(10), P1.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
           END AS ShiftEndDateTime
           
         FROM Mx_UserShifts AS P1
-        LEFT JOIN MX_USERMST AS P2 ON P1.USERID = P2.USERID
-        LEFT JOIN Mx_ShiftMst AS SM ON P1.SHIFT_ID = SM.SFTID
+        INNER JOIN MX_USERMST AS P2 ON P1.USERID = P2.USERID  -- ✅ CHANGE TO INNER JOIN
+        INNER JOIN Mx_ShiftMst AS SM ON RTRIM(P1.SHIFT_ID) = RTRIM(SM.SFTID)  -- ✅ INNER JOIN + RTRIM
         WHERE ${whereClause}
       ),
       AttendanceStatus AS (
-        SELECT 
-            SI.*,
+        SELECT DISTINCT  -- ✅ ADD DISTINCT HERE TOO
+            SI.USERID,
+            SI.Shift_date_from,
+            SI.SHIFT_ID,
+            SI.LINE,
+            SI.ShiftStartDateTime,
+            SI.ShiftEndDateTime,
             CASE WHEN EXISTS (
                 SELECT 1 
                 FROM Mx_ATDEventTrn E 
@@ -1567,9 +1557,9 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
         Shift_date_from AS DATE,
         SHIFT_ID AS SHIFT,
         LINE,
-        COUNT(*) AS ALLOTTED,
+        COUNT(DISTINCT USERID) AS ALLOTTED,  -- ✅ COUNT DISTINCT USERID
         SUM(IsPresent) AS PRESENT,
-        CAST(SUM(CASE WHEN IsPresent = 0 THEN 1 ELSE 0 END) AS INT) AS ABSENT
+        COUNT(DISTINCT USERID) - SUM(IsPresent) AS ABSENT  -- ✅ USE COUNT DISTINCT
       FROM AttendanceStatus
       GROUP BY Shift_date_from, SHIFT_ID, LINE
       ORDER BY Shift_date_from, SHIFT_ID, LINE;
@@ -1591,6 +1581,8 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
     });
   }
 });
+
+
 
 // app.get("/api/attendance/allot", async (req, res) => {
 //   const { date, shiftId, stageName, line } = req.query;
@@ -1822,12 +1814,16 @@ app.get("/api/attendance/showAll", async (req, res) => {
         SM.SFTName AS ShiftName,
         SM.SFTSTTime AS StartTime,
         SM.SFTEDTime AS EndTime,
-        -- Smart shift calculation (handles night shifts)
         CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
         CASE WHEN SM.SFTEDTime < SM.SFTSTTime
              THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
              ELSE CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
-        END AS ShiftEndDateTime
+        END AS ShiftEndDateTime,
+        -- ✅ ADD: Extended shift end with 30-minute grace period
+        CASE WHEN SM.SFTEDTime < SM.SFTSTTime
+             THEN DATEADD(MINUTE, 30, DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)))
+             ELSE DATEADD(MINUTE, 30, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
+        END AS ShiftEndWithGrace
     FROM dbo.Mx_UserShifts US
     LEFT JOIN dbo.Mx_ShiftMst SM ON US.SHIFT_ID = SM.SFTID
     LEFT JOIN dbo.MX_USERMST U ON US.USERID = U.USERID
@@ -1835,7 +1831,7 @@ app.get("/api/attendance/showAll", async (req, res) => {
       AND ISNULL(U.UserIDEnbl, 0) = 1
 ),
 Swaps AS (
-    SELECT
+    SELECT DISTINCT
         SW.SWAP_USERID,
         SW.STAGE_ID,
         SW.LINE,
@@ -1849,7 +1845,9 @@ SmartPunches AS (
         A.SHIFT_ID,
         A.ShiftStartDateTime,
         A.ShiftEndDateTime,
-        -- Smart punch IN logic (improved for night shifts)
+        A.ShiftEndWithGrace,  -- ✅ ADD: Pass grace period to SmartPunches
+        
+        -- PUNCH IN logic (unchanged)
         CASE 
             WHEN EXISTS (
                 SELECT 1 FROM Mx_ATDEventTrn E2
@@ -1867,29 +1865,31 @@ SmartPunches AS (
                 FROM Mx_ATDEventTrn E2
                 WHERE E2.USERID = A.USERID
                   AND E2.EDateTime >= A.ShiftStartDateTime
-                  AND E2.EDateTime <= A.ShiftEndDateTime
+                  AND E2.EDateTime <= A.ShiftEndWithGrace  -- ✅ CHANGED: Use grace period
             )
         END AS PUNCHIN,
-        -- Smart punch OUT logic (improved for night shifts)
+        
+        -- ✅ MODIFIED: PUNCH OUT with 30-minute grace period
         (
             SELECT MAX(E2.EDateTime)
             FROM Mx_ATDEventTrn E2
             WHERE E2.USERID = A.USERID
               AND E2.EDateTime >= A.ShiftStartDateTime
-              AND E2.EDateTime <= A.ShiftEndDateTime
+              AND E2.EDateTime <= A.ShiftEndWithGrace  -- ✅ CHANGED: Extended by 30 minutes
         ) AS PUNCHOUT,
-        -- Total punches in shift window (improved for night shifts)
+        
+        -- ✅ MODIFIED: Total punch count with grace period
         (
             SELECT COUNT(*)
             FROM Mx_ATDEventTrn E2
             WHERE E2.USERID = A.USERID
               AND E2.EDateTime >= DATEADD(MINUTE, -45, A.ShiftStartDateTime)
-              AND E2.EDateTime <= A.ShiftEndDateTime
+              AND E2.EDateTime <= A.ShiftEndWithGrace  -- ✅ CHANGED: Use grace period
         ) AS PunchCount
     FROM Assignments A
 )
 
-SELECT
+SELECT DISTINCT
     COALESCE(SP.USERID, A.USERID, S.SWAP_USERID) AS USERID,
     COALESCE(AU.NAME, SU.NAME) AS NAME,
     
@@ -1940,15 +1940,23 @@ SELECT
          THEN DATEDIFF(minute, SP.PUNCHIN, SP.PUNCHOUT)
          ELSE 0 END AS WorkedMinutes,
     
-    CASE WHEN A.ShiftEndDateTime IS NOT NULL AND SP.PUNCHOUT > A.ShiftEndDateTime
-         THEN DATEDIFF(minute, A.ShiftEndDateTime, SP.PUNCHOUT)
-         ELSE 0 END AS OvertimeMinutes
+    -- ✅ MODIFIED: Overtime calculation considers grace period
+    CASE 
+        WHEN A.ShiftEndDateTime IS NOT NULL AND SP.PUNCHOUT > A.ShiftEndDateTime
+        THEN CASE 
+            -- If punch out is within 30-min grace, no overtime
+            WHEN SP.PUNCHOUT <= A.ShiftEndWithGrace 
+            THEN 0
+            -- If beyond grace period, calculate overtime from actual shift end
+            ELSE DATEDIFF(minute, A.ShiftEndDateTime, SP.PUNCHOUT)
+        END
+        ELSE 0 
+    END AS OvertimeMinutes
 
 FROM Assignments A
 LEFT JOIN SmartPunches SP ON SP.USERID = A.USERID
 LEFT JOIN Swaps S ON A.USERID = S.SWAP_USERID
-    AND A.Original_Stage_ID = S.STAGE_ID
-    AND A.Original_LINE = S.LINE
+    AND A.Shift_date_from = S.SHIFT_DATE
 LEFT JOIN dbo.MX_USERMST AU ON A.USERID = AU.USERID
 LEFT JOIN dbo.MX_USERMST SU ON S.SWAP_USERID = SU.USERID
 LEFT JOIN dbo.Mx_STAGEMASTER ST ON ISNULL(S.STAGE_ID, A.Original_Stage_ID) = ST.stage_id
@@ -1989,6 +1997,8 @@ ORDER BY Stage_name, SHIFT_ID, USERID;
 
 
 
+
+
 // New endpoint for unassigned manpower and wrong shift employees
 app.get("/api/attendance/unassignedManpower", async (req, res) => {
   const pool = await sql.connect(config);
@@ -1998,18 +2008,182 @@ app.get("/api/attendance/unassignedManpower", async (req, res) => {
     return res.status(400).json({ error: "date parameter is required" });
   }
 
- const rawSql = `
--- Part 1: Employees present but not assigned to any shift on that date
-WITH NoShiftPresent AS (
-    SELECT
-        U.USERID,
-        U.NAME,
+  const rawSql = `
+DECLARE @TargetDate DATE = @Date;
+
+-- =====================================================================
+-- Step 1: Get unique users assigned to shifts on target date
+-- =====================================================================
+WITH AssignedUsers AS (
+    SELECT DISTINCT
+        US.USERID,
+        UM.NAME,
+        RTRIM(US.SHIFT_ID) AS SHIFT_ID,
+        RTRIM(US.LINE) AS LINE,
+        US.stage_id,
+        ST.stage_name,
+        SM.SFTName,
+        SM.SFTSTTime,
+        SM.SFTEDTime,
+        
+        -- Assigned shift window with tolerance
+        CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS AssignedShiftStart,
+        
+        CASE 
+            WHEN SM.SFTEDTime < SM.SFTSTTime  -- Night shift
+            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
+            ELSE CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
+        END AS AssignedShiftEnd,
+        
+        -- Acceptable punch-in window: 60 min before to 120 min after shift start
+        DATEADD(MINUTE, -60, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME)) AS AllowedPunchStart,
+        DATEADD(MINUTE, 120, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME)) AS AllowedPunchEnd
+        
+    FROM Mx_UserShifts US
+    INNER JOIN MX_USERMST UM ON US.USERID = UM.USERID
+    INNER JOIN Mx_ShiftMst SM ON RTRIM(US.SHIFT_ID) = RTRIM(SM.SFTID)
+    LEFT JOIN Mx_STAGEMASTER ST ON US.stage_id = ST.stage_id
+    WHERE US.Shift_date_from = @TargetDate
+      AND ISNULL(UM.UserIDEnbl, 0) = 1
+),
+
+-- =====================================================================
+-- Step 2: Get actual punch records (first and last punch)
+-- =====================================================================
+UserPunches AS (
+    SELECT 
+        E.USERID,
+        MIN(E.EDateTime) AS FirstPunch,
+        MAX(E.EDateTime) AS LastPunch,
+        COUNT(*) AS PunchCount,
+        
+        -- Also check if there's a punch crossing midnight for night shifts
+        MAX(CASE WHEN CAST(E.EDateTime AS DATE) = DATEADD(DAY, 1, @TargetDate) 
+                 THEN E.EDateTime END) AS NextDayPunch
+    FROM Mx_ATDEventTrn E
+    WHERE (CAST(E.EDateTime AS DATE) = @TargetDate 
+           OR CAST(E.EDateTime AS DATE) = DATEADD(DAY, 1, @TargetDate))
+    GROUP BY E.USERID
+),
+
+-- =====================================================================
+-- Step 3: Detect actual shift based on first punch time
+-- =====================================================================
+ActualShiftDetection AS (
+    SELECT 
+        P.USERID,
+        P.FirstPunch,
+        P.LastPunch,
+        P.PunchCount,
+        
+        -- Find best matching shift based on punch-in time
+        (SELECT TOP 1 SM2.SFTID
+         FROM Mx_ShiftMst SM2
+         WHERE P.FirstPunch BETWEEN 
+             DATEADD(MINUTE, -60, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME))
+             AND 
+             DATEADD(MINUTE, 120, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME))
+         ORDER BY ABS(DATEDIFF(MINUTE, P.FirstPunch, 
+             CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME)))
+        ) AS DetectedShiftID,
+        
+        (SELECT TOP 1 SM2.SFTName
+         FROM Mx_ShiftMst SM2
+         WHERE P.FirstPunch BETWEEN 
+             DATEADD(MINUTE, -60, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME))
+             AND 
+             DATEADD(MINUTE, 120, CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME))
+         ORDER BY ABS(DATEDIFF(MINUTE, P.FirstPunch, 
+             CAST(CONVERT(VARCHAR(10), @TargetDate, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME)))
+        ) AS DetectedShiftName
+        
+    FROM UserPunches P
+    WHERE P.FirstPunch IS NOT NULL
+),
+
+-- =====================================================================
+-- Step 4: Identify WRONG SHIFT users
+-- =====================================================================
+WrongShiftUsers AS (
+    SELECT DISTINCT
+        AU.USERID,
+        AU.NAME,
+        'Wrong Shift Detected' AS SwapStatus,
+        
+        -- Assigned shift info
+        AU.SHIFT_ID,
+        AU.SFTName AS ShiftName,
+        AU.SFTSTTime AS StartTime,
+        AU.SFTEDTime AS EndTime,
+        @TargetDate AS Shift_date_from,
+        AU.AssignedShiftStart AS ShiftStartDateTime,
+        AU.AssignedShiftEnd AS ShiftEndDateTime,
+        AU.stage_id AS Effective_Stage_ID,
+        AU.LINE,
+        AU.stage_name AS Stage_name,
+        AU.stage_id AS Stage_id,
+        
+        -- Punch info
+        ASD.FirstPunch AS PUNCHIN,
+        FORMAT(ASD.FirstPunch, 'HH:mm:ss') AS PunchInTimeOnly,
+        ASD.LastPunch AS PUNCHOUT,
+        FORMAT(ASD.LastPunch, 'HH:mm:ss') AS PunchOutTimeOnly,
+        ASD.PunchCount AS TotalPunches,
+        
+        'Present (Wrong Shift)' AS STATUS,
+        'Wrong Shift' AS PunctualityStatus,
+        
+        -- Calculate late minutes if applicable
+        CASE 
+            WHEN ASD.FirstPunch > AU.AssignedShiftStart 
+            THEN DATEDIFF(MINUTE, AU.AssignedShiftStart, ASD.FirstPunch)
+            ELSE 0 
+        END AS LateByMinutes,
+        
+        -- Calculate worked minutes
+        CASE 
+            WHEN ASD.FirstPunch IS NOT NULL AND ASD.LastPunch IS NOT NULL AND ASD.LastPunch >= ASD.FirstPunch
+            THEN DATEDIFF(MINUTE, ASD.FirstPunch, ASD.LastPunch)
+            ELSE 0 
+        END AS WorkedMinutes,
+        
+        0 AS OvertimeMinutes,
+        
+        -- Comparison columns
+        RTRIM(AU.SHIFT_ID) + ' - ' + AU.SFTName + ' (' + AU.SFTSTTime + '-' + AU.SFTEDTime + ')' AS AssignedShift,
+        ISNULL(RTRIM(ASD.DetectedShiftID) + ' - ' + ASD.DetectedShiftName, 'Unknown') AS ActualShift,
+        ASD.DetectedShiftID AS ActualShiftID,
+        AU.LINE AS AssignedLine,
+        AU.LINE AS ActualLine,
+        AU.stage_name AS AssignedStage,
+        AU.stage_name AS ActualStage
+        
+    FROM AssignedUsers AU
+    INNER JOIN ActualShiftDetection ASD ON AU.USERID = ASD.USERID
+    WHERE 
+        -- User punched but NOT within their assigned shift's acceptable window
+        ASD.FirstPunch IS NOT NULL
+        AND NOT (
+            ASD.FirstPunch BETWEEN AU.AllowedPunchStart AND AU.AllowedPunchEnd
+        )
+        -- AND the detected shift is different from assigned shift
+        AND RTRIM(ASD.DetectedShiftID) <> RTRIM(AU.SHIFT_ID)
+),
+
+-- =====================================================================
+-- Step 5: Identify NO SHIFT ASSIGNED users
+-- =====================================================================
+NoShiftUsers AS (
+    SELECT DISTINCT
+        UM.USERID,
+        UM.NAME,
         'No Shift Assigned' AS SwapStatus,
+        
         NULL AS SHIFT_ID,
         NULL AS ShiftName,
         NULL AS StartTime,
         NULL AS EndTime,
-        @Date AS Shift_date_from,
+        @TargetDate AS Shift_date_from,
         NULL AS ShiftStartDateTime,
         NULL AS ShiftEndDateTime,
         NULL AS Effective_Stage_ID,
@@ -2017,256 +2191,55 @@ WITH NoShiftPresent AS (
         'N/A' AS Stage_name,
         NULL AS Stage_id,
         
-        P.MinPunch AS PUNCHIN,
-        FORMAT(P.MinPunch, 'HH:mm:ss') AS PunchInTimeOnly,
-        P.MaxPunch AS PUNCHOUT,
-        FORMAT(P.MaxPunch, 'HH:mm:ss') AS PunchOutTimeOnly,
-        P.PunchCount AS TotalPunches,
+        ASD.FirstPunch AS PUNCHIN,
+        FORMAT(ASD.FirstPunch, 'HH:mm:ss') AS PunchInTimeOnly,
+        ASD.LastPunch AS PUNCHOUT,
+        FORMAT(ASD.LastPunch, 'HH:mm:ss') AS PunchOutTimeOnly,
+        ASD.PunchCount AS TotalPunches,
         
         'Present (No Shift)' AS STATUS,
         'No Shift' AS PunctualityStatus,
         0 AS LateByMinutes,
         
         CASE 
-            WHEN P.MinPunch IS NOT NULL AND P.MaxPunch IS NOT NULL AND P.MaxPunch >= P.MinPunch
-            THEN DATEDIFF(minute, P.MinPunch, P.MaxPunch)
+            WHEN ASD.FirstPunch IS NOT NULL AND ASD.LastPunch IS NOT NULL AND ASD.LastPunch >= ASD.FirstPunch
+            THEN DATEDIFF(MINUTE, ASD.FirstPunch, ASD.LastPunch)
             ELSE 0 
         END AS WorkedMinutes,
+        
         0 AS OvertimeMinutes,
         
-        'N/A' AS AssignedShift,
-        ISNULL(P.DetectedShiftID + ' - ' + P.DetectedShiftName, 'N/A') AS ActualShift,
-        P.DetectedShiftID AS ActualShiftID,
+        'N/A (Not Assigned)' AS AssignedShift,
+        ISNULL(RTRIM(ASD.DetectedShiftID) + ' - ' + ASD.DetectedShiftName, 'Unknown') AS ActualShift,
+        ASD.DetectedShiftID AS ActualShiftID,
         'N/A' AS AssignedLine,
-        ISNULL(P.DetectedLine, 'N/A') AS ActualLine,
+        'N/A' AS ActualLine,
         'N/A' AS AssignedStage,
-        ISNULL(P.DetectedStage, 'N/A') AS ActualStage
-    
-    FROM dbo.MX_USERMST U
-    CROSS APPLY (
-        SELECT 
-            MIN(EDateTime) as MinPunch,
-            MAX(EDateTime) as MaxPunch,
-            COUNT(*) as PunchCount,
-            -- Try to detect which shift they punched into
-            (
-                SELECT TOP 1 SM2.SFTID
-                FROM Mx_ShiftMst SM2
-                CROSS APPLY (
-                    SELECT 
-                        CAST(CONVERT(VARCHAR(10), @Date, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME) AS ShiftStart,
-                        CASE 
-                            WHEN SM2.SFTEDTime < SM2.SFTSTTime 
-                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), @Date, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME))
-                            ELSE CAST(CONVERT(VARCHAR(10), @Date, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME)
-                        END AS ShiftEnd
-                ) ShiftWindow
-                WHERE (
-                    SELECT MIN(E2.EDateTime)
-                    FROM Mx_ATDEventTrn E2
-                    WHERE E2.USERID = U.USERID
-                      AND CAST(E2.EDateTime AS DATE) = @Date
-                ) BETWEEN DATEADD(MINUTE, -45, ShiftWindow.ShiftStart) 
-                      AND DATEADD(MINUTE, 30, ShiftWindow.ShiftStart)
-                ORDER BY ABS(DATEDIFF(MINUTE, 
-                    (SELECT MIN(E2.EDateTime) FROM Mx_ATDEventTrn E2 WHERE E2.USERID = U.USERID AND CAST(E2.EDateTime AS DATE) = @Date),
-                    ShiftWindow.ShiftStart
-                ))
-            ) as DetectedShiftID,
-            -- Get detected shift name
-            (
-                SELECT TOP 1 SM2.SFTName
-                FROM Mx_ShiftMst SM2
-                CROSS APPLY (
-                    SELECT 
-                        CAST(CONVERT(VARCHAR(10), @Date, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME) AS ShiftStart,
-                        CASE 
-                            WHEN SM2.SFTEDTime < SM2.SFTSTTime 
-                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), @Date, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME))
-                            ELSE CAST(CONVERT(VARCHAR(10), @Date, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME)
-                        END AS ShiftEnd
-                ) ShiftWindow
-                WHERE (
-                    SELECT MIN(E2.EDateTime)
-                    FROM Mx_ATDEventTrn E2
-                    WHERE E2.USERID = U.USERID
-                      AND CAST(E2.EDateTime AS DATE) = @Date
-                ) BETWEEN DATEADD(MINUTE, -45, ShiftWindow.ShiftStart) 
-                      AND DATEADD(MINUTE, 30, ShiftWindow.ShiftStart)
-                ORDER BY ABS(DATEDIFF(MINUTE, 
-                    (SELECT MIN(E2.EDateTime) FROM Mx_ATDEventTrn E2 WHERE E2.USERID = U.USERID AND CAST(E2.EDateTime AS DATE) = @Date),
-                    ShiftWindow.ShiftStart
-                ))
-            ) as DetectedShiftName,
-            -- Try to find line and stage from other assignments
-            (
-                SELECT TOP 1 LINE
-                FROM Mx_UserShifts US2
-                WHERE US2.USERID = U.USERID
-                ORDER BY US2.Shift_date_from DESC
-            ) as DetectedLine,
-            (
-                SELECT TOP 1 ST.stage_name
-                FROM Mx_UserShifts US2
-                LEFT JOIN Mx_STAGEMASTER ST ON US2.stage_id = ST.stage_id
-                WHERE US2.USERID = U.USERID
-                ORDER BY US2.Shift_date_from DESC
-            ) as DetectedStage
-        FROM Mx_ATDEventTrn E
-        WHERE E.USERID = U.USERID
-          AND CAST(E.EDateTime AS DATE) = @Date
-    ) P
-    WHERE P.MinPunch IS NOT NULL
-      AND ISNULL(U.UserIDEnbl, 0) = 1
+        'N/A' AS ActualStage
+        
+    FROM MX_USERMST UM
+    INNER JOIN ActualShiftDetection ASD ON UM.USERID = ASD.USERID
+    WHERE ISNULL(UM.UserIDEnbl, 0) = 1
+      -- User has no shift assignment on target date
       AND NOT EXISTS (
-          SELECT 1 FROM Mx_UserShifts US WHERE US.USERID = U.USERID AND US.Shift_date_from = @Date
-      ) 
-      AND NOT EXISTS (
-          SELECT 1 FROM Mx_Userswap S WHERE S.SWAP_USERID = U.USERID AND S.SHIFT_DATE = @Date
+          SELECT 1 FROM Mx_UserShifts US 
+          WHERE US.USERID = UM.USERID 
+            AND US.Shift_date_from = @TargetDate
       )
+      -- But has historical assignments (valid employee)
       AND EXISTS (
-          SELECT 1 FROM Mx_UserShifts US WHERE US.USERID = U.USERID
+          SELECT 1 FROM Mx_UserShifts US 
+          WHERE US.USERID = UM.USERID
       )
-),
-
--- Part 2: Employees assigned to a shift but punched in different shift
-WrongShiftEmployees AS (
-    SELECT
-        US.USERID,
-        UM.NAME,
-        'Wrong Shift Detected' AS SwapStatus,
-        US.SHIFT_ID AS SHIFT_ID,
-        SM.SFTName AS ShiftName,
-        SM.SFTSTTime AS StartTime,
-        SM.SFTEDTime AS EndTime,
-        US.Shift_date_from,
-        
-        CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
-        CASE WHEN SM.SFTEDTime < SM.SFTSTTime
-             THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME))
-             ELSE CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTEDTime, 108) AS DATETIME)
-        END AS ShiftEndDateTime,
-        
-        US.stage_id AS Effective_Stage_ID,
-        US.LINE,
-        ST.stage_name AS Stage_name,
-        ST.Stage_id,
-        
-        P.ActualPunchIn AS PUNCHIN,
-        FORMAT(P.ActualPunchIn, 'HH:mm:ss') AS PunchInTimeOnly,
-        P.ActualPunchOut AS PUNCHOUT,
-        FORMAT(P.ActualPunchOut, 'HH:mm:ss') AS PunchOutTimeOnly,
-        P.PunchCount AS TotalPunches,
-        
-        'Present (Wrong Shift)' AS STATUS,
-        'Wrong Shift' AS PunctualityStatus,
-        0 AS LateByMinutes,
-        
-        CASE 
-            WHEN P.ActualPunchIn IS NOT NULL AND P.ActualPunchOut IS NOT NULL AND P.ActualPunchOut >= P.ActualPunchIn
-            THEN DATEDIFF(minute, P.ActualPunchIn, P.ActualPunchOut)
-            ELSE 0 
-        END AS WorkedMinutes,
-        0 AS OvertimeMinutes,
-        
-        -- Show assigned vs actual shift/line/stage
-        US.SHIFT_ID + ' - ' + SM.SFTName AS AssignedShift,
-        ISNULL(P.DetectedShiftID + ' - ' + P.DetectedShiftName, 'Unknown') AS ActualShift,
-        P.DetectedShiftID AS ActualShiftID,
-        US.LINE AS AssignedLine,
-        ISNULL(P.ActualLine, US.LINE) AS ActualLine,
-        ST.stage_name AS AssignedStage,
-        ISNULL(P.ActualStageName, ST.stage_name) AS ActualStage
-        
-    FROM Mx_UserShifts US
-    INNER JOIN MX_USERMST UM ON US.USERID = UM.USERID
-    LEFT JOIN Mx_ShiftMst SM ON US.SHIFT_ID = SM.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON US.stage_id = ST.stage_id
-    CROSS APPLY (
-        SELECT 
-            MIN(E.EDateTime) as ActualPunchIn,
-            MAX(E.EDateTime) as ActualPunchOut,
-            COUNT(*) as PunchCount,
-            -- Detect which shift they actually punched into
-            (
-                SELECT TOP 1 SM2.SFTID
-                FROM Mx_ShiftMst SM2
-                CROSS APPLY (
-                    SELECT 
-                        CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME) AS CompareShiftStart,
-                        CASE 
-                            WHEN SM2.SFTEDTime < SM2.SFTSTTime 
-                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME))
-                            ELSE CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME)
-                        END AS CompareShiftEnd
-                ) ShiftWindow
-                WHERE SM2.SFTID <> US.SHIFT_ID
-                  AND (
-                      (SELECT MIN(E2.EDateTime)
-                       FROM Mx_ATDEventTrn E2
-                       WHERE E2.USERID = US.USERID
-                         AND CAST(E2.EDateTime AS DATE) = @Date
-                      ) BETWEEN DATEADD(MINUTE, -45, ShiftWindow.CompareShiftStart) 
-                            AND DATEADD(MINUTE, 30, ShiftWindow.CompareShiftStart)
-                  )
-                ORDER BY ABS(DATEDIFF(MINUTE, 
-                    (SELECT MIN(E2.EDateTime) FROM Mx_ATDEventTrn E2 WHERE E2.USERID = US.USERID AND CAST(E2.EDateTime AS DATE) = @Date),
-                    ShiftWindow.CompareShiftStart
-                ))
-            ) as DetectedShiftID,
-            -- Get detected shift name
-            (
-                SELECT TOP 1 SM2.SFTName
-                FROM Mx_ShiftMst SM2
-                CROSS APPLY (
-                    SELECT 
-                        CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTSTTime, 108) AS DATETIME) AS CompareShiftStart,
-                        CASE 
-                            WHEN SM2.SFTEDTime < SM2.SFTSTTime 
-                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME))
-                            ELSE CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM2.SFTEDTime, 108) AS DATETIME)
-                        END AS CompareShiftEnd
-                ) ShiftWindow
-                WHERE SM2.SFTID <> US.SHIFT_ID
-                  AND (
-                      (SELECT MIN(E2.EDateTime)
-                       FROM Mx_ATDEventTrn E2
-                       WHERE E2.USERID = US.USERID
-                         AND CAST(E2.EDateTime AS DATE) = @Date
-                      ) BETWEEN DATEADD(MINUTE, -45, ShiftWindow.CompareShiftStart) 
-                            AND DATEADD(MINUTE, 30, ShiftWindow.CompareShiftStart)
-                  )
-                ORDER BY ABS(DATEDIFF(MINUTE, 
-                    (SELECT MIN(E2.EDateTime) FROM Mx_ATDEventTrn E2 WHERE E2.USERID = US.USERID AND CAST(E2.EDateTime AS DATE) = @Date),
-                    ShiftWindow.CompareShiftStart
-                ))
-            ) as DetectedShiftName,
-            US.LINE as ActualLine,
-            ST.stage_name as ActualStageName
-        FROM Mx_ATDEventTrn E
-        WHERE E.USERID = US.USERID
-          AND CAST(E.EDateTime AS DATE) = @Date
-    ) P
-    WHERE US.Shift_date_from = @Date
-      AND ISNULL(UM.UserIDEnbl, 0) = 1
-      AND P.ActualPunchIn IS NOT NULL
-      -- Check if they punched OUTSIDE their assigned shift window
-      AND NOT (
-          P.ActualPunchIn >= DATEADD(MINUTE, -45, 
-              CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME)
-          )
-          AND P.ActualPunchIn <= DATEADD(MINUTE, 30,
-              CAST(CONVERT(VARCHAR(10), US.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), SM.SFTSTTime, 108) AS DATETIME)
-          )
-      )
-      AND P.DetectedShiftID IS NOT NULL
 )
 
--- Combine both results
-SELECT * FROM NoShiftPresent
+-- =====================================================================
+-- Final Result: Return ONLY wrong shift users and no-shift users
+-- =====================================================================
+SELECT * FROM WrongShiftUsers
 UNION ALL
-SELECT * FROM WrongShiftEmployees
-ORDER BY STATUS, USERID;
+SELECT * FROM NoShiftUsers
+ORDER BY STATUS DESC, USERID;
 `;
 
   try {
@@ -2275,13 +2248,14 @@ ORDER BY STATUS, USERID;
     request.input("Date", sql.Date, date);
 
     const { recordset } = await request.query(rawSql);
-    console.log("Unassigned Manpower Results:", recordset);
+    console.log(`Unassigned/Wrong Shift Results: ${recordset.length} users found`);
     res.json(recordset);
   } catch (error) {
     console.error("Error fetching unassigned manpower:", error.message);
     res.status(500).send({ error: "Server Error", details: error.message });
   }
 });
+
 
 
 
@@ -2772,6 +2746,7 @@ app.post("/api/create-carousel-table", async (req, res) => {
       CREATE TABLE CarouselImages (
         id INT IDENTITY(1,1) PRIMARY KEY,
         image_name VARCHAR(255) NOT NULL,
+        description NVARCHAR(MAX), -- Added description column
         image_data TEXT NOT NULL,
         mime_type VARCHAR(100) NOT NULL,
         file_size INT NOT NULL,
@@ -2783,6 +2758,19 @@ app.post("/api/create-carousel-table", async (req, res) => {
     `;
 
     await pool.request().query(createTableQuery);
+
+    // Schema Migration: Add description column if it doesn't exist
+    const checkColumnQuery = `
+      IF NOT EXISTS (
+        SELECT * FROM sys.columns 
+        WHERE object_id = OBJECT_ID('CarouselImages') 
+        AND name = 'description'
+      )
+      BEGIN
+        ALTER TABLE CarouselImages ADD description NVARCHAR(MAX);
+      END
+    `;
+    await pool.request().query(checkColumnQuery);
     res.json({
       success: true,
       message: "Carousel images table created successfully",
@@ -2807,7 +2795,7 @@ app.post(
       }
 
       const { originalname, mimetype, size, buffer } = req.file;
-      const { displayOrder = 0 } = req.body;
+      const { displayOrder = 0, description = "" } = req.body; // Extract description
 
       // Convert to base64
       const base64Data = `data:${mimetype};base64,${buffer.toString("base64")}`;
@@ -2817,12 +2805,13 @@ app.post(
 
       // FIXED: Add OUTPUT INSERTED.id to return the inserted ID
       const insertQuery = `
-      INSERT INTO CarouselImages (image_name, image_data, mime_type, file_size, display_order)
+      INSERT INTO CarouselImages (image_name, description, image_data, mime_type, file_size, display_order)
       OUTPUT INSERTED.id
-      VALUES (@imageName, @imageData, @mimeType, @fileSize, @displayOrder)
+      VALUES (@imageName, @description, @imageData, @mimeType, @fileSize, @displayOrder)
     `;
 
       request.input("imageName", sql.VarChar, originalname);
+      request.input("description", sql.NVarChar, description); // Input description
       request.input("imageData", sql.Text, base64Data);
       request.input("mimeType", sql.VarChar, mimetype);
       request.input("fileSize", sql.Int, size);
@@ -2860,7 +2849,7 @@ app.get("/api/carousel-images", async (req, res) => {
   try {
     const pool = await sql.connect(config);
     const query = `
-      SELECT id, image_name, image_data, mime_type, file_size, display_order, created_date
+      SELECT id, image_name, description, image_data, mime_type, file_size, display_order, created_date 
       FROM CarouselImages 
       WHERE is_active = 1 
       ORDER BY display_order ASC, created_date DESC
@@ -3924,24 +3913,15 @@ app.post("/api/jobcard-upload", async (req, res) => {
   }
 });
 
-app.post("/api/employee-Jobreport", async (req, res) => {
-  const { employeeId, fromDate, toDate } = req.body;
-  console.log(req.body);
-  // if (!employeeId) {
-  //   return res.status(400).send("Missing required parameters");
-  // }
 
-  try {
-    await sql.connect(config);
 
-    const request = new sql.Request();
+async function getEmployeeJobReport(pool, employeeId, fromDate, toDate) {
+  const request = new sql.Request(pool); // Use the pool to create request
+  request.input("EmployeeId", sql.NVarChar, employeeId || null);
+  request.input("FromDate", sql.Date, fromDate);
+  request.input("ToDate", sql.Date, toDate);
 
-    request.input("EmployeeId", sql.NVarChar, employeeId || null); // ✅ match SQL variable name
-
-    request.input("FromDate", sql.Date, fromDate);
-    request.input("ToDate", sql.Date, toDate);
-
-    const query = `
+  const query = `
 WITH EmployeeJobreport AS (
     SELECT 
         U.USERID,
@@ -3981,7 +3961,7 @@ WITH EmployeeJobreport AS (
     LEFT JOIN Mx_UserJobCard J ON S.USERID = J.USERID AND J.Edatetime = S.Shift_date_from
     LEFT JOIN Mx_ShiftMst MS ON S.SHIFT_ID = MS.SFTID
     LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.stage_id
-    LEFT JOIN Mx_UserLeaveMaster LM ON S.USERID = LM.UserID AND S.Shift_date_from = LM.LeaveDate -- Join Leave Master
+    LEFT JOIN Mx_UserLeaveMaster LM ON S.USERID = LM.UserID AND S.Shift_date_from = LM.LeaveDate
     CROSS APPLY (
         SELECT 
             ShiftStart = CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
@@ -4039,7 +4019,7 @@ WITH EmployeeJobreport AS (
     LEFT JOIN Mx_UserJobCard J ON SW.Swap_userid = J.USERID AND J.Edatetime = SW.Shift_date
     LEFT JOIN Mx_ShiftMst MS ON SW.Shift_id = MS.SFTID
     LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.stage_id
-    LEFT JOIN Mx_UserLeaveMaster LM ON SW.Swap_userid = LM.UserID AND SW.Shift_date = LM.LeaveDate -- Join Leave Master
+    LEFT JOIN Mx_UserLeaveMaster LM ON SW.Swap_userid = LM.UserID AND SW.Shift_date = LM.LeaveDate
     CROSS APPLY (
         SELECT 
             ShiftStart = CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
@@ -4100,7 +4080,7 @@ WITH EmployeeJobreport AS (
 )
 SELECT 
     CONVERT(VARCHAR(10), [DATE], 103) AS Date,
-    [DATE] as RawDate, -- Include RawDate for sorting in frontend if needed, though we sort in SQL
+    [DATE] as RawDate,
     SHIFTNAME, 
     STAGE, 
     LINE, 
@@ -4115,7 +4095,7 @@ SELECT
     END AS Performance,
 
     Attendance,
-    ATTENDANCE_Status, -- Select Status to show 'Authorized Leave' on frontend
+    ATTENDANCE_Status,
     CASE 
         WHEN Jobreport = 'On Time' THEN 5 
         ELSE 0 
@@ -4144,12 +4124,18 @@ SELECT
     ) AS Total
 FROM EmployeeJobreport
 ORDER BY RawDate ASC;
-
-
 `;
 
-    const result = await request.query(query);
-    console.log(result.recordset);
+  return request.query(query);
+}
+
+app.post("/api/employee-Jobreport", async (req, res) => {
+  const { employeeId, fromDate, toDate } = req.body;
+  
+  try {
+    const pool = await sql.connect(config);
+    const result = await getEmployeeJobReport(pool, employeeId, fromDate, toDate);
+    
     res.json({
       employeeId,
       records: result.recordset,
@@ -4157,8 +4143,129 @@ ORDER BY RawDate ASC;
   } catch (err) {
     console.error("Error fetching Jobreport:", err);
     res.status(500).send("Error fetching Jobreport details");
-  } finally {
-    await sql.close();
+  } 
+});
+
+app.post("/api/monthly-job-card-report", async (req, res) => {
+  const { fromMonth, toMonth } = req.body; // e.g., "2025-01", "2025-02"
+
+  if (!fromMonth || !toMonth) {
+    return res.status(400).json({ error: "From Month and To Month are required" });
+  }
+
+  try {
+    const pool = await sql.connect(config);
+    
+    // Calculate start and end dates
+    const startDate = new Date(fromMonth + "-01");
+    const endDate = new Date(toMonth + "-01");
+    // Get last day of toMonth
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0); // Go back one day to get last day of previous month set above
+
+    const fromDateStr = startDate.toISOString().split("T")[0];
+    const toDateStr = endDate.toISOString().split("T")[0];
+
+    console.log(`Generating Monthly Report from ${fromDateStr} to ${toDateStr}`);
+
+    // Fetch report for ALL employees by passing null as employeeId
+    const result = await getEmployeeJobReport(pool, null, fromDateStr, toDateStr);
+    
+    res.json({
+      success: true,
+      records: result.recordset,
+      fromDate: fromDateStr,
+      toDate: toDateStr
+    });
+
+  } catch (err) {
+    console.error("Error generating monthly report:", err);
+    res.status(500).json({ error: "Error generating monthly report", details: err.message });
+  }
+});
+
+app.post("/api/unit-wise-report", async (req, res) => {
+  const { fromMonth, toMonth, shift } = req.body;
+
+  if (!fromMonth || !toMonth) {
+    return res.status(400).json({ error: "From Month and To Month are required" });
+  }
+
+  try {
+    const pool = await sql.connect(config);
+    
+    // Dates
+    const startDate = new Date(fromMonth + "-01");
+    const endDate = new Date(toMonth + "-01");
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0); 
+    const fromDateStr = startDate.toISOString().split("T")[0];
+    const toDateStr = endDate.toISOString().split("T")[0];
+
+    // 1. Fetch ALL data
+    const result = await getEmployeeJobReport(pool, null, fromDateStr, toDateStr);
+    let records = result.recordset;
+
+    // 2. Filter by Shift (if provided)
+    if (shift && shift !== "") {
+        records = records.filter(r => r.SHIFTNAME === shift || r.SHIFT === shift); 
+    }
+
+    // 3. Aggregate by User
+    const userMap = new Map();
+    
+    records.forEach(r => {
+        if (!userMap.has(r.USERID)) {
+            userMap.set(r.USERID, {
+                USERID: r.USERID,
+                NAME: r.NAME,
+                totalPoints: 0,
+                totalDays: 0,
+                totalAttendance: 0,
+                totalPunctuality: 0,
+                totalRejections: 0,
+                total5S: 0,
+                totalPPE: 0,
+                totalDiscipline: 0
+            });
+        }
+        const u = userMap.get(r.USERID);
+        u.totalDays++;
+        u.totalPoints += (r.Performance || 0);
+        u.totalAttendance += (r.Attendance === 5 && (r.ATTENDANCE_Status === 'Authorized Leave' || r.ATTENDANCE_Status === 'Authorized')) ? 5 : (r.Attendance || 0);
+        u.totalPunctuality += (r.Punctuality || 0);
+        u.totalRejections += (r.Rejections || 0);
+        u.total5S += (r["5S"] || 0);
+        u.totalPPE += (r.PPE || 0);
+        u.totalDiscipline += (r.Disclipline || 0);
+    });
+
+    const aggregated = Array.from(userMap.values()).map(u => {
+        const count = u.totalDays || 1;
+        return {
+            USERID: u.USERID,
+            NAME: u.NAME,
+            TotalDays: u.totalDays,
+            AvgPerformance: parseFloat((u.totalPoints / count).toFixed(2)),
+            AvgAttendance: parseFloat((u.totalAttendance / count).toFixed(2)),
+            AvgPunctuality: parseFloat((u.totalPunctuality / count).toFixed(2)),
+            AvgRejections: parseFloat((u.totalRejections / count).toFixed(2)),
+            Avg5S: parseFloat((u.total5S / count).toFixed(2)),
+            AvgPPE: parseFloat((u.totalPPE / count).toFixed(2)),
+            AvgDiscipline: parseFloat((u.totalDiscipline / count).toFixed(2))
+        };
+    });
+
+    res.json({
+      success: true,
+      records: aggregated,
+      fromDate: fromDateStr,
+      toDate: toDateStr
+    });
+
+  } catch (err) {
+    console.error("Error generating unit wise report:", err);
+    res.status(500).json({ error: "Error generating unit wise report", details: err.message });
   }
 });
 
@@ -4194,8 +4301,19 @@ async function ensureLeaveTableExists(pool) {
           Remarks NVARCHAR(255),
           CreatedDate DATETIME DEFAULT GETDATE(),
           CreatedBy NVARCHAR(50),
-          IsDeleted BIT DEFAULT 0 
+          IsDeleted BIT DEFAULT 0,
+          LeaveCategory NVARCHAR(20) -- Added LeaveCategory column
       )
+    END
+    
+    -- Schema Migration: Add LeaveCategory column if it doesn't exist
+    IF NOT EXISTS (
+      SELECT * FROM sys.columns 
+      WHERE object_id = OBJECT_ID('Mx_UserLeaveMaster') 
+      AND name = 'LeaveCategory'
+    )
+    BEGIN
+      ALTER TABLE Mx_UserLeaveMaster ADD LeaveCategory NVARCHAR(20);
     END
   `;
   try {
@@ -4279,7 +4397,8 @@ app.get("/api/leave/absent", async (req, res) => {
         CONVERT(VARCHAR(10), A.Shift_date_from, 120) AS ShiftDate,
         L.LeaveID, 
         L.LeaveType, 
-        L.Remarks 
+        L.Remarks,
+        L.LeaveCategory 
       FROM SmartPunches SP
       INNER JOIN Assignments A ON SP.USERID = A.USERID
       LEFT JOIN Swaps S ON A.USERID = S.SWAP_USERID
@@ -4319,7 +4438,7 @@ app.get("/api/leave/absent", async (req, res) => {
 
 
 app.post("/api/leave", async (req, res) => {
-  const { userId, date, leaveType, remarks, createdBy } = req.body;
+  const { userId, date, leaveType, remarks, createdBy, leaveCategory } = req.body;
   
   try {
     const pool = await sql.connect(config);
@@ -4336,22 +4455,24 @@ app.post("/api/leave", async (req, res) => {
         // Update
         const updateQuery = `
             UPDATE Mx_UserLeaveMaster 
-            SET LeaveType = @LeaveType, Remarks = @Remarks, CreatedBy = @CreatedBy, CreatedDate = GETDATE()
+            SET LeaveType = @LeaveType, Remarks = @Remarks, CreatedBy = @CreatedBy, LeaveCategory = @LeaveCategory, CreatedDate = GETDATE()
             WHERE LeaveID = @LeaveID
         `;
         request.input("LeaveID", sql.Int, check.recordset[0].LeaveID);
         request.input("LeaveType", sql.NVarChar, leaveType);
         request.input("Remarks", sql.NVarChar, remarks);
+        request.input("LeaveCategory", sql.NVarChar, leaveCategory || null);
         request.input("CreatedBy", sql.NVarChar, createdBy || "System");
         await request.query(updateQuery);
     } else {
         // Insert
         const insertQuery = `
-            INSERT INTO Mx_UserLeaveMaster (UserID, LeaveDate, LeaveType, Remarks, CreatedBy)
-            VALUES (@UserID, @LeaveDate, @LeaveType, @Remarks, @CreatedBy)
+            INSERT INTO Mx_UserLeaveMaster (UserID, LeaveDate, LeaveType, Remarks, CreatedBy, LeaveCategory)
+            VALUES (@UserID, @LeaveDate, @LeaveType, @Remarks, @CreatedBy, @LeaveCategory)
         `;
         request.input("LeaveType", sql.NVarChar, leaveType);
         request.input("Remarks", sql.NVarChar, remarks);
+        request.input("LeaveCategory", sql.NVarChar, leaveCategory || null);
         request.input("CreatedBy", sql.NVarChar, createdBy || "System");
         await request.query(insertQuery);
     }

@@ -71,10 +71,10 @@ const assignedLinesArr = assignedLinesStr.split(",").map(l => l.trim()).filter(l
 
       try {
         const shiftResponse = await axios.get(
-          "http192.168.2.54/api/shifts"
+          "https://192.168.2.54/api/shifts"
         );
         const lineResponse = await axios.get(
-          "http192.168.2.54/api/lines"
+          "https://192.168.2.54/api/lines"
         );
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
@@ -112,21 +112,21 @@ console.log('isAdmin set to:', isAdmin);
     setLoadingDetails(true);
     try {
 
-      console.log('Fetching attendance for:', {
+      console.log('Fetching attendance (via showAll) for:', {
         date: formattedDate,
         shifts: selectedShifts,
         lines: selectedLines,
       });
       
       const [response, unassignedRes] = await Promise.all([
-        axios.get("http192.168.2.54/api/attendance", {
+        axios.get("https://192.168.2.54/api/attendance/showAll", {
           params: {
             date: formattedDate,
             shifts: selectedShifts.join(","),
             lines: selectedLines.join(","),
           },
         }),
-        axios.get("http192.168.2.54/api/attendance/unassignedManpower", {
+        axios.get("https://192.168.2.54/api/attendance/unassignedManpower", {
            params: {
              date: formattedDate,
              shifts: "S1,S2,S3", 
@@ -135,21 +135,68 @@ console.log('isAdmin set to:', isAdmin);
         })
       ]);
 
-      setAttendanceDetails(response.data || []);
+      // Client-side aggregation to fix mismatch between aggregated API and detailed API.
+      // We derive the summary directly from the detailed records.
+      const showAllData = response.data || [];
+      const aggregationMap = new Map();
+
+      showAllData.forEach((record) => {
+        const stage = record.Stage_name || "N/A";
+        const shift = record.SHIFT_ID || "N/A";
+        const line = record.LINE || "N/A";
+        // Create a unique key for grouping
+        const key = `${stage}|${shift}|${line}`;
+
+        if (!aggregationMap.has(key)) {
+          aggregationMap.set(key, {
+            Stage_name: stage,
+            SHIFT_ID: shift,
+            LINE: line,
+            SFTSTTime: record.SFTSTTime || "N/A", // Assume consistent within group
+            ALLOT: 0,
+            PRESENT: 0,
+            ABSENT: 0,
+            FirstPunchIn: null, // Will calculate earliest
+            PunctualityStatus: "N/A"
+          });
+        }
+
+        const group = aggregationMap.get(key);
+        group.ALLOT += 1; // Count every record as allotted
+
+        const status = String(record.STATUS || record.status || "").toLowerCase().trim();
+        if (status === "present" || status === "p") {
+          group.PRESENT += 1;
+        } else if (status === "absent" || status === "a") {
+          group.ABSENT += 1;
+        }
+
+        // Calculate earliest punch in for the group (for Excel export)
+        if (record.PUNCHIN) {
+            // Simple string comparison for ISO dates or HH:mm:ss works if format is consistent, 
+            // but let's be safe(r). If it's just time, string compare is usually okay for same day.
+            if (!group.FirstPunchIn || record.PUNCHIN < group.FirstPunchIn) {
+                group.FirstPunchIn = record.PUNCHIN;
+            }
+        }
+      });
+
+      const aggregatedDetails = Array.from(aggregationMap.values()).map(group => ({
+          ...group,
+          FirstPunchIn: group.FirstPunchIn || "No Punch"
+      }));
+
+      setAttendanceDetails(aggregatedDetails);
       
       // Process Unassigned Count
       const unassignedData = unassignedRes.data || [];
       const noShiftCount = unassignedData.length;
       setUnassignedCount(noShiftCount);
 
-      console.log("=== ATTENDANCE SUMMARY DATA ===");
-      console.log("Full response:", response.data);
-      console.log("Total records:", response.data?.length);
+      console.log("=== ATTENDANCE SUMMARY DATA (Aggregated) ===");
+      console.log("Source records:", showAllData.length);
+      console.log("Aggregated groups:", aggregatedDetails.length);
       console.log("Unassigned count (All):", noShiftCount);
-      if (response.data && response.data.length > 0) {
-        console.log("Sample record:", response.data[0]);
-        console.log("Fields in record:", Object.keys(response.data[0]));
-      }
       console.log("===============================");
       setShowTable(true);
     } catch (error) {
@@ -176,7 +223,7 @@ console.log('isAdmin set to:', isAdmin);
       ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "http192.168.2.54/api/attendance/showAll",
+          "https://192.168.2.54/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -239,7 +286,7 @@ console.log('isAdmin set to:', isAdmin);
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "http192.168.2.54/api/attendance/showAll",
+          "https://192.168.2.54/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -388,7 +435,7 @@ console.log('isAdmin set to:', isAdmin);
 
     try {
       const response = await axios.get(
-        "http192.168.2.54/api/attendance/showAll",
+        "https://192.168.2.54/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -427,7 +474,7 @@ console.log('isAdmin set to:', isAdmin);
     try {
       // Use the existing showAll endpoint with all shifts and lines
       const response = await axios.get(
-        "http192.168.2.54/api/attendance/unassignedManpower",
+        "https://192.168.2.54/api/attendance/unassignedManpower",
         {
           params: {
             date: formattedDate
@@ -478,7 +525,6 @@ console.log('isAdmin set to:', isAdmin);
       "Stage Name": record?.Stage_name || "N/A",
       "Shift ID": record?.SHIFT_ID || "N/A",
       Line: record?.LINE || "N/A",
-      "Shift Start Time": record?.SFTSTTime || "N/A",
       Allot: record?.ALLOT || 0,
       Present: record?.PRESENT || 0,
       Absent: record?.ABSENT || 0,
@@ -590,7 +636,7 @@ console.log('isAdmin set to:', isAdmin);
     }));
 
     axios
-      .post("http192.168.2.54/api/saveUserSwap", swaps)
+      .post("https://192.168.2.54/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -608,7 +654,7 @@ console.log('isAdmin set to:', isAdmin);
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("http192.168.2.54/api/getEmployees", {
+        .get("https://192.168.2.54/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,
@@ -829,7 +875,7 @@ console.log('isAdmin set to:', isAdmin);
                     onClick={handleShowUnassignedManpower}
                     style={{ fontSize: "13px" }}
                   >
-                    Present (Manpower without shift allocation)
+                    Present (Non alloted manpower)
                   </Button>
                 </div>
               </div>
@@ -948,7 +994,6 @@ console.log('isAdmin set to:', isAdmin);
                           <th>Stage Name</th>
                           <th>Shift ID</th>
                           <th>Line</th>
-                          <th>Start Time</th>
                           <th>Allot</th>
                           <th>Present</th>
                           <th>Absent</th>
@@ -962,7 +1007,6 @@ console.log('isAdmin set to:', isAdmin);
                               <td>{detail.Stage_name || "N/A"}</td>
                               <td>{detail.SHIFT_ID || "N/A"}</td>
                               <td>{detail.LINE || "N/A"}</td>
-                              <td>{detail.SFTSTTime || "N/A"}</td>
                               <td>
                                 <button
                                   className="animated-button"
@@ -1030,7 +1074,6 @@ console.log('isAdmin set to:', isAdmin);
                           <td colSpan="3" style={{ fontWeight: "bold" }}>
                             Total
                           </td>
-                          <td></td>
                           <td></td>
                           <td style={{ fontWeight: "bold" }}>
                             {calculateTotals().allot}

@@ -65,7 +65,7 @@ const formatDatefordisplay = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("http192.168.2.54/api/employees");
+        const res = await axios.get("https://192.168.2.54/api/employees");
 
         if (Array.isArray(res.data)) {
           const formatted = res.data.map((emp) => ({
@@ -112,7 +112,7 @@ const formatDatefordisplay = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "http192.168.2.54/api/employee-history",
+        "https://192.168.2.54/api/employee-history",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),

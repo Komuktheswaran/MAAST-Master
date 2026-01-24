@@ -194,7 +194,7 @@ const UserShiftUpload = () => {
       const currentBatch = data.slice(i, i + batchSize);
       try {
         const response = await axios.post(
-          "http192.168.2.54/api/saveUserShifts",
+          "https://192.168.2.54/api/saveUserShifts",
           currentBatch,
           { headers: { "Content-Type": "application/json" } }
         );
@@ -246,7 +246,7 @@ const UserShiftUpload = () => {
 
   const downloadTemplate = () => {
     // Trigger download from backend
-    window.location.href = "http192.168.2.54/api/download-sample-user-shift";
+    window.location.href = "https://192.168.2.54/api/download-sample-user-shift";
   };
 
   const tableInstance = useTable({ columns, data });

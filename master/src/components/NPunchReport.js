@@ -10,8 +10,8 @@ import { Modal, ListGroup } from "react-bootstrap";
 import '../styles/UserShiftUpload.css';
 import emvLogo from '../pictures/emvlogo.png';
 
-const API_BASE_URL = "http192.168.2.54";
-const EMPLOYEE_API_URL = "http192.168.2.54/api/employees";
+const API_BASE_URL = "https://192.168.2.54";
+const EMPLOYEE_API_URL = "https://192.168.2.54/api/employees";
 
 const NPunchReport = () => {
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -32,7 +32,7 @@ const NPunchReport = () => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("http192.168.2.54/api/employees");
+        const res = await axios.get("https://192.168.2.54/api/employees");
 
         if (Array.isArray(res.data)) {
            const formatted = res.data.map((emp) => ({

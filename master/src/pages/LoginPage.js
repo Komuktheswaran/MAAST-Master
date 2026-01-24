@@ -98,7 +98,7 @@ const LoginPage = () => {
       try {
 
         const response = await axios.post(
-          "http192.168.2.54/api/login",
+          "https://192.168.2.54/api/login",
           {
             userId,
             password,

@@ -72,7 +72,7 @@ const isAdmin = AdminFlag === 1;
     setErrorImages('');
     try {
       const response = await axios.get(
-        "http192.168.2.54/api/carousel-images"
+        "https://192.168.2.54/api/carousel-images"
       );
       setCarouselImages(response.data || []);
     } catch (error) {
@@ -820,9 +820,12 @@ const defaultCarouselContent = [
         alt={image.image_name}
         className="carousel-image"
       />
-      <div className="image-name-overlay">
-        {image.image_name}
-      </div>
+       {/* Removed image name overlay */}
+       {image.description && (
+        <div className="image-description-overlay">
+          {image.description}
+        </div>
+      )}
     </div>
     <p className="legend" style={{ display: 'none' }}>{image.image_name}</p>
   </div>
@@ -859,8 +862,18 @@ const defaultCarouselContent = [
       </>
      )}
       <style>{`
- 
-
+        .image-description-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          background-color: rgba(0, 0, 0, 0.6);
+          color: white;
+          padding: 10px;
+          text-align: center;
+          font-size: 16px;
+          font-weight: 500;
+        }
       `}</style>
     </>
   );

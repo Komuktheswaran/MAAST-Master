@@ -168,8 +168,8 @@ const Summary = () => {
         console.log("Fetching dropdown options...");
 
         const [shiftRes, lineRes] = await Promise.all([
-          axios.get("http192.168.2.54/api/shifts"),
-          axios.get("http192.168.2.54/api/lines"),
+          axios.get("https://192.168.2.54/api/shifts"),
+          axios.get("https://192.168.2.54/api/lines"),
         ]);
 
         console.log("Shift options response:", shiftRes.data);
@@ -240,7 +240,7 @@ const Summary = () => {
       console.log("Sending request with params:", params);
 
       const response = await axios.get(
-        "http192.168.2.54/api/attendance/overall-summary",
+        "https://192.168.2.54/api/attendance/overall-summary",
         { params, timeout: 60000 }
       );
 

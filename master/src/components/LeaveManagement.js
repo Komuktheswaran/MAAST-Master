@@ -22,6 +22,18 @@ const LeaveRow = React.memo(({ emp, onUpdate, onSave }) => {
           <option value="Authorized">Authorized</option>
           <option value="UnAuth">Unauthorized</option>
         </Form.Select>
+        {emp.LeaveType === "Authorized" && (
+          <Form.Select
+            value={emp.LeaveCategory || ""}
+            onChange={(e) => onUpdate(emp.USERID, emp.ShiftDate, "LeaveCategory", e.target.value)}
+            className="border-secondary glass-input mt-2"
+            size="sm"
+          >
+            <option value="">Select Category</option>
+            <option value="Emergency">Emergency</option>
+            <option value="Preapproved">PreInformed</option>
+          </Form.Select>
+        )}
       </td>
       <td>
         <Form.Control
@@ -47,6 +59,7 @@ const LeaveRow = React.memo(({ emp, onUpdate, onSave }) => {
   // Custom comparison to prevent re-renders unless specific fields change
   return (
     prevProps.emp.LeaveType === nextProps.emp.LeaveType &&
+    prevProps.emp.LeaveCategory === nextProps.emp.LeaveCategory &&
     prevProps.emp.Remarks === nextProps.emp.Remarks &&
     prevProps.emp.LeaveID === nextProps.emp.LeaveID // Check if ID exists (saved state)
   );
@@ -86,8 +99,8 @@ const LeaveManagement = () => {
     const fetchFilters = async () => {
       try {
         const [shiftRes, lineRes] = await Promise.all([
-          axios.get("http192.168.2.54/api/shifts"),
-          axios.get("http192.168.2.54/api/lines")
+          axios.get("https://192.168.2.54/api/shifts"),
+          axios.get("https://192.168.2.54/api/lines")
         ]);
         setShifts(shiftRes.data || []);
         setLines(lineRes.data || []);
@@ -104,7 +117,7 @@ const LeaveManagement = () => {
     setError("");
     setCurrentPage(1); // Reset pagination on fetch
     try {
-      const res = await axios.get("http192.168.2.54/api/leave/absent", {
+      const res = await axios.get("https://192.168.2.54/api/leave/absent", {
         params: { 
           fromDate,
           toDate,
@@ -130,11 +143,12 @@ const LeaveManagement = () => {
       return;
     }
     try {
-      await axios.post("http192.168.2.54/api/leave", {
+      await axios.post("https://192.168.2.54/api/leave", {
         userId: emp.USERID,
         date: emp.ShiftDate,
         leaveType: emp.LeaveType,
         remarks: emp.Remarks,
+        leaveCategory: emp.LeaveType === "Authorized" ? emp.LeaveCategory : null,
         createdBy: sessionStorage.getItem("username") || "Admin",
       });
       alert("Saved successfully");

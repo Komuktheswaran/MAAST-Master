@@ -53,7 +53,7 @@ const formatDates = (dateStr) => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("http192.168.2.54/api/employees");
+        const res = await axios.get("https://192.168.2.54/api/employees");
         if (Array.isArray(res.data)) {
            const formatted = res.data.map((emp) => ({
             value: emp.userid, // Use userid as value
@@ -92,7 +92,7 @@ const formatDates = (dateStr) => {
 
     try {
       const response = await axios.post(
-        "http192.168.2.54/api/employee-punctuality",
+        "https://192.168.2.54/api/employee-punctuality",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),

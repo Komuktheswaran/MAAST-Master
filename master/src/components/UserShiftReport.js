@@ -24,7 +24,7 @@ import * as XLSX from "xlsx";
 import "../styles/UserShiftReport.css";
 import emvLogo from '../pictures/emvlogo.png';
 
-const baseURL = "http192.168.2.54/api";
+const baseURL = "https://192.168.2.54/api";
 
 const UserShiftReport = () => {
   const [userShifts, setUserShifts] = useState([]);

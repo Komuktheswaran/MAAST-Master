@@ -31,6 +31,7 @@ const ImageUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [description, setDescription] = useState(''); // New state for description
   const [editDialog, setEditDialog] = useState({ open: false, image: null });
 
   useEffect(() => {
@@ -41,7 +42,7 @@ const ImageUpload = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "http192.168.2.54/api/carousel-images"
+        "https://192.168.2.54/api/carousel-images"
       );
       setImages(response.data);
     } catch (error) {
@@ -75,11 +76,12 @@ const ImageUpload = () => {
 
     const formData = new FormData();
     formData.append("image", file);
+    formData.append("description", description); // Append description
     formData.append("displayOrder", images.length);
 
     try {
       await axios.post(
-        "http192.168.2.54/api/carousel-images/upload",
+        "https://192.168.2.54/api/carousel-images/upload",
         formData,
         {
           headers: {
@@ -90,7 +92,7 @@ const ImageUpload = () => {
 
       setSuccess("Image uploaded successfully!");
       fetchImages(); // Refresh the image list
-
+      setDescription(""); // Reset description
       // Reset file input
       event.target.value = "";
     } catch (error) {
@@ -105,7 +107,7 @@ const ImageUpload = () => {
     if (!window.confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      await axios.delete(`http192.168.2.54/api/carousel-images/${id}`);
+      await axios.delete(`https://192.168.2.54/api/carousel-images/${id}`);
       setSuccess('Image deleted successfully!');
       fetchImages();
     } catch (error) {
@@ -127,7 +129,7 @@ const ImageUpload = () => {
     try {
       const updatePromises = items.map((item, index) =>
         axios.put(
-          `http192.168.2.54/api/carousel-images/${item.id}/order`,
+          `https://192.168.2.54/api/carousel-images/${item.id}/order`,
           {
             displayOrder: index,
           }
@@ -175,6 +177,16 @@ const ImageUpload = () => {
           <Typography variant="h6" sx={{ mb: 2 }}>
             Upload New Image
           </Typography>
+
+          <TextField
+              fullWidth
+              label="Image Description"
+              variant="outlined"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              sx={{ mb: 2 }}
+              placeholder="Enter a description for the image (optional)"
+          />
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button

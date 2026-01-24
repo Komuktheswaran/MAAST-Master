@@ -134,7 +134,7 @@ const formatDatefordisplay = (dateStr) => {
  const handleJobCardUpload = async () => {
   setLoading(true);
   try {
-    const response = await axios.post('http192.168.2.54/api/jobcard-upload', data, {
+    const response = await axios.post('https://192.168.2.54/api/jobcard-upload', data, {
 
       headers: { 'Content-Type': 'application/json' }
     });
@@ -151,7 +151,7 @@ const formatDatefordisplay = (dateStr) => {
 
   const downloadTemplate = () => {
     const link = document.createElement('a');
-    link.href = 'http192.168.2.54/download-templatejob';
+    link.href = 'https://192.168.2.54/download-templatejob';
     link.download = 'EmployeeJobCardSampleData.xlsx';
     document.body.appendChild(link);
     link.click();
