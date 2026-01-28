@@ -47,8 +47,8 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts start",
-    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 react-scripts build --no-minify",
+    "start": "cross-env NODE_OPTIONS=--max-old-space-size=8096 react-scripts start",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=8096 react-scripts build --no-minify",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
     "test": "react-scripts test",

@@ -1,9 +1,4 @@
-import {
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
-} from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
@@ -27,19 +22,18 @@ const AddUsers = () => {
   });
   const [notification, setNotification] = useState("");
   const [editingUser, setEditingUser] = useState(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false); 
-  const [lineOptions, setLineOptions] = useState([]);    
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [lineOptions, setLineOptions] = useState([]);
   const [loadingLines, setLoadingLines] = useState(false);
   const [selectedLines, setSelectedLines] = useState([]);
 
-const safeTrim = (value) => (value ? value.toString().trim() : "");
-
+  const safeTrim = (value) => (value ? value.toString().trim() : "");
 
   useEffect(() => {
     fetchData();
     fetchOptions();
   }, []);
-  
+
   const handleLineChange = (event) => {
     const { value, checked } = event.target;
     if (checked) {
@@ -48,25 +42,23 @@ const safeTrim = (value) => (value ? value.toString().trim() : "");
       setSelectedLines(selectedLines.filter((line) => line !== value));
     }
   };
- const fetchOptions = async () => {
-      setLoadingLines(true);
-      try {
-        const lineResponse = await axios.get(
-          "https://192.168.2.54/api/lines"
-        );
-        setLineOptions(lineResponse.data || []);
-      } catch (error) {
-        console.error("Error fetching options:", error);
-        setLineOptions([]);
-      } finally {
-        setLoadingLines(false);
-      }
-    };
+  const fetchOptions = async () => {
+    setLoadingLines(true);
+    try {
+      const lineResponse = await axios.get("https://192.168.2.54/api/lines");
+      setLineOptions(lineResponse.data || []);
+    } catch (error) {
+      console.error("Error fetching options:", error);
+      setLineOptions([]);
+    } finally {
+      setLoadingLines(false);
+    }
+  };
   const fetchData = async () => {
     try {
       const response = await axios.get("https://192.168.2.54/api/User-master");
       const sorted = response.data.sort((a, b) =>
-        a.user_id.localeCompare(b.user_id)
+        a.user_id.localeCompare(b.user_id),
       );
       setUsers(sorted);
     } catch (error) {
@@ -78,69 +70,66 @@ const safeTrim = (value) => (value ? value.toString().trim() : "");
     const { name, value } = e.target;
     setNewUser({ ...newUser, [name]: value });
   };
-const handleRoleChange = (e) => {
-  const role = e.target.value;
-  setNewUser((prev) => ({
-    ...prev,
-    Adminflag: role === "Admin" ? "1" : "0",
-  }));
-};
-
- const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  const userPayload = {
-    ...newUser,
-    lines: newUser.Adminflag === "1" ? "ALL" : selectedLines, // ✅ Add lines
+  const handleRoleChange = (e) => {
+    const role = e.target.value;
+    setNewUser((prev) => ({
+      ...prev,
+      Adminflag: role === "Admin" ? "1" : "0",
+    }));
   };
 
-  if (editingUser) {
-    await updateUser(userPayload);
-  } else {
-    await addUser(userPayload);
-  }
-};
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
+    const userPayload = {
+      ...newUser,
+      lines: newUser.Adminflag === "1" ? "ALL" : selectedLines, // ✅ Add lines
+    };
 
-const addUser = async (userPayload) => {
-  try {
-    await axios.post("https://192.168.2.54/api/User-master", userPayload);
-    setNotification("User added successfully");
-    setSnackbarOpen(true);
-    setNewUser({ user_id: "", password: "", Adminflag: "" });
-    setSelectedLines([]);
-    fetchData();
-  } catch (error) {
-    console.error("Error adding User:", error);
-    setNotification("Error adding User");
-    setSnackbarOpen(true);
-  }
-};
+    if (editingUser) {
+      await updateUser(userPayload);
+    } else {
+      await addUser(userPayload);
+    }
+  };
 
-const updateUser = async (userPayload) => {
-  try {
-    await axios.put(
-      `https://192.168.2.54/api/User-master/${editingUser.user_id}`,
-      userPayload
-    );
-    setNotification("User updated successfully");
-    setSnackbarOpen(true);
+  const addUser = async (userPayload) => {
+    try {
+      await axios.post("https://192.168.2.54/api/User-master", userPayload);
+      setNotification("User added successfully");
+      setSnackbarOpen(true);
+      setNewUser({ user_id: "", password: "", Adminflag: "" });
+      setSelectedLines([]);
+      fetchData();
+    } catch (error) {
+      console.error("Error adding User:", error);
+      setNotification("Error adding User");
+      setSnackbarOpen(true);
+    }
+  };
 
-    // ✅ Reset form after update
-    setEditingUser(null);
-    setNewUser({ user_id: "", password: "", Adminflag: "" });
-    setSelectedLines([]);
+  const updateUser = async (userPayload) => {
+    try {
+      await axios.put(
+        `https://192.168.2.54/api/User-master/${editingUser.user_id}`,
+        userPayload,
+      );
+      setNotification("User updated successfully");
+      setSnackbarOpen(true);
 
-    // ✅ Refresh table
-    fetchData();
-  } catch (error) {
-    console.error("Error updating User:", error);
-    setNotification("Error updating User");
-    setSnackbarOpen(true);
-  }
-};
+      // ✅ Reset form after update
+      setEditingUser(null);
+      setNewUser({ user_id: "", password: "", Adminflag: "" });
+      setSelectedLines([]);
 
-
+      // ✅ Refresh table
+      fetchData();
+    } catch (error) {
+      console.error("Error updating User:", error);
+      setNotification("Error updating User");
+      setSnackbarOpen(true);
+    }
+  };
 
   const deleteUser = async (id) => {
     try {
@@ -155,28 +144,30 @@ const updateUser = async (userPayload) => {
     }
   };
 
-const editUser = (user) => {
-  setNewUser({
-    user_id: user.user_id,
-    password: user.password,
-    Adminflag: user.Adminflag, // Keep as string
-  });
+  const editUser = (user) => {
+    setNewUser({
+      user_id: user.user_id,
+      password: user.password,
+      Adminflag: user.Adminflag, // Keep as string
+    });
 
-  // ✅ Set selected lines when editing
-  if (user.Adminflag === "1") {
-    setSelectedLines(["ALL"]);
-  } else {
-    const userLines = user.LINE ? user.LINE.split(",").map(l => l.trim()) : [];
-    setSelectedLines(userLines);
-  }
+    // ✅ Set selected lines when editing
+    if (user.Adminflag === "1") {
+      setSelectedLines(["ALL"]);
+    } else {
+      const userLines = user.LINE
+        ? user.LINE.split(",").map((l) => l.trim())
+        : [];
+      setSelectedLines(userLines);
+    }
 
-  setEditingUser(user);
-};
+    setEditingUser(user);
+  };
 
-const cancelEdit = () => {
-  setNewUser({ user_id: "", password: "", Adminflag: "" });
-  setEditingUser(null);
-};
+  const cancelEdit = () => {
+    setNewUser({ user_id: "", password: "", Adminflag: "" });
+    setEditingUser(null);
+  };
 
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
@@ -200,77 +191,89 @@ const cancelEdit = () => {
       </Typography>
 
       <div className="glass-card p-4 mb-4">
-      <form onSubmit={handleSubmit} className="form-container">
-        <TextField
-          label="User ID"
-          name="user_id"
-          value={newUser.user_id}
-          onChange={handleChange}
-          required
-          fullWidth
-          margin="normal"
-          className="glass-input-mui"
-          InputProps={{ className: "glass-input" }}
-        />
-        <TextField
-          label="Password"
-          name="password"
-          type="password"
-          value={newUser.password}
-          onChange={handleChange}
-          required
-          fullWidth
-          margin="normal"
-          className="glass-input-mui"
-          InputProps={{ className: "glass-input" }}
-        />
+        <form onSubmit={handleSubmit} className="form-container">
+          <TextField
+            label="User ID"
+            name="user_id"
+            value={newUser.user_id}
+            onChange={handleChange}
+            required
+            fullWidth
+            margin="normal"
+            className="glass-input-mui"
+            InputProps={{ className: "glass-input" }}
+          />
+          <TextField
+            label="Password"
+            name="password"
+            type="password"
+            value={newUser.password}
+            onChange={handleChange}
+            required
+            fullWidth
+            margin="normal"
+            className="glass-input-mui"
+            InputProps={{ className: "glass-input" }}
+          />
 
-     <select
-  value={newUser.Adminflag === "1" ? "Admin" : newUser.Adminflag === "0" ? "Employee" : ""}
-  onChange={handleRoleChange}
-  className="form-select glass-input my-3"
-  required
->
-  <option value="">Select Role</option>
-  <option value="Admin">Admin</option>
-  <option value="Employee">Employee</option>
-</select>
+          <select
+            value={
+              newUser.Adminflag === "1"
+                ? "Admin"
+                : newUser.Adminflag === "0"
+                  ? "Employee"
+                  : ""
+            }
+            onChange={handleRoleChange}
+            className="form-select glass-input my-3"
+            required
+          >
+            <option value="">Select Role</option>
+            <option value="Admin">Admin</option>
+            <option value="Employee">Employee</option>
+          </select>
 
-{/* Show line options only for Employees */}
+          {/* Show line options only for Employees */}
 
-{newUser.Adminflag === "0" && (
-  <FormControl fullWidth margin="normal">
-    <InputLabel id="line-select-label">Select Line</InputLabel><br></br>
-   <Select
-  labelId="line-select-label"
-  multiple   // ✅ allow multiple selection
-  value={selectedLines}
-  onChange={(e) => setSelectedLines(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-  renderValue={(selected) => selected.join(", ")} // ✅ show selected as comma separated
-  required
-  className="glass-input"
->
-  {lineOptions.map((line, index) => (
-    <MenuItem key={index} value={safeTrim(line.LINE) || ""}>
-      {safeTrim(line.LINE) || "NULL"}
-    </MenuItem>
-  ))}
-</Select>
-
-  </FormControl>
-)}
-
-        <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-          <Button type="submit" variant="primary">
-            {editingUser ? "Update User" : "Add User"}
-          </Button>
-          {editingUser && (
-            <Button variant="secondary" onClick={cancelEdit}>
-              Cancel
-            </Button>
+          {newUser.Adminflag === "0" && (
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="line-select-label">Select Line</InputLabel>
+              <br></br>
+              <Select
+                labelId="line-select-label"
+                multiple // ✅ allow multiple selection
+                value={selectedLines}
+                onChange={(e) =>
+                  setSelectedLines(
+                    typeof e.target.value === "string"
+                      ? e.target.value.split(",")
+                      : e.target.value,
+                  )
+                }
+                renderValue={(selected) => selected.join(", ")} // ✅ show selected as comma separated
+                required
+                className="glass-input"
+              >
+                {lineOptions.map((line, index) => (
+                  <MenuItem key={index} value={safeTrim(line.LINE) || ""}>
+                    {safeTrim(line.LINE) || "NULL"}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           )}
-        </div>
-      </form>
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+            <Button type="submit" variant="primary">
+              {editingUser ? "Update User" : "Add User"}
+            </Button>
+            {editingUser && (
+              <Button variant="secondary" onClick={cancelEdit}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </form>
       </div>
 
       <Table striped bordered hover responsive className="glass-table">
@@ -289,7 +292,7 @@ const cancelEdit = () => {
               <td>{index + 1}</td>
               <td>{User.user_id}</td>
               <td>{User.password}</td>
-              <td>{User.Adminflag === '1' ? "Admin" : "Employee"}</td>
+              <td>{User.Adminflag === "1" ? "Admin" : "Employee"}</td>
               <td>
                 <Button onClick={() => editUser(User)} variant="warning">
                   <MdEdit />
@@ -321,4 +324,3 @@ const cancelEdit = () => {
 };
 
 export default AddUsers;
-

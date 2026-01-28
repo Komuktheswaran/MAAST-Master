@@ -1,72 +1,98 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
-import { Table, Button, Form, Container, Row, Col, Alert, Spinner, Pagination } from "react-bootstrap";
+import {
+  Table,
+  Button,
+  Form,
+  Container,
+  Row,
+  Col,
+  Alert,
+  Spinner,
+  Pagination,
+} from "react-bootstrap";
 import { DateTime } from "luxon";
 
 // Memoized Table Row Component
-const LeaveRow = React.memo(({ emp, onUpdate, onSave }) => {
-  return (
-    <tr>
-      <td>{emp.ShiftDate}</td>
-      <td>{emp.USERID}</td>
-      <td>{emp.NAME}</td>
-      <td>{emp.LINE}</td>
-      <td>{emp.SHIFT_ID}</td>
-      <td>
-        <Form.Select
-          value={emp.LeaveType || ""}
-          onChange={(e) => onUpdate(emp.USERID, emp.ShiftDate, "LeaveType", e.target.value)}
-          className="border-secondary glass-input"
-        >
-          <option value="">Select Type</option>
-          <option value="Authorized">Authorized</option>
-          <option value="UnAuth">Unauthorized</option>
-        </Form.Select>
-        {emp.LeaveType === "Authorized" && (
+const LeaveRow = React.memo(
+  ({ emp, onUpdate, onSave }) => {
+    return (
+      <tr>
+        <td>{emp.ShiftDate}</td>
+        <td>{emp.USERID}</td>
+        <td>{emp.NAME}</td>
+        <td>{emp.LINE}</td>
+        <td>{emp.SHIFT_ID}</td>
+        <td>
           <Form.Select
-            value={emp.LeaveCategory || ""}
-            onChange={(e) => onUpdate(emp.USERID, emp.ShiftDate, "LeaveCategory", e.target.value)}
-            className="border-secondary glass-input mt-2"
-            size="sm"
+            value={emp.LeaveType || ""}
+            onChange={(e) =>
+              onUpdate(emp.USERID, emp.ShiftDate, "LeaveType", e.target.value)
+            }
+            className="border-secondary glass-input"
           >
-            <option value="">Select Category</option>
-            <option value="Emergency">Emergency</option>
-            <option value="Preapproved">PreInformed</option>
+            <option value="">Select Type</option>
+            <option value="Authorized">Authorized</option>
+            <option value="UnAuth">Unauthorized</option>
           </Form.Select>
-        )}
-      </td>
-      <td>
-        <Form.Control
-          type="text"
-          value={emp.Remarks || ""}
-          placeholder="Enter remarks"
-          onChange={(e) => onUpdate(emp.USERID, emp.ShiftDate, "Remarks", e.target.value)}
-          className="border-secondary glass-input"
-        />
-      </td>
-      <td>
-        <Button
-          variant={emp.LeaveID ? "success" : "warning"}
-          size="sm"
-          onClick={() => onSave(emp)}
-        >
-          {emp.LeaveID ? "Update" : "Save"}
-        </Button>
-      </td>
-    </tr>
-  );
-}, (prevProps, nextProps) => {
-  // Custom comparison to prevent re-renders unless specific fields change
-  return (
-    prevProps.emp.LeaveType === nextProps.emp.LeaveType &&
-    prevProps.emp.LeaveCategory === nextProps.emp.LeaveCategory &&
-    prevProps.emp.Remarks === nextProps.emp.Remarks &&
-    prevProps.emp.LeaveID === nextProps.emp.LeaveID // Check if ID exists (saved state)
-  );
-});
+          {emp.LeaveType === "Authorized" && (
+            <Form.Select
+              value={emp.LeaveCategory || ""}
+              onChange={(e) =>
+                onUpdate(
+                  emp.USERID,
+                  emp.ShiftDate,
+                  "LeaveCategory",
+                  e.target.value,
+                )
+              }
+              className="border-secondary glass-input mt-2"
+              size="sm"
+            >
+              <option value="">Select Category</option>
+              <option value="Emergency">Emergency</option>
+              <option value="Preapproved">PreInformed</option>
+            </Form.Select>
+          )}
+        </td>
+        <td>
+          <Form.Control
+            type="text"
+            value={emp.Remarks || ""}
+            placeholder="Enter remarks"
+            onChange={(e) =>
+              onUpdate(emp.USERID, emp.ShiftDate, "Remarks", e.target.value)
+            }
+            className="border-secondary glass-input"
+          />
+        </td>
+        <td>
+          <Button
+            variant={emp.LeaveID ? "success" : "warning"}
+            size="sm"
+            onClick={() => onSave(emp)}
+          >
+            {emp.LeaveID ? "Update" : "Save"}
+          </Button>
+        </td>
+      </tr>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison to prevent re-renders unless specific fields change
+    return (
+      prevProps.emp.LeaveType === nextProps.emp.LeaveType &&
+      prevProps.emp.LeaveCategory === nextProps.emp.LeaveCategory &&
+      prevProps.emp.Remarks === nextProps.emp.Remarks &&
+      prevProps.emp.LeaveID === nextProps.emp.LeaveID // Check if ID exists (saved state)
+    );
+  },
+);
 
 const LeaveManagement = () => {
-  const [fromDate, setFromDate] = useState(DateTime.now().toFormat("yyyy-MM-dd"));
+  const [fromDate, setFromDate] = useState(
+    DateTime.now().toFormat("yyyy-MM-dd"),
+  );
   const [toDate, setToDate] = useState(DateTime.now().toFormat("yyyy-MM-dd"));
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -100,7 +126,7 @@ const LeaveManagement = () => {
       try {
         const [shiftRes, lineRes] = await Promise.all([
           axios.get("https://192.168.2.54/api/shifts"),
-          axios.get("https://192.168.2.54/api/lines")
+          axios.get("https://192.168.2.54/api/lines"),
         ]);
         setShifts(shiftRes.data || []);
         setLines(lineRes.data || []);
@@ -118,11 +144,11 @@ const LeaveManagement = () => {
     setCurrentPage(1); // Reset pagination on fetch
     try {
       const res = await axios.get("https://192.168.2.54/api/leave/absent", {
-        params: { 
+        params: {
           fromDate,
           toDate,
           shift: selectedShift,
-          line: selectedLine
+          line: selectedLine,
         },
       });
       setEmployees(res.data || []);
@@ -148,7 +174,8 @@ const LeaveManagement = () => {
         date: emp.ShiftDate,
         leaveType: emp.LeaveType,
         remarks: emp.Remarks,
-        leaveCategory: emp.LeaveType === "Authorized" ? emp.LeaveCategory : null,
+        leaveCategory:
+          emp.LeaveType === "Authorized" ? emp.LeaveCategory : null,
         createdBy: sessionStorage.getItem("username") || "Admin",
       });
       alert("Saved successfully");
@@ -162,22 +189,28 @@ const LeaveManagement = () => {
   }, []);
 
   const updateField = useCallback((id, shiftDate, field, value) => {
-    setEmployees(prev => 
-      prev.map((e) => (e.USERID === id && e.ShiftDate === shiftDate ? { ...e, [field]: value } : e))
+    setEmployees((prev) =>
+      prev.map((e) =>
+        e.USERID === id && e.ShiftDate === shiftDate
+          ? { ...e, [field]: value }
+          : e,
+      ),
     );
   }, []);
 
   const exportToExcel = () => {
     import("xlsx").then((XLSX) => {
-      const worksheet = XLSX.utils.json_to_sheet(employees.map(e => ({
-        "User ID": e.USERID,
-        "Name": e.NAME,
-        "Shift": e.SHIFT_ID,
-        "Line": e.LINE,
-        "Date": e.ShiftDate,
-        "Leave Type": e.LeaveType || "",
-        "Remarks": e.Remarks || ""
-      })));
+      const worksheet = XLSX.utils.json_to_sheet(
+        employees.map((e) => ({
+          "User ID": e.USERID,
+          Name: e.NAME,
+          Shift: e.SHIFT_ID,
+          Line: e.LINE,
+          Date: e.ShiftDate,
+          "Leave Type": e.LeaveType || "",
+          Remarks: e.Remarks || "",
+        })),
+      );
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Absent Report");
       XLSX.writeFile(workbook, `Absent_Report_${fromDate}_to_${toDate}.xlsx`);
@@ -186,16 +219,24 @@ const LeaveManagement = () => {
 
   // Filtered Data
   const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => 
-      (emp.USERID?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) ||
-      (emp.NAME?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase())
+    return employees.filter(
+      (emp) =>
+        (emp.USERID?.toLowerCase() || "").includes(
+          debouncedSearchTerm.toLowerCase(),
+        ) ||
+        (emp.NAME?.toLowerCase() || "").includes(
+          debouncedSearchTerm.toLowerCase(),
+        ),
     );
   }, [employees, debouncedSearchTerm]);
 
   // Pagination Logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredEmployees.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredEmployees.slice(
+    indexOfFirstItem,
+    indexOfLastItem,
+  );
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
 
   const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
@@ -225,27 +266,31 @@ const LeaveManagement = () => {
           </Col>
           <Col md={2}>
             <Form.Label>Filter Shift</Form.Label>
-            <Form.Select 
-              value={selectedShift} 
-              onChange={e => setSelectedShift(e.target.value)}
+            <Form.Select
+              value={selectedShift}
+              onChange={(e) => setSelectedShift(e.target.value)}
               className="border-secondary glass-input"
             >
               <option value="">All Shifts</option>
               {shifts.map((s, idx) => (
-                 <option key={idx} value={s.SHIFT_ID}>{s.SHIFT_ID}</option>
+                <option key={idx} value={s.SHIFT_ID}>
+                  {s.SHIFT_ID}
+                </option>
               ))}
             </Form.Select>
           </Col>
           <Col md={2}>
             <Form.Label>Filter Line</Form.Label>
-            <Form.Select 
-              value={selectedLine} 
-              onChange={e => setSelectedLine(e.target.value)}
+            <Form.Select
+              value={selectedLine}
+              onChange={(e) => setSelectedLine(e.target.value)}
               className="border-secondary glass-input"
             >
               <option value="">All Lines</option>
               {lines.map((l, idx) => (
-                <option key={idx} value={l.LINE}>{l.LINE}</option>
+                <option key={idx} value={l.LINE}>
+                  {l.LINE}
+                </option>
               ))}
             </Form.Select>
           </Col>
@@ -291,9 +336,15 @@ const LeaveManagement = () => {
               />
             </Col>
           </Row>
-          
+
           <div className="glass-card mb-4">
-            <Table striped bordered hover responsive className="glass-table mb-0">
+            <Table
+              striped
+              bordered
+              hover
+              responsive
+              className="glass-table mb-0"
+            >
               <thead>
                 <tr>
                   <th>Date</th>
@@ -308,11 +359,11 @@ const LeaveManagement = () => {
               </thead>
               <tbody>
                 {currentItems.map((emp) => (
-                  <LeaveRow 
-                    key={`${emp.USERID}-${emp.ShiftDate}`} 
-                    emp={emp} 
-                    onUpdate={updateField} 
-                    onSave={handleSave} 
+                  <LeaveRow
+                    key={`${emp.USERID}-${emp.ShiftDate}`}
+                    emp={emp}
+                    onUpdate={updateField}
+                    onSave={handleSave}
                   />
                 ))}
               </tbody>
@@ -323,9 +374,15 @@ const LeaveManagement = () => {
           {totalPages > 1 && (
             <div className="d-flex justify-content-center mt-3">
               <Pagination>
-                <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
-                <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-                
+                <Pagination.First
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                />
+                <Pagination.Prev
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                />
+
                 {[...Array(Math.min(5, totalPages))].map((_, idx) => {
                   // Show window of pages around current or start
                   let pageNum = currentPage - 2 + idx;
@@ -334,8 +391,8 @@ const LeaveManagement = () => {
                   if (pageNum < 1) return null;
 
                   return (
-                    <Pagination.Item 
-                      key={pageNum} 
+                    <Pagination.Item
+                      key={pageNum}
                       active={pageNum === currentPage}
                       onClick={() => handlePageChange(pageNum)}
                     >
@@ -344,8 +401,14 @@ const LeaveManagement = () => {
                   );
                 })}
 
-                <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
-                <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
+                <Pagination.Next
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                />
+                <Pagination.Last
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                />
               </Pagination>
             </div>
           )}

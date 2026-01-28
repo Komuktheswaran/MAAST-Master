@@ -1,682 +1,207 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Container,
   Row,
   Col,
-  Table,
-  Button,
   Form,
+  Button,
+  Table,
   Spinner,
   Alert,
+  Card,
 } from "react-bootstrap";
-import axios from "axios";
-
-import * as XLSX from "xlsx";
-import { DateTime } from 'luxon';
 import Select from "react-select";
-import '../styles/UserShiftUpload.css';
-import emvLogo from '../pictures/emvlogo.png';
+import axios from "axios";
+import * as XLSX from "xlsx";
+import { FaFileExcel } from "react-icons/fa";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
+import emvLogo from "../pictures/emvlogo.png"; // Ensure this path is correct
 
 const EmployeeJobCardDownload = () => {
-  const [employeeName, setEmployeeName] = useState("");
-  const [JobDataData, setJobDataData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingEmployees, setLoadingEmployees] = useState(true);
-  const [error, setError] = useState("");
-  const [allEmployees, setAllEmployees] = useState([]);
-  const [employeeIdInput, setEmployeeIdInput] = useState("");
-  const [debouncedInput, setDebouncedInput] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [reportType, setReportType] = useState("date-range"); // date-range, month-wise, unit-wise
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-
-  // New State for Month-wise Report
-  const [reportType, setReportType] = useState("date-range"); // 'date-range' or 'month-wise'
   const [fromMonth, setFromMonth] = useState("");
   const [toMonth, setToMonth] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedLine, setSelectedLine] = useState("");
+  const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [employeeIdInput, setEmployeeIdInput] = useState("");
+  const [allEmployees, setAllEmployees] = useState([]);
 
-  // New State for Unit Wise Report
-  const [shifts, setShifts] = useState([]);
+  const [JobDataData, setJobDataData] = useState([]);
+  const [monthlySummary, setMonthlySummary] = useState([]);
+  const [monthlyRawData, setMonthlyRawData] = useState([]);
+
+  const [unitBuckets, setUnitBuckets] = useState({});
+  const [chartData, setChartData] = useState([]);
+  const [selectedBucket, setSelectedBucket] = useState(null);
   const [selectedShift, setSelectedShift] = useState("");
 
+  const [loading, setLoading] = useState(false);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [error, setError] = useState("");
+  const [lines, setLines] = useState([]);
+  const [shifts, setShifts] = useState([]);
 
-  const MAX_OPTIONS = 100; // Limit displayed options for performance
+  // Fetch Lines and Shifts on mount
+  useEffect(() => {
+    const fetchMeta = async () => {
+      try {
+        const lineRes = await axios.get("https://192.168.2.54/api/lines");
+        if (lineRes.data && Array.isArray(lineRes.data)) setLines(lineRes.data);
 
-
-
-function formatDateforbackend(date) {
-  if (!date) return '';
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-
-
-const formatDates = (dateStr) => {
-  if (!dateStr) return dateStr;
-  
-  // Try parsing strictly as dd-MM-yyyy first (common in your data)
-  let dt = DateTime.fromFormat(dateStr, 'dd-MM-yyyy');
-  
-  if (!dt.isValid) {
-      // Try parsing as ISO yyyy-MM-dd
-      dt = DateTime.fromISO(dateStr);
-  }
-  
-  if (!dt.isValid) {
-      // Try parsing as JS Date (last resort)
-      const jsDate = new Date(dateStr);
-      if (!isNaN(jsDate.getTime())) {
-          return DateTime.fromJSDate(jsDate).toFormat('dd-MM-yyyy');
+        const shiftRes = await axios.get("https://192.168.2.54/api/shifts");
+        if (shiftRes.data) setShifts(shiftRes.data);
+      } catch (e) {
+        console.error(e);
       }
-      return "N/A";
-  }
+    };
+    fetchMeta();
+  }, []);
 
-  return dt.toFormat('dd-MM-yyyy');
-};
-
-  // Fetch employees on mount
+  // Fetch Employees
   useEffect(() => {
     const fetchEmployees = async () => {
       setLoadingEmployees(true);
       try {
-        const res = await axios.get("https://192.168.2.54/api/employees");
-
-        if (Array.isArray(res.data)) {
-          const formatted = res.data
-            .map((emp) => ({
-              value: emp.userid,
-              label: `${emp.userid} - ${emp.name}`,
-              name: emp.name
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label));
-          setAllEmployees(formatted);
+        const response = await axios.get(
+          "https://192.168.2.54/api/employees-showall",
+        );
+        if (response.data && Array.isArray(response.data)) {
+          const activeUsers = response.data.filter(
+            (user) => user.UserIDEnbl === 1,
+          );
+          setAllEmployees(activeUsers);
+          const options = activeUsers.map((user) => ({
+            value: user.userid,
+            label: `${user.name} (${user.userid})`,
+            id: user.userid,
+            name: user.name,
+          }));
+          setEmployeeOptions(options);
         }
       } catch (err) {
-        console.error("Error fetching employee list:", err);
-        setError("Failed to load employees. Please refresh the page.");
+        console.error("Error fetching employees:", err);
+        setError("Failed to load employee list.");
       } finally {
         setLoadingEmployees(false);
       }
     };
-    
-    // Fetch Shifts
-    const fetchShifts = async () => {
-        try {
-            const res = await axios.get("https://192.168.2.54/api/shifts");
-            if (Array.isArray(res.data)) {
-                setShifts(res.data);
-            }
-        } catch(err) {
-            console.error("Error fetching shifts", err);
-        }
-    }
-
     fetchEmployees();
-    fetchShifts();
   }, []);
 
-  // Debounce search input to prevent lag
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedInput(employeeIdInput);
-    }, 300); // 300ms debounce delay
+  const handleSearchInputChange = (newValue) => {
+    setEmployeeIdInput(newValue);
+  };
 
-    return () => clearTimeout(timer);
-  }, [employeeIdInput]);
+  const handleEmployeeChange = (selectedOption) => {
+    setSelectedEmployee(selectedOption);
+  };
 
-  // Memoized filtered employee options (optimized for performance)
-  const employeeOptions = useMemo(() => {
-    // Don't show options until user starts typing (prevents rendering thousands of items)
-    if (!debouncedInput || debouncedInput.trim() === "") {
-      return [];
-    }
-    
-    const searchLower = debouncedInput.toLowerCase();
-    const filtered = [];
-    
-    // Limit results for performance - stop once we hit MAX_OPTIONS
-    for (let i = 0; i < allEmployees.length && filtered.length < MAX_OPTIONS; i++) {
-      if (allEmployees[i].label.toLowerCase().includes(searchLower)) {
-        filtered.push(allEmployees[i]);
-      }
-    }
-    
-    return filtered;
-  }, [debouncedInput, allEmployees]);
+  const noOptionsMessage = () => {
+    return employeeIdInput.length > 0 ? "No user found" : "Type to search...";
+  };
 
-  // Memoized selected employee - search in all employees, not just filtered
-  const selectedEmployee = useMemo(() => {
-    if (!employeeId) return null;
-    return allEmployees.find((opt) => opt.value === employeeId) || null;
-  }, [allEmployees, employeeId]);
+  // --- Calculations ---
 
-  // Optimized handlers with useCallback
-  const handleEmployeeChange = useCallback((selected) => {
-    setEmployeeId(selected ? selected.value : "");
-    setEmployeeName(selected ? selected.name : "");
-  }, []);
+  const calculateWeightedScore = (userData) => {
+    const count = userData.length || 1;
+    // Calculate Averages for each category
+    const avgPerformance =
+      userData.reduce((sum, item) => sum + (item.Performance || 0), 0) / count;
 
-  const handleSearchInputChange = useCallback((val) => {
-    setEmployeeIdInput(val);
-  }, []);
+    // Attendance Special Logic: return 5 if Attendance is 5 AND Status is Authorized/Authorized Leave
+    const avgAttendance =
+      userData.reduce((sum, item) => {
+        const val =
+          item.Attendance === 5 &&
+          (item.ATTENDANCE_Status === "Authorized Leave" ||
+            item.ATTENDANCE_Status === "Authorized")
+            ? 5
+            : item.Attendance || 0;
+        return sum + val;
+      }, 0) / count;
 
-  // Custom message for better UX
-  const noOptionsMessage = useCallback(() => {
-    if (!debouncedInput || debouncedInput.trim() === "") {
-      return "Type to search employees...";
-    }
-    return employeeOptions.length >= MAX_OPTIONS 
-      ? `Showing first ${MAX_OPTIONS} results. Type more to refine search.`
-      : "No employees found";
-  }, [debouncedInput, employeeOptions.length]);
+    const avgPunctuality =
+      userData.reduce((sum, item) => sum + (item.Punctuality || 0), 0) / count;
+    const avgRejections =
+      userData.reduce((sum, item) => sum + (item.Rejections || 0), 0) / count;
+    const avg5S =
+      userData.reduce((sum, item) => sum + (item["5S"] || 0), 0) / count;
+    const avgPPE =
+      userData.reduce((sum, item) => sum + (item.Safety || 0), 0) / count;
+    const avgDiscipline =
+      userData.reduce((sum, item) => sum + (item.Discipline || 0), 0) / count;
+
+    const totalScore =
+      avgPerformance +
+      avgAttendance +
+      avgPunctuality +
+      avgRejections +
+      avg5S +
+      avgPPE +
+      avgDiscipline;
+
+    return {
+      count,
+      avgPerformance: avgPerformance.toFixed(2),
+      avgAttendance: avgAttendance.toFixed(2),
+      avgPunctuality: avgPunctuality.toFixed(2),
+      avgRejections: avgRejections.toFixed(2),
+      avg5S: avg5S.toFixed(2),
+      avgPPE: avgPPE.toFixed(2),
+      avgDiscipline: avgDiscipline.toFixed(2),
+      totalScore: totalScore.toFixed(2),
+    };
+  };
+
+  // --- Fetch Methods ---
 
   const fetchJobData = async () => {
-    if (!employeeId) {
-      setError("Please select an employee.");
+    if (!selectedEmployee || !fromDate || !toDate) {
+      setError("Please select Employee, From Date and To Date.");
       return;
     }
-    if (!fromDate || !toDate) {
-      setError("Please select From Date and To Date.");
-      return;
-    }
-
-    setError("");
     setLoading(true);
+    setError("");
+    setJobDataData([]);
 
     try {
       const response = await axios.post(
         "https://192.168.2.54/api/employee-Jobreport",
         {
-          fromDate: formatDateforbackend(fromDate),
-          toDate: formatDateforbackend(toDate),
-          employeeId: employeeId, // ✅ send employeeId instead of name
+          employeeId: selectedEmployee.value,
+          fromDate,
+          toDate,
         },
-        { timeout: 330000 }
       );
-      console.log(response.data);
+      console.log("Job Data: ", response.data);
 
       if (response.data && Array.isArray(response.data.records)) {
-        // Sort by RawDate (YYYY-MM-DD) which is safer than Date (DD/MM/YYYY)
-        const sortedRecords = response.data.records.sort((a, b) => {
-            const dateA = new Date(a.RawDate || a.Date.split('/').reverse().join('-'));
-            const dateB = new Date(b.RawDate || b.Date.split('/').reverse().join('-'));
-            return dateA - dateB;
-        });
-        setJobDataData(sortedRecords);
-
-        if (response.data.records.length === 0) {
-          setError("No JobData found for the selected filters.");
-        }
+        setJobDataData(response.data.records);
       } else {
-        setError("Invalid response format from server.");
+        setError("No data found.");
       }
-    } catch (error) {
-      console.error("Error fetching Employee Job Card Data:", error);
-      if (error.code === "ECONNABORTED") {
-        setError("Request timeout. Please try again.");
-      } else if (error.response) {
-        setError(
-          `Server error: ${error.response.data || error.response.statusText}`
-        );
-      } else if (error.request) {
-        setError("Network error. Please check your connection.");
-      } else {
-        setError("An unexpected error occurred. Please try again.");
-      }
-      setJobDataData([]);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch data.");
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadExcel = () => {
-    if (!Array.isArray(JobDataData) || JobDataData.length === 0) {
-      setError("No JobData data to export.");
-      return;
-    }
-
-    try {
-      // Sort data by Date
-      // Sort data by Date (using sortedData from state should be enough, but ensuring here too)
-      const sortedData = [...JobDataData].sort((a, b) => {
-         const dateA = new Date(a.RawDate || a.Date.split('/').reverse().join('-'));
-         const dateB = new Date(b.RawDate || b.Date.split('/').reverse().join('-'));
-         return dateA - dateB;
-      });
-      const count = sortedData.length || 1; // Avoid division by zero
-
-      // Calculate totals for numeric columns
-      const totalTarget = sortedData.reduce(
-        (sum, item) => sum + (item.Target || 0),
-        0
-      );
-      const totalActual = sortedData.reduce(
-        (sum, item) => sum + (item.Actual || 0),
-        0
-      );
-      
-      const totalRejections = sortedData.reduce(
-        (sum, item) => sum + (item.Rejections || 0),
-        0
-      );
-      
-      const totalPerformancePoints = sortedData.reduce(
-        (sum, item) => sum + (item.Performance || 0),
-        0
-      );
-
-      // Percentage Formula for Performance: (Total Points / (Count * 50)) * 100
-      const performancePercentage = count > 0 
-        ? ((totalPerformancePoints / (count * 50)) * 100).toFixed(2) + "%" 
-        : "0%";
-
-      // Calculate Totals for Attendance and Punctuality for Percentage Formula
-      const totalAttendancePoints = sortedData.reduce((sum, item) => sum + (item.Attendance === 5 ? 5 : (item.Attendance || 0)), 0);
-      const totalPunctualityPoints = sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0);
-
-      const attendancePercentage = count > 0 ? ((totalAttendancePoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
-      const punctualityPercentage = count > 0 ? ((totalPunctualityPoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
-      
-      // Calculate Totals for Rejections, 5S, PPE, Discipline for Percentage Formula
-      // Formula: (Total Points / (Count * 10)) * 100
-      // Note: totalRejections was already calculated above
-      const total5S = sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0);
-      const totalPPE = sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0);
-      const totalDiscipline = sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0);
-
-      const rejectionsPercentage = count > 0 ? ((totalRejections / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-      const fiveSPercentage = count > 0 ? ((total5S / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-      const ppePercentage = count > 0 ? ((totalPPE / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-      const disciplinePercentage = count > 0 ? ((totalDiscipline / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-      
-      // Calculate AVERAGES for score columns (as per Excel formula)
-
-      // Target/Actual can stay as Sum if needed, or Average? Excel had 'None' for Target.
-      // But usually Target/Actual are Summed over a period.
-      // User request specifically mentioned: "production performance, attendance, punchuality, rejections, 5S,safety &PPE usage, Discipline, total"
-      // So Target/Actual might remain Sum. 
-      // Checking Excel analysis: Index 6 (Actual) had 'TOTAL' text. Index 5 (Target) 'None'.
-      // I'll keep them as Sum for now as it makes sense for quantity.
-      
-      const avgPerformance = (sortedData.reduce(
-        (sum, item) => sum + (item.Performance || 0),
-        0
-      ) / count).toFixed(2);
-
-      const avgAttendance = (JobDataData.reduce(
-        (sum, item) => sum + (item.Attendance || 0),
-        0
-      ) / count).toFixed(2);
-
-      const avgPunctuality = (JobDataData.reduce(
-        (sum, item) => sum + (item.Punctuality || 0),
-        0
-      ) / count).toFixed(2);
-
-      const avgRejections = (JobDataData.reduce(
-        (sum, item) => sum + (item.Rejections || 0),
-        0
-      ) / count).toFixed(2);
-
-      const avg5S = (JobDataData.reduce(
-        (sum, item) => sum + (item["5S"] || 0),
-        0
-      ) / count).toFixed(2);
-
-      const avgPPE = (JobDataData.reduce(
-        (sum, item) => sum + (item.PPE || 0),
-        0
-      ) / count).toFixed(2);
-
-      const avgDiscipline = (JobDataData.reduce(
-        (sum, item) => sum + (item.Disclipline || 0),
-        0
-      ) / count).toFixed(2);
-
-      // Final Total is Sum of the Averages
-      const totalTotal = (
-          parseFloat(avgPerformance) +
-          parseFloat(avgAttendance) +
-          parseFloat(avgPunctuality) +
-          parseFloat(avgRejections) +
-          parseFloat(avg5S) +
-          parseFloat(avgPPE) +
-          parseFloat(avgDiscipline)
-      ).toFixed(2);
-
-      const worksheetData = [
-        ["Employee Job Card Data"],
-        ["NAME:", employeeName, ""],
-        ["ID NO.", employeeId || "", "", "", ""],
-        [],
-        [
-          "SL NO.",
-          "DATE",
-          "SHIFT",
-          "STAGE",
-          "LINE",
-          "Target",
-          "Actual",
-          "Production Performance",
-          "Attendance",
-          "Punctuality",
-          "Rejections",
-          "5S",
-          "Safety & PPE Usage",
-          "Discipline",
-          "Total",
-        ],
-        ...JobDataData.map((item, index) => [
-          index + 1,
-          item.Date,
-          item.SHIFTNAME || "",
-          item.STAGE || "",
-          item.LINE || "",
-          item.Target || 0,
-          item.Actual || 0,
-          item.Performance || 0,
-          (item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) 
-            ? 5   // Value is 5, formatting will add "(Auth)"
-            : (item.Attendance || 0),
-          item.Punctuality || 0,
-          item.Rejections || 0,
-          item["5S"] || 0,
-          item.PPE || 0,
-          item.Disclipline || 0,
-          item.Total || 0,
-        ]),
-        // ✅ Add Total Row
-        [
-          "",
-          "",
-          "",
-          "",
-          "TOTAL",
-          totalTarget,
-          totalActual,
-          avgPerformance,
-          avgAttendance,
-          avgPunctuality,
-          avgRejections,
-          avg5S,
-          avgPPE,
-          avgDiscipline,
-          totalTotal,
-        ],
-        // ✅ Add Percentage Row
-        [
-          "",
-          "",
-          "",
-          "",
-          "PERCENTAGE",
-          "",
-          "",
-          performancePercentage,
-          attendancePercentage,  // Index 8
-          punctualityPercentage, // Index 9
-          rejectionsPercentage,  // Index 10
-          fiveSPercentage,       // Index 11
-          ppePercentage,         // Index 12
-          disciplinePercentage,  // Index 13
-          "",
-        ],
-      ];
-
-      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-      
-      // Inject Formulas
-      const range = XLSX.utils.decode_range(worksheet["!ref"]);
-      // Data starts at Row index 5 (Excel Row 6) because Header is at index 4
-      const dataStartRow = 5; 
-      const dataEndRow = range.e.r - 2; // Last data row (before Total and Percentage rows)
-
-      for (let R = dataStartRow; R <= dataEndRow; ++R) {
-        // Column O (Index 14) is Total. Range H (7) to N (13) are metrics.
-        // Excel rows are 1-based, so R + 1
-        const rowNum = R + 1;
-        const totalCellRef = XLSX.utils.encode_cell({ c: 14, r: R });
-        // Formula: SUM(H{row}:N{row})
-        worksheet[totalCellRef] = { f: `SUM(H${rowNum}:N${rowNum})`, t: 'n' }; 
-      }
-
-      // Summary Total Row (Average of Totals)
-      // The "Total" summary cell is at [Range.e.r-1][14] (Column O)
-      const summaryTotalRowIndex = range.e.r - 1;
-      const summaryTotalCellRef = XLSX.utils.encode_cell({ c: 14, r: summaryTotalRowIndex });
-      // Formula: AVERAGE(O6:O{LastDataRow})
-      worksheet[summaryTotalCellRef] = { f: `AVERAGE(O${dataStartRow + 1}:O${dataEndRow + 1})`, t: 'n' };
-
-      // Merge title
-      worksheet["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }, // adjust merge based on last column
-      ];
-
-      // Set column widths
-      worksheet["!cols"] = Array(15).fill({ wch: 15 });
-
-      // Apply styles
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cell_address = { c: C, r: R };
-          const cell_ref = XLSX.utils.encode_cell(cell_address);
-          let cell = worksheet[cell_ref];
-          
-          // Ensure cell exists for styling even if empty
-          if (!cell) {
-              cell = { v: "" };
-              worksheet[cell_ref] = cell;
-          }
-
-          if (cell) {
-            // Apply Custom Format for Authorized Leave
-            // Data rows are from index 5 to dataEndRow. 
-            // R corresponds to Excel row (0-based index in loop)
-            // JobDataData index = R - 5
-            if (R >= 5 && R <= dataEndRow && C === 8) { // Column 8 is Attendance (I)
-                const dataIndex = R - 5;
-                if (dataIndex >= 0 && dataIndex < JobDataData.length) {
-                    const item = JobDataData[dataIndex];
-                    if (item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) {
-                        cell.z = '0 " (Auth)"'; // Custom Number Format
-                    }
-                }
-            }
-
-            // Title row
-            if (R === 0) {
-              cell.s = {
-                font: { name: "Arial", sz: 14, bold: true },
-                fill: { fgColor: { rgb: "FFFF00" } },
-                alignment: { horizontal: "center", vertical: "center" },
-              };
-            }
-            // Header row
-            else if (R === 4) {
-              cell.s = {
-                font: { name: "Arial", sz: 10, bold: true },
-                fill: { fgColor: { rgb: "D9E1F2" } },
-                alignment: { horizontal: "center", vertical: "center" },
-                border: {
-                  top: { style: "thin" },
-                  bottom: { style: "thin" },
-                  left: { style: "thin" },
-                  right: { style: "thin" },
-                },
-              };
-            }
-            // Total row & Percentage row
-            else if (R === range.e.r || R === range.e.r - 1) {
-              cell.s = {
-                font: {
-                  name: "Arial",
-                  sz: 10,
-                  bold: true,
-                  color: { rgb: "FFFFFF" },
-                },
-                fill: { fgColor: { rgb: "4472C4" } }, // Dark Blue background
-                alignment: { horizontal: "center", vertical: "center" },
-                border: {
-                  top: { style: "thin" },
-                  bottom: { style: "thin" },
-                  left: { style: "thin" },
-                  right: { style: "thin" },
-                },
-              };
-            }
-            // Normal cells
-            else {
-              cell.s = {
-                font: { name: "Arial", sz: 10 },
-                alignment: { horizontal: "center", vertical: "center" },
-                border: {
-                  top: { style: "thin" },
-                  bottom: { style: "thin" },
-                  left: { style: "thin" },
-                  right: { style: "thin" },
-                },
-              };
-            }
-          }
-        }
-      }
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        "Employee Job Card Data"
-      );
-
-      const fileName = `EmployeeJobCardDownload__${employeeName}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
-
-      setError("");
-    } catch (error) {
-      console.error("Error downloading Excel:", error);
-      setError("Failed to download Excel file. Please try again.");
-    }
-  };
-
-  const downloadUnitReport = async () => {
-    if (!fromMonth || !toMonth) {
-        setError("Please select From Month and To Month.");
-        return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-        const response = await axios.post(
-            "https://192.168.2.54/api/unit-wise-report",
-            { fromMonth, toMonth, shift: selectedShift },
-            { timeout: 600000 }
-        );
-
-        if (response.data && response.data.success && Array.isArray(response.data.records)) {
-            const records = response.data.records;
-            if (records.length === 0) {
-                setError("No data found for requirements.");
-                setLoading(false);
-                return;
-            }
-
-            // Bucketize
-            const buckets = {
-                "< 60%": [],
-                "60% - 70%": [],
-                "70% - 80%": [],
-                "80% - 90%": [],
-                "> 90%": []
-            };
-
-            records.forEach(user => {
-                const p = user.AvgPerformance;
-                if (p < 60) buckets["< 60%"].push(user);
-                else if (p >= 60 && p < 70) buckets["60% - 70%"].push(user);
-                else if (p >= 70 && p < 80) buckets["70% - 80%"].push(user);
-                else if (p >= 80 && p < 90) buckets["80% - 90%"].push(user);
-                else buckets["> 90%"].push(user);
-            });
-
-            const workbook = XLSX.utils.book_new();
-
-            // 1. Summary Sheet (Graph Data)
-            const summaryData = [
-                ["Performance Distribution Summary", "", ""],
-                [`Range: ${fromMonth} to ${toMonth}`, `Shift: ${selectedShift || "All"}`, ""],
-                [],
-                ["Category", "Count", "Employees"]
-            ];
-            
-            Object.keys(buckets).forEach(key => {
-                summaryData.push([key, buckets[key].length, buckets[key].length > 0 ? "See Sheet" : "None"]);
-            });
-
-            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-            summarySheet["!cols"] = [{wch:20}, {wch:10}, {wch:15}];
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary (Graph Data)");
-
-            // 2. Individual Bucket Sheets
-            Object.keys(buckets).forEach(key => {
-                const users = buckets[key];
-                if (users.length > 0) {
-                    const sheetData = [
-                        [`Employees with Performance ${key}`],
-                        [],
-                        ["S.No", "User ID", "Name", "Total Days", "Avg Performance", "Avg Attendance", "Avg Punctuality", "Avg Rejections", "Avg 5S", "Avg PPE", "Avg Discipline"]
-                    ];
-                    
-                    users.forEach((u, i) => {
-                        sheetData.push([
-                            i + 1,
-                            u.USERID,
-                            u.NAME,
-                            u.TotalDays,
-                            u.AvgPerformance + '%',
-                            u.AvgAttendance + '%',
-                            u.AvgPunctuality + '%',
-                            u.AvgRejections + '%',
-                            u.Avg5S + '%',
-                            u.AvgPPE + '%',
-                            u.AvgDiscipline + '%'
-                        ]);
-                    });
-
-                    const sheet = XLSX.utils.aoa_to_sheet(sheetData);
-                    sheet["!cols"] = Array(11).fill({wch:15});
-                    // Clean sheet name (Excel limit 31 chars, no special chars)
-                    // Buckets keys are safe: <, %, >, - are allowed in logic logic but strictly < > are NOT allowed in Sheet Names? 
-                    // Excel Sheet names cannot contain: \ / ? * [ ] :
-                    // < > are allowed? Actually, let's Replace symbols to be safe.
-                    let safeSheetName = key.replace(/[<>%]/g, "").trim(); 
-                    if (safeSheetName === "60  70") safeSheetName = "60-70";
-                    if (safeSheetName === "70  80") safeSheetName = "70-80";
-                    if (safeSheetName === "80  90") safeSheetName = "80-90";
-                    if (safeSheetName === "60") safeSheetName = "Below 60";
-                    if (safeSheetName === "90") safeSheetName = "Above 90";
-
-                    XLSX.utils.book_append_sheet(workbook, sheet, safeSheetName);
-                }
-            });
-
-            XLSX.writeFile(workbook, `Unit_Wise_Report_${fromMonth}_to_${toMonth}.xlsx`);
-
-        }
-    } catch (err) {
-        console.error("Error downloading unit report:", err);
-        setError("Failed to download unit report.");
-    } finally {
-        setLoading(false);
-    }
-  }
-
-  const downloadMonthlyReport = async () => {
+  const fetchMonthlyData = async () => {
     if (!fromMonth || !toMonth) {
       setError("Please select From Month and To Month.");
       return;
@@ -684,172 +209,292 @@ const formatDates = (dateStr) => {
 
     setLoading(true);
     setError("");
+    setMonthlySummary([]);
+    setMonthlyRawData([]);
 
     try {
       const response = await axios.post(
         "https://192.168.2.54/api/monthly-job-card-report",
-        { fromMonth, toMonth },
-        { timeout: 600000 } // Long timeout for large data
+        {
+          fromMonth,
+          toMonth,
+          employeeId: selectedEmployee ? selectedEmployee.value : null,
+          line: selectedLine || null,
+        },
+        // IMPORTANT: We need JSON response for the preview table, NOT blob.
+        // If we want to download Excel, we use generateMonthlyExcel.
+        // But here we are fetching data to SHOW in the grid.
+        { timeout: 600000000 },
       );
+      console.log("Monthly Data: ", response.data);
 
-      if (response.data && response.data.success && Array.isArray(response.data.records)) {
-        const records = response.data.records;
-        
-        if (records.length === 0) {
-          setError("No data found for the selected month range.");
+      if (response.data && response.data.success) {
+        // Updated Logic: Backend now returns 'summary' instead of raw 'records' to avoid crash.
+        const summary = response.data.summary || [];
+        const records = response.data.records || []; // Fallback if backend not updated
+
+        if (summary.length === 0 && records.length === 0) {
+          setError("No data found for the selected range.");
           setLoading(false);
           return;
         }
 
-        // Group by User
-        const usersMap = new Map();
-        records.forEach(record => {
-           if (!usersMap.has(record.USERID)) {
-             usersMap.set(record.USERID, {
-               name: record.NAME,
-               id: record.USERID,
-               data: []
-             });
-           }
-           usersMap.get(record.USERID).data.push(record);
-        });
+        // --- Generate Month Keys ---
+        let current = new Date(fromMonth + "-01");
+        const end = new Date(toMonth + "-01");
+        const monthKeys = []; // YYYY-MM
+        const monthLabels = []; // Month Name YYYY
 
-        const workbook = XLSX.utils.book_new();
+        while (current <= end) {
+          const y = current.getFullYear();
+          const m = String(current.getMonth() + 1).padStart(2, "0");
+          monthKeys.push(`${y}-${m}`);
+          monthLabels.push(
+            current.toLocaleString("default", {
+              month: "long",
+              year: "numeric",
+            }),
+          );
+          current.setMonth(current.getMonth() + 1);
+        }
 
-        // 1. Summary Sheet
-        const summaryData = [
-          ["Month-wise Job Card Summary", "", "", "", "", "", "", "", ""],
-          [`Range: ${fromMonth} to ${toMonth}`, "", "", "", "", "", "", "", ""],
-          [],
-          ["S.No", "Employee ID", "Name", "Total Days", "Avg Performance", "Avg Attendance", "Avg Punctuality", "Avg Rejections", "Total Score"]
-        ];
+        // --- Prepare Summary Data (Matrix) ---
+        // Header Row
+        const headerRow = ["Sl no", "ID No", "Name", ...monthLabels];
+        const matrixRows = [];
+
+        // Add Header
+        matrixRows.push(headerRow);
 
         let index = 1;
-        usersMap.forEach((user) => {
-           const userData = user.data;
-           const count = userData.length;
-           
-           // Calculate averages similar to individual sheet
-           const avgPerformance = (userData.reduce((sum, item) => sum + (item.Performance || 0), 0) / count).toFixed(2);
-           const avgAttendance = (userData.reduce((sum, item) => sum + ((item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) ? 5 : (item.Attendance || 0)), 0) / count).toFixed(2);
-           const avgPunctuality = (userData.reduce((sum, item) => sum + (item.Punctuality || 0), 0) / count).toFixed(2);
-           const avgRejections = (userData.reduce((sum, item) => sum + (item.Rejections || 0), 0) / count).toFixed(2);
-           
-           // Simple Total Score algorithm (Sum of averages)
-           const avg5S = (userData.reduce((sum, item) => sum + (item["5S"] || 0), 0) / count).toFixed(2);
-           const avgPPE = (userData.reduce((sum, item) => sum + (item.PPE || 0), 0) / count).toFixed(2);
-           const avgDiscipline = (userData.reduce((sum, item) => sum + (item.Disclipline || 0), 0) / count).toFixed(2);
 
-           const totalScore = (
-             parseFloat(avgPerformance) + parseFloat(avgAttendance) + parseFloat(avgPunctuality) + 
-             parseFloat(avgRejections) + parseFloat(avg5S) + parseFloat(avgPPE) + parseFloat(avgDiscipline)
-           ).toFixed(2);
+        if (summary.length > 0) {
+          // New Path: Use Server Aggregated Summary
+          summary.forEach((user) => {
+            const row = [index++, user.id, user.name];
+            monthKeys.forEach((mKey) => {
+              const score = user.monthlyScores[mKey];
+              row.push(score ? score : 0);
+            });
+            matrixRows.push(row);
+          });
+        } else {
+          // Old Path: Client Side Aggregation (Legacy Support)
+          const usersMap = new Map();
+          records.forEach((record) => {
+            const uid = record.UserID || record.USERID;
+            const uname = record.Name || record.NAME;
+            if (!usersMap.has(uid)) {
+              usersMap.set(uid, {
+                name: uname || "Unknown",
+                id: uid,
+                data: [],
+                monthData: new Map(),
+              });
+            }
+            const user = usersMap.get(uid);
+            let rDateObj = null;
+            if (record.RawDate) rDateObj = new Date(record.RawDate);
+            else if (record.Edatetime) rDateObj = new Date(record.Edatetime);
 
-           summaryData.push([
-             index++,
-             user.id,
-             user.name,
-             count,
-             avgPerformance + '%',
-             avgAttendance + '%',
-             avgPunctuality + '%',
-             avgRejections + '%',
-             totalScore
-           ]);
-        });
-        
-        const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-        // Style Header
-        summarySheet["!cols"] = [{wch:5}, {wch:15}, {wch:30}, {wch:10}, {wch:15}, {wch:15}, {wch:15}, {wch:15}, {wch:15}];
-        XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+            if (rDateObj && !isNaN(rDateObj.getTime())) {
+              const mKey = rDateObj.toISOString().substring(0, 7);
+              if (!user.monthData.has(mKey)) user.monthData.set(mKey, []);
+              user.monthData.get(mKey).push(record);
+            }
+          });
 
-        // 2. Individual Sheets
-        usersMap.forEach((user) => {
-           const sortedData = user.data.sort((a, b) => {
-               const dateA = new Date(a.RawDate || a.Date.split('/').reverse().join('-'));
-               const dateB = new Date(b.RawDate || b.Date.split('/').reverse().join('-'));
-               return dateA - dateB;
-           });
-           
-           // Reuse existing logic structure for individual sheet data
-           // Copy-paste logic from downloadExcel but applied to sortedData
-           const count = sortedData.length || 1;
-           const totalTarget = sortedData.reduce((sum, item) => sum + (item.Target || 0), 0);
-           const totalActual = sortedData.reduce((sum, item) => sum + (item.Actual || 0), 0);
-           
-           const avgPerformance = (sortedData.reduce((sum, item) => sum + (item.Performance || 0), 0) / count).toFixed(2);
-           const avgAttendance = (sortedData.reduce((sum, item) => sum + ((item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) ? 5 : (item.Attendance || 0)), 0) / count).toFixed(2);
-           const avgPunctuality = (sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0) / count).toFixed(2);
-           const avgRejections = (sortedData.reduce((sum, item) => sum + (item.Rejections || 0), 0) / count).toFixed(2);
-           const avg5S = (sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0) / count).toFixed(2);
-           const avgPPE = (sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0) / count).toFixed(2);
-           const avgDiscipline = (sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0) / count).toFixed(2);
-           
-           const totalTotal = (
-               parseFloat(avgPerformance) + parseFloat(avgAttendance) + parseFloat(avgPunctuality) +
-               parseFloat(avgRejections) + parseFloat(avg5S) + parseFloat(avgPPE) + parseFloat(avgDiscipline)
-           ).toFixed(2);
+          usersMap.forEach((user) => {
+            const row = [index++, user.id, user.name];
+            monthKeys.forEach((mKey) => {
+              const mRecords = user.monthData.get(mKey);
+              if (mRecords && mRecords.length > 0) {
+                const stats = calculateWeightedScore(mRecords);
+                row.push(stats.totalScore);
+              } else {
+                row.push(0);
+              }
+            });
+            matrixRows.push(row);
+          });
+        }
 
-           // Percentage Calculations for bottom row
-            const totalPerformancePoints = sortedData.reduce((sum, item) => sum + (item.Performance || 0), 0);
-            const performancePercentage = count > 0 ? ((totalPerformancePoints / (count * 50)) * 100).toFixed(2) + "%" : "0%";
-            // ... (Other percentages reused logic) ... 
-            // Simplified for brevity, assume similar calculation or direct average usage if acceptable.
-            // Actually user wants "individual employees format", so same as existing.
-
-            const sheetData = [
-                ["Employee Job Card Data"],
-                ["NAME:", user.name, ""],
-                ["ID NO.", user.id, "", "", ""],
-                [],
-                ["SL NO.", "DATE", "SHIFT", "STAGE", "LINE", "Target", "Actual", "Performance", "Attendance", "Punctuality", "Rejections", "5S", "PPE", "Discipline", "Total"],
-                ...sortedData.map((item, i) => [
-                    i + 1, item.Date, item.SHIFTNAME, item.STAGE, item.LINE, item.Target, item.Actual, item.Performance,
-                    (item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) 
-                        ? 5 // Format will handle (Auth)
-                        : (item.Attendance || 0),
-                    item.Punctuality, item.Rejections, item["5S"], item.PPE, item.Disclipline, item.Total
-                ]),
-                ["", "", "", "", "TOTAL", totalTarget, totalActual, avgPerformance, avgAttendance, avgPunctuality, avgRejections, avg5S, avgPPE, avgDiscipline, totalTotal]
-            ];
-            
-            // Clean sheet name (max 31 chars, no invalid chars)
-            const safeName = user.name.replace(/[:\\/?*[\]]/g, "").substring(0, 25) + ` (${user.id})`;
-            const sheet = XLSX.utils.aoa_to_sheet(sheetData);
-            
-            // Apply formatting (Essential logic reused)
-            // ... (Simplified styling for this block to avoid huge complexity in replacement)
-            // Adding merge for title
-             sheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }];
-             sheet["!cols"] = Array(15).fill({ wch: 15 });
-
-            XLSX.utils.book_append_sheet(workbook, sheet, safeName.substring(0, 31));
-        });
-
-        XLSX.writeFile(workbook, `Monthly_Report_${fromMonth}_to_${toMonth}.xlsx`);
-
+        setMonthlySummary(matrixRows);
+        setMonthlyRawData(records); // Note: this might be empty now if using summary
       } else {
-        setError("Invalid response from server.");
+        setError("No records found.");
       }
-
     } catch (err) {
-      console.error("Error downloading monthly report:", err);
-      setError("Failed to download report. " + (err.message || ""));
+      console.error(err);
+      setError("Failed to fetch monthly data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const generateMonthlyExcel = async () => {
+    if (!fromMonth || !toMonth) {
+      setError("Please select From Month and To Month.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        "https://192.168.2.54/api/monthly-job-card-excel",
+        {
+          fromMonth,
+          toMonth,
+          employeeId: selectedEmployee ? selectedEmployee.value : null,
+          line: selectedLine || null,
+        },
+        {
+          responseType: "blob", // Important for file download
+          timeout: 60000000000000000000000000000000000000000000000000, // Large timeout for generation
+        },
+      );
+
+      // Trigger Download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Monthly_Report_${fromMonth}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Excel Download Error:", err);
+      setError("Failed to download excel. Check server logs.");
+      if (err.response && err.response.data) {
+        // Try to read blob as text to see error message
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const msg = JSON.parse(reader.result);
+            console.error(msg);
+          } catch (e) {}
+        };
+        reader.readAsText(err.response.data);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchUnitData = async () => {
+    if (!fromMonth || !toMonth) {
+      setError("Please select From Month and To Month.");
+      return;
+    }
 
+    setLoading(true);
+    setError("");
+    setUnitBuckets({});
+    setChartData([]);
+
+    try {
+      const response = await axios.post(
+        "https://192.168.2.54/api/unit-wise-report",
+        {
+          fromMonth,
+          toMonth,
+          shift: selectedShift, // Pass selectedShift
+          line: selectedLine,
+        },
+      );
+
+      console.log("Unit Data:", response.data);
+
+      if (response.data && response.data.success) {
+        const records = response.data.records;
+
+        // Bucket Logic
+        const buckets = {
+          "90-100%": [],
+          "80-90%": [],
+          "70-80%": [],
+          "60-70%": [],
+          "Below 60%": [],
+        };
+
+        records.forEach((rec) => {
+          const score = parseFloat(rec.AvgTotal) || 0;
+          if (score >= 90)
+            buckets["90-100%"].push({ ...rec, totalScore: score });
+          else if (score >= 80)
+            buckets["80-90%"].push({ ...rec, totalScore: score });
+          else if (score >= 70)
+            buckets["70-80%"].push({ ...rec, totalScore: score });
+          else if (score >= 60)
+            buckets["60-70%"].push({ ...rec, totalScore: score });
+          else buckets["Below 60%"].push({ ...rec, totalScore: score });
+        });
+
+        setUnitBuckets(buckets);
+
+        // Chart Data
+        const cData = [
+          { name: "90-100%", count: buckets["90-100%"].length },
+          { name: "80-90%", count: buckets["80-90%"].length },
+          { name: "70-80%", count: buckets["70-80%"].length },
+          { name: "60-70%", count: buckets["60-70%"].length },
+          { name: "Below 60%", count: buckets["Below 60%"].length },
+        ];
+        setChartData(cData);
+
+        if (records.length === 0) setError("No records found.");
+      } else {
+        setError("Failed to fetch unit data.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error fetching unit wise report.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateUnitExcel = () => {
+    // Export all buckets in one file with multiple sheets? Or one sheet?
+    // Let's do one sheet with sections or multiple sheets. Multiple sheets is cleaner.
+    try {
+      const wb = XLSX.utils.book_new();
+      Object.keys(unitBuckets).forEach((key) => {
+        if (unitBuckets[key].length > 0) {
+          const data = unitBuckets[key].map((u) => ({
+            ID: u.USERID,
+            Name: u.NAME,
+            "Total Score": u.totalScore,
+            Performance: u.avgPerformance,
+            Attendance: u.avgAttendance,
+            Punctuality: u.avgPunctuality,
+            Rejections: u.avgRejections,
+            "5S": u.avg5S,
+            PPE: u.avgPPE,
+            Discipline: u.avgDiscipline,
+          }));
+          const ws = XLSX.utils.json_to_sheet(data);
+          XLSX.utils.book_append_sheet(wb, ws, key.replace(/[<>%]/g, ""));
+        }
+      });
+      XLSX.writeFile(wb, "Unit_Analysis_Report.xlsx");
+    } catch (e) {
+      console.error(e);
+      setError("Download failed");
+    }
+  };
 
   const resetFilters = () => {
-    setEmployeeName("");
+    setEmployeeIdInput("");
+    setSelectedEmployee(null);
     setJobDataData([]);
     setError("");
+    setMonthlySummary([]);
+    setChartData([]);
   };
 
   return (
-    <Container 
+    <Container
       fluid
       className="container-fluid"
       style={{
@@ -858,12 +503,14 @@ const formatDates = (dateStr) => {
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
         minHeight: "100vh",
-        opacity: "0.9",
+        opacity: "0.95",
         paddingTop: "20px",
-        maxWidth: "100%",
+        backgroundColor: "#f4f6f9",
       }}
     >
-      <h2 className="title mb-3">Employee Job Card Data</h2>
+      <h2 className="mb-4 text-center text-dark fw-bold">
+        Employee Job Card Data
+      </h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -878,338 +525,482 @@ const formatDates = (dateStr) => {
         </div>
       ) : (
         <>
-      <div className="glass-card p-4 mb-4">
-
-        {/* Report Type Toggle */}
-        <div className="d-flex justify-content-center mb-4">
-           <div className="btn-group" role="group">
-              <input 
-                type="radio" 
-                className="btn-check" 
-                name="reportType" 
-                id="typeDateRange" 
-                autoComplete="off" 
-                checked={reportType === "date-range"}
-                onChange={() => setReportType("date-range")}
-              />
-              <label className="btn btn-outline-primary" htmlFor="typeDateRange">Date Range (Single Employee)</label>
-
-              <input 
-                type="radio" 
-                className="btn-check" 
-                name="reportType" 
-                id="typeMonthWise" 
-                autoComplete="off" 
-                checked={reportType === "month-wise"}
-                onChange={() => setReportType("month-wise")}
-              />
-              <label className="btn btn-outline-primary" htmlFor="typeMonthWise">Month Wise (All Employees)</label>
-
-              <input 
-                type="radio" 
-                className="btn-check" 
-                name="reportType" 
-                id="typeUnitWise" 
-                autoComplete="off" 
-                checked={reportType === "unit-wise"}
-                onChange={() => setReportType("unit-wise")}
-              />
-              <label className="btn btn-outline-primary" htmlFor="typeUnitWise">Unit Wise (Graph)</label>
-           </div>
-        </div>
-
-      <Row className="mb-3">
-     
-       {reportType === "date-range" && (
-        <Col md={3}>
-            <label className="form-label">Select Employee</label>
-            <Select
-              options={employeeOptions}
-              value={selectedEmployee}
-              onChange={handleEmployeeChange}
-              onInputChange={handleSearchInputChange}
-              placeholder="Type to search employee..."
-              isClearable
-              isLoading={loadingEmployees}
-              isDisabled={loadingEmployees}
-              noOptionsMessage={noOptionsMessage}
-              filterOption={null}
-              menuIsOpen={employeeIdInput.length > 0 ? undefined : false}
-            />
-        </Col>
-       )}
-        
-        {reportType === "date-range" ? (
-          <>
-            <Col md={3}>
-              <Form.Label>From Date *</Form.Label>
-              <Form.Control
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
-              />
-            </Col>
-
-            <Col md={3}>
-              <Form.Label>To Date *</Form.Label>
-              <Form.Control
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
-              />
-            </Col>
-          </>
-        ) : (
-          <>
-            <Col md={3}>
-              <Form.Label>From Month *</Form.Label>
-              <Form.Control
-                type="month"
-                value={fromMonth}
-                onChange={(e) => setFromMonth(e.target.value)}
-              />
-            </Col>
-
-            <Col md={3}>
-              <Form.Label>To Month *</Form.Label>
-              <Form.Control
-                type="month"
-                value={toMonth}
-                onChange={(e) => setToMonth(e.target.value)}
-              />
-            </Col>
-          </>
-        )}
-
-       {reportType === "unit-wise" && (
-           <>
-            <Col md={3}>
-                <Form.Label>Select Available Shift</Form.Label>
-                <Form.Select 
-                    value={selectedShift} 
-                    onChange={(e) => setSelectedShift(e.target.value)}
+          <div className="glass-card p-4 mb-4 shadow rounded bg-white">
+            {/* Toggle Report Type */}
+            <div className="d-flex justify-content-center mb-4">
+              <div className="btn-group" role="group">
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="reportType"
+                  id="typeDateRange"
+                  checked={reportType === "date-range"}
+                  onChange={() => setReportType("date-range")}
+                />
+                <label
+                  className="btn btn-outline-primary"
+                  htmlFor="typeDateRange"
                 >
-                    <option value="">All Shifts (Combined)</option>
-                    {shifts.map(s => (
-                        <option key={s.SFTID} value={s.SFTID}>{s.SFTName} ({s.SFTID})</option>
+                  Date Range (Individual)
+                </label>
+
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="reportType"
+                  id="typeMonthWise"
+                  checked={reportType === "month-wise"}
+                  onChange={() => setReportType("month-wise")}
+                />
+                <label
+                  className="btn btn-outline-primary"
+                  htmlFor="typeMonthWise"
+                >
+                  Month Wise (Summary)
+                </label>
+
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="reportType"
+                  id="typeUnitWise"
+                  checked={reportType === "unit-wise"}
+                  onChange={() => setReportType("unit-wise")}
+                />
+                <label
+                  className="btn btn-outline-primary"
+                  htmlFor="typeUnitWise"
+                >
+                  Unit Wise (Graph)
+                </label>
+              </div>
+            </div>
+
+            <Row className="mb-3 g-3">
+              {/* Filters */}
+              {(reportType === "date-range" || reportType === "month-wise") && (
+                <Col md={3}>
+                  <Form.Label>
+                    Select Employee{" "}
+                    {reportType === "month-wise" && "(Optional)"}
+                  </Form.Label>
+                  <Select
+                    options={employeeOptions}
+                    value={selectedEmployee}
+                    onChange={handleEmployeeChange}
+                    onInputChange={handleSearchInputChange}
+                    placeholder="Search employee..."
+                    isClearable={true}
+                    filterOption={(candidate, input) => {
+                      if (!input) return true;
+                      const search = input.toLowerCase();
+                      // Check ID (value) or Name
+                      // candidate.data contains { value, label, id, name }
+                      const id =
+                        candidate.data.value?.toString().toLowerCase() || "";
+                      const name =
+                        candidate.data.name?.toString().toLowerCase() || "";
+                      return id.startsWith(search) || name.startsWith(search);
+                    }}
+                  />
+                </Col>
+              )}
+
+              {reportType === "date-range" ? (
+                <>
+                  <Col md={3}>
+                    <Form.Label>From Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </Col>
+                  <Col md={3}>
+                    <Form.Label>To Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </Col>
+                </>
+              ) : (
+                <>
+                  <Col md={2}>
+                    <Form.Label>From Month</Form.Label>
+                    <Form.Control
+                      type="month"
+                      value={fromMonth}
+                      onChange={(e) => setFromMonth(e.target.value)}
+                    />
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label>To Month</Form.Label>
+                    <Form.Control
+                      type="month"
+                      value={toMonth}
+                      onChange={(e) => setToMonth(e.target.value)}
+                    />
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label>Line (Optional)</Form.Label>
+                    <Form.Select
+                      value={selectedLine}
+                      onChange={(e) => setSelectedLine(e.target.value)}
+                    >
+                      <option value="">All Lines</option>
+                      {lines.map((l, i) => (
+                        <option key={i} value={l.LINE}>
+                          {l.LINE}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                </>
+              )}
+
+              {reportType === "unit-wise" && (
+                <Col md={3}>
+                  <Form.Label>Shift (Optional)</Form.Label>
+                  <Form.Select
+                    value={selectedShift}
+                    onChange={(e) => setSelectedShift(e.target.value)}
+                  >
+                    <option value="">All Shifts</option>
+                    {shifts.map((s) => (
+                      <option key={s.SFTID} value={s.SFTID}>
+                        {s.SFTName}
+                      </option>
                     ))}
-                </Form.Select>
-            </Col>
+                  </Form.Select>
+                </Col>
+              )}
+            </Row>
 
-            <Col md={3}>
-              <Form.Label>From Month *</Form.Label>
-              <Form.Control
-                type="month"
-                value={fromMonth}
-                onChange={(e) => setFromMonth(e.target.value)}
-              />
-            </Col>
+            <div className="d-flex justify-content-between">
+              <div>
+                {reportType === "date-range" && (
+                  <Button
+                    variant="primary"
+                    onClick={fetchJobData}
+                    disabled={loading}
+                    className="me-2"
+                  >
+                    Show JobData
+                  </Button>
+                )}
+                {reportType === "month-wise" && (
+                  <Button
+                    variant="success"
+                    onClick={fetchMonthlyData}
+                    disabled={loading}
+                    className="me-2"
+                  >
+                    Show Monthly Data
+                  </Button>
+                )}
+                {reportType === "unit-wise" && (
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="warning"
+                      onClick={fetchUnitData}
+                      disabled={loading}
+                    >
+                      Analyze Performance
+                    </Button>
+                    {Object.keys(unitBuckets).length > 0 && (
+                      <Button variant="success" onClick={generateUnitExcel}>
+                        <FaFileExcel className="me-2" /> Download Report
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <Button
+                  variant="outline-secondary"
+                  onClick={resetFilters}
+                  className="ms-2"
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </div>
 
-            <Col md={3}>
-              <Form.Label>To Month *</Form.Label>
-              <Form.Control
-                type="month"
-                value={toMonth}
-                onChange={(e) => setToMonth(e.target.value)}
-              />
-            </Col>
-           </>
-       )}
-
-      </Row>
-
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          {reportType === "date-range" ? (
-             <Button onClick={fetchJobData} disabled={loading} className="me-2">
-                 {loading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : "Show JobData"}
-             </Button>
-          ) : reportType === "month-wise" ? (
-             <Button onClick={downloadMonthlyReport} disabled={loading} className="me-2" variant="success">
-                 {loading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : "📥 Download Monthly Report"}
-             </Button>
-          ) : (
-             <Button onClick={downloadUnitReport} disabled={loading} className="me-2" variant="warning">
-                 {loading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : "📊 Download Unit Wise Report"}
-             </Button>
+          {loading && (
+            <div className="text-center py-4">
+              <Spinner animation="border" variant="primary" />
+              <p>Loading Data...</p>
+            </div>
           )}
 
-          <Button variant="outline-secondary" onClick={resetFilters}>
-            Reset Filters
-          </Button>
-        </div>
+          {/* RESULTS: DATE RANGE */}
+          {reportType === "date-range" &&
+            JobDataData.length > 0 &&
+            !loading && (
+              <div className="glass-card p-4 bg-white shadow rounded">
+                <div className="d-flex justify-content-end mb-2">
+                  <Button variant="success" size="sm" onClick={downloadExcel}>
+                    <FaFileExcel className="me-1" /> Download Excel
+                  </Button>
+                </div>
+                <Table responsive striped bordered hover size="sm">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Shift</th>
+                      <th>Line</th>
+                      <th>Target</th>
+                      <th>Actual</th>
+                      <th>Perf.</th>
+                      <th>Att.</th>
+                      <th>Punct.</th>
+                      <th>Rej.</th>
+                      <th>5S</th>
+                      <th>Safety</th>
+                      <th>Disc.</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {JobDataData.map((item, idx) => (
+                      <tr key={idx}>
+                        <td>{item.Date || item.Edatetime}</td>
+                        <td>{item.SHIFTNAME}</td>
+                        <td>{item.LINE}</td>
+                        <td>{item.Target}</td>
+                        <td>{item.Actual}</td>
+                        <td>{item.Performance}</td>
+                        <td>
+                          {item.Attendance === 5 &&
+                          item.ATTENDANCE_Status?.includes("Auth")
+                            ? "5 (Auth)"
+                            : item.Attendance}
+                        </td>
+                        <td>{item.Punctuality}</td>
+                        <td>{item.Rejections}</td>
+                        <td>{item["5S"]}</td>
+                        <td>{item.Safety}</td>
+                        <td>{item.Discipline}</td>
+                        <td>
+                          <strong>{item.Total}</strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="table-secondary fw-bold">
+                      <td colSpan={3} className="text-end">
+                        Total / Average:
+                      </td>
+                      <td>
+                        {JobDataData.reduce(
+                          (sum, item) => sum + (parseFloat(item.Target) || 0),
+                          0,
+                        )}
+                      </td>
+                      <td>
+                        {JobDataData.reduce(
+                          (sum, item) => sum + (parseFloat(item.Actual) || 0),
+                          0,
+                        )}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) =>
+                              sum + (parseFloat(item.Performance) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) =>
+                              sum + (parseFloat(item.Attendance) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) =>
+                              sum + (parseFloat(item.Punctuality) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) =>
+                              sum + (parseFloat(item.Rejections) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) => sum + (parseFloat(item["5S"]) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) => sum + (parseFloat(item.Safety) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) =>
+                              sum + (parseFloat(item.Discipline) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                      <td>
+                        {(
+                          JobDataData.reduce(
+                            (sum, item) => sum + (parseFloat(item.Total) || 0),
+                            0,
+                          ) / (JobDataData.length || 1)
+                        ).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </div>
+            )}
 
-        {reportType === "date-range" && JobDataData.length > 0 && (
-          <Button variant="success" onClick={downloadExcel}>
-            📥 Download Excel (Current View)
-          </Button>
-        )}
-      </div>
-      </div>
+          {/* RESULTS: MONTH WISE */}
+          {reportType === "month-wise" &&
+            monthlySummary.length > 0 &&
+            !loading && (
+              <div className="glass-card p-4 bg-white shadow rounded mt-3">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h4>Monthly Summary</h4>
+                  <Button variant="success" onClick={generateMonthlyExcel}>
+                    <FaFileExcel /> Excel
+                  </Button>
+                </div>
+                <div
+                  className="table-responsive"
+                  style={{ maxHeight: "500px" }}
+                >
+                  <Table striped bordered hover className="text-center">
+                    <thead className="table-dark">
+                      <tr>
+                        {monthlySummary[0].map((header, i) => (
+                          <th key={i}>{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlySummary.slice(1).map((row, r) => (
+                        <tr key={r}>
+                          {row.map((cell, c) => (
+                            <td key={c}>{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              </div>
+            )}
 
-      {loading && reportType === "month-wise" && (
-        <div className="text-center py-4">
-           <Spinner animation="border" variant="success" />
-           <p className="mt-2 text-success">Generating Monthly Report... This may take a while.</p>
-        </div>
-      )}
+          {/* RESULTS: UNIT WISE (GRAPH) */}
+          {reportType === "unit-wise" && chartData.length > 0 && !loading && (
+            <div className="glass-card p-4 bg-white shadow rounded mt-3">
+              <h4 className="text-center mb-4">Performance Distribution</h4>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar
+                    dataKey="count"
+                    name="Employees"
+                    onClick={(data) => setSelectedBucket(data.name)}
+                    cursor="pointer"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
 
-      {loading && reportType === "unit-wise" && (
-        <div className="text-center py-4">
-           <Spinner animation="border" variant="warning" />
-           <p className="mt-2 text-warning">Analyzing Performance Distribution... Please wait.</p>
-        </div>
-      )}
+              {selectedBucket && unitBuckets[selectedBucket] && (
+                <div className="mt-4">
+                  <h5></h5>
+                  {(() => {
+                    const bucketData = unitBuckets[selectedBucket] || [];
+                    const monthKeys =
+                      bucketData.length > 0 && bucketData[0].monthlyScores
+                        ? Object.keys(bucketData[0].monthlyScores)
+                        : [];
 
-      {loading && reportType === "date-range" ? (
-        <div className="text-center py-4">
-          <Spinner animation="border" />
-          <p className="mt-2">Loading data ...</p>
-        </div>
-      ) : reportType === "date-range" && JobDataData.length > 0 ? (
-        <>
-          <div className="glass-card p-4">
-          <Table striped bordered hover responsive className="glass-table">
-            <thead>
-              <tr>
-                <th>S.No</th>
-                <th>Date</th>
-                <th>Shift</th>
-                <th>Stage</th>
-                <th>Line</th>
-                <th>Target</th>
-                <th>Actual</th>
-                <th>Performance</th>
-                <th>Attendence</th>
-                <th>Punctuality</th>
-                <th>Rejections</th>
-                <th>5S</th>
-                <th>Safety & PPE Usage</th>
-                <th>Discipline</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {JobDataData.map((item, index) => (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-            <td>{item.Date || item.Edatetime || item.DisplayDate}</td>
-            <td>{item.SHIFTNAME || "N/A"}</td>
-            <td>{item.STAGE || "N/A"}</td>
-            <td>{item.LINE || "N/A"}</td>
-            <td>{item.Target || 0}</td>
-            <td>{item.Actual || 0}</td>
-            <td>{item.Performance || 0}</td>
-            <td>
-              {(item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) 
-                ? "5 (Auth)" 
-                : (item.Attendance || 0)}
-            </td>
-            <td>{item.Punctuality || 0}</td>
-            <td>{item.Rejections || 0}</td>
-            <td>{item["5S"] || 0}</td>
-            <td>{item.PPE || 0}</td>
-            <td>{item.Disclipline || 0}</td>
-            <td>{item.Total || 0}</td>
-                </tr>
-              ))}
-
-              {/* Calculations for Web View */}
-              {(() => {
-                  const sortedData = JobDataData;
-                  const count = sortedData.length || 1;
-                  
-                  const totalTarget = sortedData.reduce((sum, item) => sum + (item.Target || 0), 0);
-                  const totalActual = sortedData.reduce((sum, item) => sum + (item.Actual || 0), 0);
-                  
-                  // Score Averages
-                  const avgPerformance = (sortedData.reduce((sum, item) => sum + (item.Performance || 0), 0) / count).toFixed(2);
-                  const avgAttendance = (sortedData.reduce((sum, item) => sum + ((item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) ? 5 : (item.Attendance || 0)), 0) / count).toFixed(2);
-                  const avgPunctuality = (sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0) / count).toFixed(2);
-                  const avgRejections = (sortedData.reduce((sum, item) => sum + (item.Rejections || 0), 0) / count).toFixed(2);
-                  const avg5S = (sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0) / count).toFixed(2);
-                  const avgPPE = (sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0) / count).toFixed(2);
-                  const avgDiscipline = (sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0) / count).toFixed(2);
-                  
-                  // Total of Averages
-                  const totalTotal = (
-                    parseFloat(avgPerformance) + parseFloat(avgAttendance) + parseFloat(avgPunctuality) + 
-                    parseFloat(avgRejections) + parseFloat(avg5S) + parseFloat(avgPPE) + parseFloat(avgDiscipline)
-                  ).toFixed(2);
-
-                  // Percentage Calculations
-                  const totalPerformancePoints = sortedData.reduce((sum, item) => sum + (item.Performance || 0), 0);
-                  const performancePercentage = count > 0 ? ((totalPerformancePoints / (count * 50)) * 100).toFixed(2) + "%" : "0%";
-
-                  const totalAttendancePoints = sortedData.reduce((sum, item) => sum + ((item.Attendance === 5 && (item.ATTENDANCE_Status === 'Authorized Leave' || item.ATTENDANCE_Status === 'Authorized')) ? 5 : (item.Attendance || 0)), 0);
-                  const attendancePercentage = count > 0 ? ((totalAttendancePoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
-
-                  const totalPunctualityPoints = sortedData.reduce((sum, item) => sum + (item.Punctuality || 0), 0);
-                  const punctualityPercentage = count > 0 ? ((totalPunctualityPoints / (count * 5)) * 100).toFixed(2) + "%" : "0%";
-                  
-                  // For Rejection, 5S, PPE, Discipline: Formula is (Total / (Count * 10)) * 100
-                  const totalRejectionsPoints = sortedData.reduce((sum, item) => sum + (item.Rejections || 0), 0);
-                  const rejectionsPercentage = count > 0 ? ((totalRejectionsPoints / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-
-                  const total5S = sortedData.reduce((sum, item) => sum + (item["5S"] || 0), 0);
-                  const fiveSPercentage = count > 0 ? ((total5S / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-
-                  const totalPPE = sortedData.reduce((sum, item) => sum + (item.PPE || 0), 0);
-                  const ppePercentage = count > 0 ? ((totalPPE / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-
-                  const totalDiscipline = sortedData.reduce((sum, item) => sum + (item.Disclipline || 0), 0);
-                  const disciplinePercentage = count > 0 ? ((totalDiscipline / (count * 10)) * 100).toFixed(2) + "%" : "0%";
-
-                  return (
-                      <>
-                          {/* Total Row */}
-                          <tr className="text-center fw-bold" style={{ backgroundColor: '#f8f9fa' }}>
-                              <td colSpan="5" className="text-end">TOTAL</td>
-                              <td>{totalTarget}</td>
-                              <td>{totalActual}</td>
-                              <td>{avgPerformance}</td>
-                              <td>{avgAttendance}</td>
-                              <td>{avgPunctuality}</td>
-                              <td>{avgRejections}</td>
-                              <td>{avg5S}</td>
-                              <td>{avgPPE}</td>
-                              <td>{avgDiscipline}</td>
-                              <td>{totalTotal}</td>
+                    return (
+                      <Table striped bordered hover size="sm">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Total Score</th>
+                            <th>Perf.</th>
+                            <th>Att.</th>
+                            <th>Rej.</th>
+                            {monthKeys.map((m) => (
+                              <th key={m}>{m}</th>
+                            ))}
                           </tr>
-                          
-                          {/* Percentage Row */}
-                          <tr className="text-center fw-bold" style={{ backgroundColor: '#f8f9fa' }}>
-                              <td colSpan="5" className="text-end">PERCENTAGE</td>
-                              <td></td>
-                              <td></td>
-                              <td>{performancePercentage}</td>
-                              <td>{attendancePercentage}</td>
-                              <td>{punctualityPercentage}</td>
-                              <td>{rejectionsPercentage}</td>
-                              <td>{fiveSPercentage}</td>
-                              <td>{ppePercentage}</td>
-                              <td>{disciplinePercentage}</td>
-                              <td></td>
-                          </tr>
-                      </>
-                  );
-              })()}
-            </tbody>
-          </Table>
-          </div>
+                        </thead>
+                        <tbody>
+                          {bucketData.map((u, i) => (
+                            <tr key={i}>
+                              <td>{u.USERID}</td>
+                              <td>{u.NAME}</td>
+                              <td>
+                                <strong>{u.totalScore}</strong>
+                              </td>
+                              <td>{u.avgPerformance}</td>
+                              <td>{u.avgAttendance}</td>
+                              <td>{u.avgRejections}</td>
+                              {monthKeys.map((m) => (
+                                <td key={m}>
+                                  {u.monthlyScores && u.monthlyScores[m]
+                                    ? u.monthlyScores[m]
+                                    : "-"}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
         </>
-      ) : (
-        <div className="text-center py-4">
-          <p className="text-muted">
-            No Employee  data found. Please select your filters 
-          </p>
-        </div>
       )}
-        </>
-      )}
-
     </Container>
   );
 };

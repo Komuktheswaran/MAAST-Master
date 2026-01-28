@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Form, Container, Row, Col, Table, Button, Spinner} from "react-bootstrap";
+import {
+  Form,
+  Container,
+  Row,
+  Col,
+  Table,
+  Button,
+  Spinner,
+} from "react-bootstrap";
 import axios from "axios";
 import { DateTime } from "luxon";
 import * as XLSX from "xlsx";
@@ -7,16 +15,16 @@ import { FaDownload } from "react-icons/fa";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../styles/Attendance.css";
 import {
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Legend, 
-  CartesianGrid, 
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
   LabelList,
   Cell,
-  Line
+  Line,
 } from "recharts";
 
 const Attendance = () => {
@@ -44,51 +52,44 @@ const Attendance = () => {
   const [unassignedEmployees, setUnassignedEmployees] = useState([]);
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [loadingUnassigned, setLoadingUnassigned] = useState(false);
-    const AdminFlag = parseInt(sessionStorage.getItem("AdminFlag")) || 0;
-const isAdmin = AdminFlag === 1;
+  const AdminFlag = parseInt(sessionStorage.getItem("AdminFlag")) || 0;
+  const isAdmin = AdminFlag === 1;
 
   const [assignedLines, setAssignedLines] = useState([]);
   const [isRestricted, setIsRestricted] = useState(false);
-// Load stored line selection (or multiple lines) from sessionStorage, adjust key accordingly
-const assignedLinesStr = sessionStorage.getItem("Line") || "";
-const assignedLinesArr = assignedLinesStr.split(",").map(l => l.trim()).filter(l => l);
-
-
+  // Load stored line selection (or multiple lines) from sessionStorage, adjust key accordingly
+  const assignedLinesStr = sessionStorage.getItem("Line") || "";
+  const assignedLinesArr = assignedLinesStr
+    .split(",")
+    .map((l) => l.trim())
+    .filter((l) => l);
 
   // Safe trim helper function
   const safeTrim = (value) => {
-    return value && typeof value === 'string' ? value.trim() : value;
+    return value && typeof value === "string" ? value.trim() : value;
   };
-
-
 
   useEffect(() => {
     const fetchOptions = async () => {
       setLoadingShifts(true);
       setLoadingLines(true);
-      
-
 
       try {
         const shiftResponse = await axios.get(
-          "https://192.168.2.54/api/shifts"
+          "https://192.168.2.54/api/shifts",
         );
-        const lineResponse = await axios.get(
-          "https://192.168.2.54/api/lines"
-        );
+        const lineResponse = await axios.get("https://192.168.2.54/api/lines");
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
         setLineOptions(lineResponse.data || []);
 
-console.log('isAdmin set to:', isAdmin);
-
+        console.log("isAdmin set to:", isAdmin);
 
         setAssignedLines(assignedLinesArr);
-  if (!isAdmin && assignedLinesArr.length > 0) {
-    // Set default selected lines to assigned lines for restricted users
-    setSelectedLines(assignedLinesArr);
-  }
-        
+        if (!isAdmin && assignedLinesArr.length > 0) {
+          // Set default selected lines to assigned lines for restricted users
+          setSelectedLines(assignedLinesArr);
+        }
       } catch (error) {
         console.error("Error fetching options:", error);
         setShiftOptions([]);
@@ -111,13 +112,12 @@ console.log('isAdmin set to:', isAdmin);
     const formattedDate = formatDate(selectedDate);
     setLoadingDetails(true);
     try {
-
-      console.log('Fetching attendance (via showAll) for:', {
+      console.log("Fetching attendance (via showAll) for:", {
         date: formattedDate,
         shifts: selectedShifts,
         lines: selectedLines,
       });
-      
+
       const [response, unassignedRes] = await Promise.all([
         axios.get("https://192.168.2.54/api/attendance/showAll", {
           params: {
@@ -127,12 +127,12 @@ console.log('isAdmin set to:', isAdmin);
           },
         }),
         axios.get("https://192.168.2.54/api/attendance/unassignedManpower", {
-           params: {
-             date: formattedDate,
-             shifts: "S1,S2,S3", 
-             lines: "1A,1B,2A,2B,3A,3B,4A,4B,5A,5B",
-           },
-        })
+          params: {
+            date: formattedDate,
+            shifts: "S1,S2,S3",
+            lines: "1A,1B,2A,2B,3A,3B,4A,4B,5A,5B",
+          },
+        }),
       ]);
 
       // Client-side aggregation to fix mismatch between aggregated API and detailed API.
@@ -157,14 +157,16 @@ console.log('isAdmin set to:', isAdmin);
             PRESENT: 0,
             ABSENT: 0,
             FirstPunchIn: null, // Will calculate earliest
-            PunctualityStatus: "N/A"
+            PunctualityStatus: "N/A",
           });
         }
 
         const group = aggregationMap.get(key);
         group.ALLOT += 1; // Count every record as allotted
 
-        const status = String(record.STATUS || record.status || "").toLowerCase().trim();
+        const status = String(record.STATUS || record.status || "")
+          .toLowerCase()
+          .trim();
         if (status === "present" || status === "p") {
           group.PRESENT += 1;
         } else if (status === "absent" || status === "a") {
@@ -173,21 +175,23 @@ console.log('isAdmin set to:', isAdmin);
 
         // Calculate earliest punch in for the group (for Excel export)
         if (record.PUNCHIN) {
-            // Simple string comparison for ISO dates or HH:mm:ss works if format is consistent, 
-            // but let's be safe(r). If it's just time, string compare is usually okay for same day.
-            if (!group.FirstPunchIn || record.PUNCHIN < group.FirstPunchIn) {
-                group.FirstPunchIn = record.PUNCHIN;
-            }
+          // Simple string comparison for ISO dates or HH:mm:ss works if format is consistent,
+          // but let's be safe(r). If it's just time, string compare is usually okay for same day.
+          if (!group.FirstPunchIn || record.PUNCHIN < group.FirstPunchIn) {
+            group.FirstPunchIn = record.PUNCHIN;
+          }
         }
       });
 
-      const aggregatedDetails = Array.from(aggregationMap.values()).map(group => ({
+      const aggregatedDetails = Array.from(aggregationMap.values()).map(
+        (group) => ({
           ...group,
-          FirstPunchIn: group.FirstPunchIn || "No Punch"
-      }));
+          FirstPunchIn: group.FirstPunchIn || "No Punch",
+        }),
+      );
 
       setAttendanceDetails(aggregatedDetails);
-      
+
       // Process Unassigned Count
       const unassignedData = unassignedRes.data || [];
       const noShiftCount = unassignedData.length;
@@ -230,7 +234,7 @@ console.log('isAdmin set to:', isAdmin);
               shifts: selectedShifts.join(","),
               lines: selectedLines.join(","),
             },
-          }
+          },
         );
         console.log("=== SHOW ALL RESPONSE ===");
         console.log("Total button response:", response.data);
@@ -238,10 +242,12 @@ console.log('isAdmin set to:', isAdmin);
         const responseData = response.data || [];
 
         // Log all unique STATUS values to debug
-        const uniqueStatuses = [...new Set(responseData.map(r => r.STATUS || r.status))];
+        const uniqueStatuses = [
+          ...new Set(responseData.map((r) => r.STATUS || r.status)),
+        ];
         console.log("Unique STATUS values in response:", uniqueStatuses);
         console.log("Total records received:", responseData.length);
-        
+
         // Count records by status
         const statusCounts = responseData.reduce((acc, record) => {
           const status = record.STATUS || record.status || "UNKNOWN";
@@ -259,7 +265,7 @@ console.log('isAdmin set to:', isAdmin);
           // Normalize the status field - handle various cases
           const rawStatus = record.STATUS || record.status || "";
           const status = String(rawStatus).toLowerCase().trim();
-          
+
           if (type === "present") {
             // Match: "present", "Present", "PRESENT", "P", "p"
             return status === "present" || status === "p";
@@ -271,16 +277,24 @@ console.log('isAdmin set to:', isAdmin);
         });
 
         console.log(
-          `Total records: ${responseData.length}, Filtered ${type} records: ${filtered.length}`
+          `Total records: ${responseData.length}, Filtered ${type} records: ${filtered.length}`,
         );
-        
+
         // Warn user if there's a mismatch
         if (filtered.length === 0 && type === "present" && totals.present > 0) {
-          console.warn("⚠️ DATA MISMATCH: Summary shows", totals.present, "present records, but detail query returned 0 present records.");
-          console.warn("This suggests the /api/attendance and /api/attendance/showAll endpoints are querying different data.");
-          alert(`Data Mismatch Detected!\n\nThe summary shows ${totals.present} present employees, but no present records were found in the detailed data.\n\nThis may be due to:\n1. Night shift date/time boundary issues\n2. Different query logic between summary and detail endpoints\n3. Data synchronization issues\n\nPlease check the backend API logic.`);
+          console.warn(
+            "⚠️ DATA MISMATCH: Summary shows",
+            totals.present,
+            "present records, but detail query returned 0 present records.",
+          );
+          console.warn(
+            "This suggests the /api/attendance and /api/attendance/showAll endpoints are querying different data.",
+          );
+          alert(
+            `Data Mismatch Detected!\n\nThe summary shows ${totals.present} present employees, but no present records were found in the detailed data.\n\nThis may be due to:\n1. Night shift date/time boundary issues\n2. Different query logic between summary and detail endpoints\n3. Data synchronization issues\n\nPlease check the backend API logic.`,
+          );
         }
-        
+
         setDetailedRecords(filtered);
         setShowAllDetails(false);
       } else {
@@ -293,7 +307,7 @@ console.log('isAdmin set to:', isAdmin);
               shifts: selectedShifts.join(","),
               lines: selectedLines.join(","),
             },
-          }
+          },
         );
 
         const responseData = response.data || [];
@@ -345,7 +359,7 @@ console.log('isAdmin set to:', isAdmin);
 
         console.log(
           `Stage-wise filtered records for ${type}:`,
-          filtered.length
+          filtered.length,
         );
         setDetailedRecords(filtered);
         setShowAllDetails(false);
@@ -367,30 +381,27 @@ console.log('isAdmin set to:', isAdmin);
     }
   };
 
-
   const handleLineChange = (event) => {
-  const isRestricted = StoredLine && StoredLine !== "ALL" && !isAdmin;
+    const isRestricted = StoredLine && StoredLine !== "ALL" && !isAdmin;
 
-  if (isRestricted) {
-    // block change if restricted
-    return;
-  }
-
-  const { value, checked } = event.target;
-
-  setSelectedLines((prevSelectedLines) => {
-    if (checked) {
-      if (!prevSelectedLines.includes(value)) {
-        return [...prevSelectedLines, value];
-      }
-      return prevSelectedLines; // no duplicate addition
-    } else {
-      return prevSelectedLines.filter((line) => line !== value);
+    if (isRestricted) {
+      // block change if restricted
+      return;
     }
-  });
-};
 
+    const { value, checked } = event.target;
 
+    setSelectedLines((prevSelectedLines) => {
+      if (checked) {
+        if (!prevSelectedLines.includes(value)) {
+          return [...prevSelectedLines, value];
+        }
+        return prevSelectedLines; // no duplicate addition
+      } else {
+        return prevSelectedLines.filter((line) => line !== value);
+      }
+    });
+  };
 
   const formatDate = (date) => {
     return DateTime.fromJSDate(date).toFormat("yyyy-MM-dd");
@@ -442,17 +453,24 @@ console.log('isAdmin set to:', isAdmin);
             shifts: selectedShifts.join(","),
             lines: selectedLines.join(","),
           },
-        }
+        },
       );
-      
+
       // Filter to only show Present and Absent records
       const responseData = response.data || [];
       const filteredRecords = responseData.filter((record) => {
         if (!record) return false;
-        const status = String(record.STATUS || record.status || "").toLowerCase().trim();
-        return status === "present" || status === "p" || status === "absent" || status === "a";
+        const status = String(record.STATUS || record.status || "")
+          .toLowerCase()
+          .trim();
+        return (
+          status === "present" ||
+          status === "p" ||
+          status === "absent" ||
+          status === "a"
+        );
       });
-      
+
       setDetailedRecords(filteredRecords);
       console.log("showall (filtered to Present/Absent only)", filteredRecords);
     } catch (error) {
@@ -477,9 +495,9 @@ console.log('isAdmin set to:', isAdmin);
         "https://192.168.2.54/api/attendance/unassignedManpower",
         {
           params: {
-            date: formattedDate
+            date: formattedDate,
           },
-        }
+        },
       );
       console.log("Unassigned Manpower Response:", response.data);
 
@@ -511,7 +529,7 @@ console.log('isAdmin set to:', isAdmin);
         }
         return acc;
       },
-      { allot: 0, present: 0, absent: 0 }
+      { allot: 0, present: 0, absent: 0 },
     );
     return { ...totals, unassigned: unassignedCount };
   };
@@ -566,7 +584,7 @@ console.log('isAdmin set to:', isAdmin);
 
     XLSX.writeFile(
       workbook,
-      `Attendance_Details_${formatDate(selectedDate)}.xlsx`
+      `Attendance_Details_${formatDate(selectedDate)}.xlsx`,
     );
   };
 
@@ -580,10 +598,8 @@ console.log('isAdmin set to:', isAdmin);
       "Shift ID": record?.SHIFT_ID || "N/A",
       Line: record?.LINE || "N/A",
       Status: record?.STATUS || "N/A",
-      "Punch in Time": record?.PUNCHIN
-        || "No Punch",
-        "Punch out Time": record?.PUNCHOUT
-        || "No Punch",
+      "Punch in Time": record?.PUNCHIN || "No Punch",
+      "Punch out Time": record?.PUNCHOUT || "No Punch",
       "Shift Start Time": record?.SFTSTTime || "N/A",
       "Punctuality Status": record?.PunctualityStatus || "N/A",
       "Swap User": record?.SWAPUSERNAME || "No Swap",
@@ -608,7 +624,7 @@ console.log('isAdmin set to:', isAdmin);
 
     XLSX.writeFile(
       workbook,
-      `Attendance_Details_${formatDate(selectedDate)}.xlsx`
+      `Attendance_Details_${formatDate(selectedDate)}.xlsx`,
     );
   };
 
@@ -616,7 +632,7 @@ console.log('isAdmin set to:', isAdmin);
     if (!Array.isArray(detailedRecords)) return;
 
     const recordsToSwap = detailedRecords.filter(
-      (record) => record && record.swapEmployee
+      (record) => record && record.swapEmployee,
     );
 
     if (recordsToSwap.length === 0) {
@@ -644,7 +660,7 @@ console.log('isAdmin set to:', isAdmin);
           prevRecords.map((record) => ({
             ...record,
             swapEmployee: "",
-          }))
+          })),
         );
       })
       .catch((error) => console.error(error));
@@ -681,23 +697,26 @@ console.log('isAdmin set to:', isAdmin);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   useEffect(() => {
     const handler = setTimeout(() => {
-        setDebouncedSearchQuery(searchQuery);
+      setDebouncedSearchQuery(searchQuery);
     }, 300);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const filteredEmployees = Array.isArray(swapEmployees) ? swapEmployees.filter((swapdetail) => {
-    if (!swapdetail) return false;
-    const query = debouncedSearchQuery.toLowerCase();
-    return (
-      (swapdetail.USERID && swapdetail.USERID.toLowerCase().includes(query)) ||
-      (swapdetail.NAME && swapdetail.NAME.toLowerCase().includes(query)) ||
-      (swapdetail.Stage_name &&
-        swapdetail.Stage_name.toLowerCase().includes(query)) ||
-      (swapdetail.SKILL_DESCRIPTION &&
-        swapdetail.SKILL_DESCRIPTION.toLowerCase().includes(query))
-    );
-  }) : [];
+  const filteredEmployees = Array.isArray(swapEmployees)
+    ? swapEmployees.filter((swapdetail) => {
+        if (!swapdetail) return false;
+        const query = debouncedSearchQuery.toLowerCase();
+        return (
+          (swapdetail.USERID &&
+            swapdetail.USERID.toLowerCase().includes(query)) ||
+          (swapdetail.NAME && swapdetail.NAME.toLowerCase().includes(query)) ||
+          (swapdetail.Stage_name &&
+            swapdetail.Stage_name.toLowerCase().includes(query)) ||
+          (swapdetail.SKILL_DESCRIPTION &&
+            swapdetail.SKILL_DESCRIPTION.toLowerCase().includes(query))
+        );
+      })
+    : [];
 
   const handleClosePopup = () => {
     setSwapPopup(false);
@@ -719,10 +738,11 @@ console.log('isAdmin set to:', isAdmin);
       };
 
       const updatedRecords = detailedRecords.map((record) =>
-        record && record.USERID === selectedRecord.USERID &&
+        record &&
+        record.USERID === selectedRecord.USERID &&
         record.SHIFT_ID === selectedRecord.SHIFT_ID
           ? updatedRecord
-          : record
+          : record,
       );
 
       setDetailedRecords(updatedRecords);
@@ -809,7 +829,7 @@ console.log('isAdmin set to:', isAdmin);
             </div>
           </div>
         )}
-        
+
         <Row className="mt-4">
           <h1>Attendance Management</h1>
           <div className="d-flex justify-content-end mb-3">
@@ -839,23 +859,25 @@ console.log('isAdmin set to:', isAdmin);
                 {loadingShifts ? (
                   <Spinner animation="border" variant="primary" />
                 ) : (
-                  Array.isArray(shiftOptions) && shiftOptions.map((shift, index) => (
-                    shift && (
-                      <Form.Check
-                        key={index}
-                        type="checkbox"
-                        label={shift.SHIFT_ID || "N/A"}
-                        value={shift.SHIFT_ID || ""}
-                        onChange={(e) =>
-                          handleCheckboxChange(
-                            e,
-                            setSelectedShifts,
-                            selectedShifts
-                          )
-                        }
-                      />
-                    )
-                  ))
+                  Array.isArray(shiftOptions) &&
+                  shiftOptions.map(
+                    (shift, index) =>
+                      shift && (
+                        <Form.Check
+                          key={index}
+                          type="checkbox"
+                          label={shift.SHIFT_ID || "N/A"}
+                          value={shift.SHIFT_ID || ""}
+                          onChange={(e) =>
+                            handleCheckboxChange(
+                              e,
+                              setSelectedShifts,
+                              selectedShifts,
+                            )
+                          }
+                        />
+                      ),
+                  )
                 )}
               </div>
             </Col>
@@ -887,55 +909,61 @@ console.log('isAdmin set to:', isAdmin);
                   padding: "10px",
                   fontSize: "15px",
                 }}
-              > 
+              >
+                {isRestricted && (
+                  <div
+                    style={{
+                      marginBottom: "10px",
+                      color: "red",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Your line selection is restricted to: {StoredLine}
+                  </div>
+                )}
 
-              {isRestricted && (
-  <div style={{ marginBottom: "10px", color: "red", fontWeight: "bold" }}>
-    Your line selection is restricted to: {StoredLine}
-  </div>
-)}
+                {loadingLines ? (
+                  <Spinner animation="border" variant="primary" />
+                ) : (
+                  Array.isArray(lineOptions) &&
+                  lineOptions.map((line, index) => {
+                    const lineVal = safeTrim(line.LINE) || "N/A";
 
-              
-            
-{loadingLines ? (
-  <Spinner animation="border" variant="primary" />
-) : (
-  Array.isArray(lineOptions) && lineOptions.map((line, index) => {
-    const lineVal = safeTrim(line.LINE) || "N/A";
+                    // Disable all checkboxes if user is restricted (not admin and has assigned lines)
+                    const isDisabled = !isAdmin && assignedLines.length > 0;
 
-    // Disable all checkboxes if user is restricted (not admin and has assigned lines)
-    const isDisabled = !isAdmin && assignedLines.length > 0;
+                    // Checked if assigned for restricted, or normally selected for admin
+                    const isChecked = isDisabled
+                      ? assignedLines.includes(lineVal)
+                      : selectedLines.includes(lineVal);
 
-    // Checked if assigned for restricted, or normally selected for admin
-    const isChecked = isDisabled
-      ? assignedLines.includes(lineVal)
-      : selectedLines.includes(lineVal);
-
-    return (
-      <div key={index} style={{ marginBottom: "8px", color: isDisabled ? "grey" : "inherit" }}>
-        <input
-          type="checkbox"
-          value={lineVal}
-          disabled={isDisabled}
-          checked={isChecked}
-          onChange={handleLineChange}
-          style={{ marginRight: "5px" }}
-        />
-        <label>
-          {lineVal} {isDisabled && "(Locked)"}
-        </label>
-      </div>
-    );
-  })
-)}
-
-
-               </div>
-
-               
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          marginBottom: "8px",
+                          color: isDisabled ? "grey" : "inherit",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          value={lineVal}
+                          disabled={isDisabled}
+                          checked={isChecked}
+                          onChange={handleLineChange}
+                          style={{ marginRight: "5px" }}
+                        />
+                        <label>
+                          {lineVal} {isDisabled && "(Locked)"}
+                        </label>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </Col>
           </Row>
-          
+
           {showTable && (
             <Row>
               <Col md={6} className="mb-3">
@@ -987,7 +1015,13 @@ console.log('isAdmin set to:', isAdmin);
                   {loadingDetails ? (
                     <Spinner animation="border" />
                   ) : (
-                    <Table striped bordered hover responsive className="glass-table">
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      responsive
+                      className="glass-table"
+                    >
                       <thead style={{ fontSize: "15px" }}>
                         <tr>
                           <th>S.No</th>
@@ -1000,76 +1034,89 @@ console.log('isAdmin set to:', isAdmin);
                         </tr>
                       </thead>
                       <tbody style={{ fontSize: "15px" }}>
-                        {Array.isArray(attendanceDetails) && attendanceDetails.map((detail, index) => (
-                          detail && (
-                            <tr key={index}>
-                              <td>{index + 1}</td>
-                              <td>{detail.Stage_name || "N/A"}</td>
-                              <td>{detail.SHIFT_ID || "N/A"}</td>
-                              <td>{detail.LINE || "N/A"}</td>
-                              <td>
-                                <button
-                                  className="animated-button"
-                                  onClick={() =>
-                                    fetchDetailedRecords(
-                                      "allot",
-                                      detail.SHIFT_ID,
-                                      detail.Stage_name,
-                                      detail.LINE
-                                    )
-                                  }
-                                  disabled={loadingRecords && detailType === "allot"}
-                                >
-                                  {loadingRecords && detailType === "allot" ? (
-                                    <Spinner animation="border" size="sm" />
-                                  ) : (
-                                    detail.ALLOT || 0
-                                  )}
-                                </button>
-                              </td>
-                              <td>
-                                <button
-                                  className="animated-button present"
-                                  onClick={() =>
-                                    fetchDetailedRecords(
-                                      "present",
-                                      detail.SHIFT_ID,
-                                      detail.Stage_name,
-                                      detail.LINE
-                                    )
-                                  }
-                                  disabled={loadingRecords && detailType === "present"}
-                                >
-                                  {loadingRecords && detailType === "present" ? (
-                                    <Spinner animation="border" size="sm" />
-                                  ) : (
-                                    detail.PRESENT || 0
-                                  )}
-                                </button>
-                              </td>
-                              <td>
-                                <button
-                                  className="animated-button absent"
-                                  onClick={() =>
-                                    fetchDetailedRecords(
-                                      "absent",
-                                      detail.SHIFT_ID,
-                                      detail.Stage_name,
-                                      detail.LINE
-                                    )
-                                  }
-                                  disabled={loadingRecords && detailType === "absent"}
-                                >
-                                  {loadingRecords && detailType === "absent" ? (
-                                    <Spinner animation="border" size="sm" />
-                                  ) : (
-                                    detail.ABSENT || 0
-                                  )}
-                                </button>
-                              </td>
-                            </tr>
-                          )
-                        ))}
+                        {Array.isArray(attendanceDetails) &&
+                          attendanceDetails.map(
+                            (detail, index) =>
+                              detail && (
+                                <tr key={index}>
+                                  <td>{index + 1}</td>
+                                  <td>{detail.Stage_name || "N/A"}</td>
+                                  <td>{detail.SHIFT_ID || "N/A"}</td>
+                                  <td>{detail.LINE || "N/A"}</td>
+                                  <td>
+                                    <button
+                                      className="animated-button"
+                                      onClick={() =>
+                                        fetchDetailedRecords(
+                                          "allot",
+                                          detail.SHIFT_ID,
+                                          detail.Stage_name,
+                                          detail.LINE,
+                                        )
+                                      }
+                                      disabled={
+                                        loadingRecords && detailType === "allot"
+                                      }
+                                    >
+                                      {loadingRecords &&
+                                      detailType === "allot" ? (
+                                        <Spinner animation="border" size="sm" />
+                                      ) : (
+                                        detail.ALLOT || 0
+                                      )}
+                                    </button>
+                                  </td>
+                                  <td>
+                                    <button
+                                      className="animated-button present"
+                                      onClick={() =>
+                                        fetchDetailedRecords(
+                                          "present",
+                                          detail.SHIFT_ID,
+                                          detail.Stage_name,
+                                          detail.LINE,
+                                        )
+                                      }
+                                      disabled={
+                                        loadingRecords &&
+                                        detailType === "present"
+                                      }
+                                    >
+                                      {loadingRecords &&
+                                      detailType === "present" ? (
+                                        <Spinner animation="border" size="sm" />
+                                      ) : (
+                                        detail.PRESENT || 0
+                                      )}
+                                    </button>
+                                  </td>
+                                  <td>
+                                    <button
+                                      className="animated-button absent"
+                                      onClick={() =>
+                                        fetchDetailedRecords(
+                                          "absent",
+                                          detail.SHIFT_ID,
+                                          detail.Stage_name,
+                                          detail.LINE,
+                                        )
+                                      }
+                                      disabled={
+                                        loadingRecords &&
+                                        detailType === "absent"
+                                      }
+                                    >
+                                      {loadingRecords &&
+                                      detailType === "absent" ? (
+                                        <Spinner animation="border" size="sm" />
+                                      ) : (
+                                        detail.ABSENT || 0
+                                      )}
+                                    </button>
+                                  </td>
+                                </tr>
+                              ),
+                          )}
                         <tr>
                           <td colSpan="3" style={{ fontWeight: "bold" }}>
                             Total
@@ -1092,7 +1139,10 @@ console.log('isAdmin set to:', isAdmin);
 
                 {/* GRAPH SECTION */}
                 {showGraph &&
-                  (totals.allot > 0 || totals.present > 0 || totals.absent > 0 || totals.unassigned > 0) && (
+                  (totals.allot > 0 ||
+                    totals.present > 0 ||
+                    totals.absent > 0 ||
+                    totals.unassigned > 0) && (
                     <div className="d-flex justify-content-center mt-4">
                       <div className="fixed-barchart">
                         <BarChart
@@ -1112,10 +1162,10 @@ console.log('isAdmin set to:', isAdmin);
                           <Tooltip />
                           <Legend />
                           <Bar dataKey="value">
-                            <LabelList 
-                              dataKey="value" 
-                              position="top" 
-                              style={{ fontSize: '14px', fontWeight: 'bold' }}
+                            <LabelList
+                              dataKey="value"
+                              position="top"
+                              style={{ fontSize: "14px", fontWeight: "bold" }}
                             />
                             <Cell fill="#0d6efd" />
                             <Cell fill="#228B22" />
@@ -1127,7 +1177,7 @@ console.log('isAdmin set to:', isAdmin);
                     </div>
                   )}
               </Col>
-              
+
               {/* Dynamic Details Panel - Shows all types of details */}
               {(showAllDetails || detailType) && (
                 <Col md={6} className="mb-3">
@@ -1136,19 +1186,19 @@ console.log('isAdmin set to:', isAdmin);
                       {detailType === "unassigned"
                         ? "Present (Manpower without shift allocation)"
                         : detailType === "showAll"
-                        ? "Show All Details"
-                        : detailType
-                        ? `${
-                            detailType.charAt(0).toUpperCase() +
-                            detailType.slice(1)
-                          } Details`
-                        : "Details"}
+                          ? "Show All Details"
+                          : detailType
+                            ? `${
+                                detailType.charAt(0).toUpperCase() +
+                                detailType.slice(1)
+                              } Details`
+                            : "Details"}
                     </h2>
                     <Button variant="success" onClick={downloadAll}>
                       <FaDownload /> Download All Details
                     </Button>
                   </div>
-                  
+
                   {(detailType === "absent" || detailType === "present") && (
                     <div className="d-flex justify-content-end align-items-center mb-3">
                       <Button onClick={handleSaveAllSwaps}>
@@ -1162,12 +1212,19 @@ console.log('isAdmin set to:', isAdmin);
                       <Spinner animation="border" />
                     ) : detailType === "unassigned" ? (
                       // Unassigned Manpower Table
-                      !Array.isArray(unassignedEmployees) || unassignedEmployees.length === 0 ? (
+                      !Array.isArray(unassignedEmployees) ||
+                      unassignedEmployees.length === 0 ? (
                         <div className="text-center p-3">
                           <p>No unassigned or wrong shift employees found.</p>
                         </div>
                       ) : (
-                        <Table striped bordered hover responsive className="glass-table">
+                        <Table
+                          striped
+                          bordered
+                          hover
+                          responsive
+                          className="glass-table"
+                        >
                           <thead style={{ fontSize: "15px" }}>
                             <tr>
                               <th>S.No</th>
@@ -1181,40 +1238,68 @@ console.log('isAdmin set to:', isAdmin);
                             </tr>
                           </thead>
                           <tbody style={{ fontSize: "15px" }}>
-                            {unassignedEmployees.map((record, index) => (
-                              record && (
-                                <tr key={index}>
-                                  <td>{index + 1}</td>
-                                  <td>{record.USERID || "N/A"}</td>
-                                  <td>{record.NAME || "N/A"}</td>
-                                  <td>{formatPunchTime(record.PUNCHIN) || "No Punch In"}</td>
-                                  <td>{formatPunchTime(record.PUNCHOUT) || "No Punch Out"}</td>
-                                  <td style={{ textAlign: "center" }}>
-                                    {record.TotalPunches || 0}
-                                  </td>
-                                  <td style={{ textAlign: "center", fontWeight: "bold" }}>
-                                    {record.WorkedMinutes ? (record.WorkedMinutes / 60).toFixed(2) : "0.00"} hrs
-                                  </td>
-                                  <td style={{
-                                    color: record.IsWrongShift ? "red" : "orange",
-                                    fontWeight: "bold"
-                                  }}>
-                                    {record.STATUS || "N/A"}
-                                  </td>
-                                </tr>
-                              )
-                            ))}
+                            {unassignedEmployees.map(
+                              (record, index) =>
+                                record && (
+                                  <tr key={index}>
+                                    <td>{index + 1}</td>
+                                    <td>{record.USERID || "N/A"}</td>
+                                    <td>{record.NAME || "N/A"}</td>
+                                    <td>
+                                      {formatPunchTime(record.PUNCHIN) ||
+                                        "No Punch In"}
+                                    </td>
+                                    <td>
+                                      {formatPunchTime(record.PUNCHOUT) ||
+                                        "No Punch Out"}
+                                    </td>
+                                    <td style={{ textAlign: "center" }}>
+                                      {record.TotalPunches || 0}
+                                    </td>
+                                    <td
+                                      style={{
+                                        textAlign: "center",
+                                        fontWeight: "bold",
+                                      }}
+                                    >
+                                      {record.WorkedMinutes
+                                        ? (record.WorkedMinutes / 60).toFixed(2)
+                                        : "0.00"}{" "}
+                                      hrs
+                                    </td>
+                                    <td
+                                      style={{
+                                        color: record.IsWrongShift
+                                          ? "red"
+                                          : "orange",
+                                        fontWeight: "bold",
+                                      }}
+                                    >
+                                      {record.STATUS || "N/A"}
+                                    </td>
+                                  </tr>
+                                ),
+                            )}
                           </tbody>
                         </Table>
                       )
+                    ) : // Regular Details Table (Present, Absent, Show All, Allot)
+                    !Array.isArray(detailedRecords) ||
+                      detailedRecords.length === 0 ? (
+                      <div className="text-center p-3">
+                        <p>
+                          No {detailType} records found for the selected
+                          criteria.
+                        </p>
+                      </div>
                     ) : (
-                      // Regular Details Table (Present, Absent, Show All, Allot)
-                      !Array.isArray(detailedRecords) || detailedRecords.length === 0 ? (
-                        <div className="text-center p-3">
-                          <p>No {detailType} records found for the selected criteria.</p>
-                        </div>
-                      ) : (
-                      <Table striped bordered hover responsive className="glass-table">
+                      <Table
+                        striped
+                        bordered
+                        hover
+                        responsive
+                        className="glass-table"
+                      >
                         <thead style={{ fontSize: "15px" }}>
                           <tr>
                             <th>S.No</th>
@@ -1230,84 +1315,111 @@ console.log('isAdmin set to:', isAdmin);
                             {detailType === "showAll" && <th>Status</th>}
                             {detailType === "showAll" && <th>Punch Time</th>}
                             {detailType === "showAll" && <th>Punch Out</th>}
-                            {(detailType === "absent" || detailType === "present") && <th>Line</th>}
-                            {(detailType === "absent" || detailType === "present") && <th>Swap Action</th>}
-                            {(detailType === "absent" || detailType === "present") && <th>Selected Swap</th>}
-                            {(detailType === "absent" || detailType === "present") && <th>Swapped Employee</th>}
+                            {(detailType === "absent" ||
+                              detailType === "present") && <th>Line</th>}
+                            {(detailType === "absent" ||
+                              detailType === "present") && <th>Swap Action</th>}
+                            {(detailType === "absent" ||
+                              detailType === "present") && (
+                              <th>Selected Swap</th>
+                            )}
+                            {(detailType === "absent" ||
+                              detailType === "present") && (
+                              <th>Swapped Employee</th>
+                            )}
                           </tr>
                         </thead>
                         <tbody style={{ fontSize: "15px" }}>
-                          {detailedRecords.map((record, index) => (
-                            record && (
-                              <tr key={index}>
-                                <td>{index + 1}</td>
-                                <td>{record.USERID || "N/A"}</td>
-                                <td>{record.NAME || "N/A"}</td>
-                                <td>{record.Stage_name || "N/A"}</td>
-                                <td>{record.SHIFT_ID || "N/A"}</td>
-                                
-                                {detailType === "present" && (
-                                  <>
-                                    <td>{record.PUNCHIN}</td>
-                                    <td>{record.PUNCHOUT || "No Punch Out"}</td>
-                                    <td>{record.StartTime || "N/A"}</td>
-                                    <td style={{
-                                      color: getPunctualityColor(record.PunctualityStatus),
-                                      fontWeight: "bold"
-                                    }}>
-                                      {record.PunctualityStatus || "Unknown"}
-                                    </td>
-                                  </>
-                                )}
-                                
-                                {detailType === "showAll" && (
-                                  <>
-                                    <td>{record.LINE || "N/A"}</td>
-                                    <td style={{
-                                      color: record.STATUS && record.STATUS.toLowerCase() === "absent" ? "red" : "green",
-                                      fontWeight: "bold"
-                                    }}>
-                                      {record.STATUS || "N/A"}
-                                    </td>
-                                    <td>{record.PUNCHIN}</td>
-                                    <td>{record.PUNCHOUT || "No Punch Out"}</td>
-                                  </>
-                                )}
-                                
-                                {(detailType === "absent" || detailType === "present") && (
-                                  <>
-                                    <td>{record.LINE || "N/A"}</td>
-                                    <td>
-                                      <Button
-                                        onClick={() =>
-                                          handleShowEmployees(
-                                            record.USERID,
-                                            record.NAME,
-                                            record.SHIFT_ID,
-                                            record.Stage_name,
-                                            record.LINE
-                                          )
-                                        }
-                                        disabled={record.SWAPUSERNAME}
-                                        variant="primary"
-                                        size="sm"
+                          {detailedRecords.map(
+                            (record, index) =>
+                              record && (
+                                <tr key={index}>
+                                  <td>{index + 1}</td>
+                                  <td>{record.USERID || "N/A"}</td>
+                                  <td>{record.NAME || "N/A"}</td>
+                                  <td>{record.Stage_name || "N/A"}</td>
+                                  <td>{record.SHIFT_ID || "N/A"}</td>
+
+                                  {detailType === "present" && (
+                                    <>
+                                      <td>{record.PUNCHIN}</td>
+                                      <td>
+                                        {record.PUNCHOUT || "No Punch Out"}
+                                      </td>
+                                      <td>{record.StartTime || "N/A"}</td>
+                                      <td
+                                        style={{
+                                          color: getPunctualityColor(
+                                            record.PunctualityStatus,
+                                          ),
+                                          fontWeight: "bold",
+                                        }}
                                       >
-                                        Swap
-                                      </Button>
-                                    </td>
-                                    <td>
-                                      {record.swapEmployee || "No Swap Selected"}
-                                    </td>
-                                    <td>{record.SWAPUSERNAME || "No Swap"}</td>
-                                  </>
-                                )}
-                              </tr>
-                            )
-                          ))}
+                                        {record.PunctualityStatus || "Unknown"}
+                                      </td>
+                                    </>
+                                  )}
+
+                                  {detailType === "showAll" && (
+                                    <>
+                                      <td>{record.LINE || "N/A"}</td>
+                                      <td
+                                        style={{
+                                          color:
+                                            record.STATUS &&
+                                            record.STATUS.toLowerCase() ===
+                                              "absent"
+                                              ? "red"
+                                              : "green",
+                                          fontWeight: "bold",
+                                        }}
+                                      >
+                                        {record.STATUS || "N/A"}
+                                      </td>
+                                      <td>{record.PUNCHIN}</td>
+                                      <td>
+                                        {record.PUNCHOUT || "No Punch Out"}
+                                      </td>
+                                    </>
+                                  )}
+
+                                  {(detailType === "absent" ||
+                                    detailType === "present") && (
+                                    <>
+                                      <td>{record.LINE || "N/A"}</td>
+                                      <td>
+                                        <Button
+                                          onClick={() =>
+                                            handleShowEmployees(
+                                              record.USERID,
+                                              record.NAME,
+                                              record.SHIFT_ID,
+                                              record.Stage_name,
+                                              record.LINE,
+                                            )
+                                          }
+                                          disabled={record.SWAPUSERNAME}
+                                          variant="primary"
+                                          size="sm"
+                                        >
+                                          Swap
+                                        </Button>
+                                      </td>
+                                      <td>
+                                        {record.swapEmployee ||
+                                          "No Swap Selected"}
+                                      </td>
+                                      <td>
+                                        {record.SWAPUSERNAME || "No Swap"}
+                                      </td>
+                                    </>
+                                  )}
+                                </tr>
+                              ),
+                          )}
                         </tbody>
                       </Table>
-                    )
-                  )}
+                    )}
                   </div>
                 </Col>
               )}

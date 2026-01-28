@@ -12,8 +12,8 @@ import {
 import axios from "axios";
 import { DateTime } from "luxon";
 import * as XLSX from "xlsx";
-import emvLogo from '../pictures/emvlogo.png';
-import '../styles/UserSkills.css';
+import emvLogo from "../pictures/emvlogo.png";
+import "../styles/UserSkills.css";
 
 // Custom Dropdown with Checkboxes Component
 const MultiSelectDropdown = ({
@@ -148,7 +148,7 @@ const MultiSelectDropdown = ({
 const Summary = () => {
   // ✅ State for date range
   const [fromDate, setFromDate] = useState(
-    DateTime.now().minus({ days: 7 }).toISODate()
+    DateTime.now().minus({ days: 7 }).toISODate(),
   );
   const [toDate, setToDate] = useState(DateTime.now().toISODate());
 
@@ -183,7 +183,7 @@ const Summary = () => {
       } catch (err) {
         console.error("Error fetching dropdown options:", err);
         setError(
-          `Failed to load dropdown options: ${err.message}. Please refresh the page.`
+          `Failed to load dropdown options: ${err.message}. Please refresh the page.`,
         );
       }
     };
@@ -241,7 +241,7 @@ const Summary = () => {
 
       const response = await axios.get(
         "https://192.168.2.54/api/attendance/overall-summary",
-        { params, timeout: 60000 }
+        { params, timeout: 60000 },
       );
 
       console.log("API Response:", response.data);
@@ -261,7 +261,7 @@ const Summary = () => {
         setError("Request timeout. Please try again.");
       } else if (err.response) {
         setError(
-          `Server error: ${err.response.data?.error || err.response.statusText}`
+          `Server error: ${err.response.data?.error || err.response.statusText}`,
         );
       } else if (err.request) {
         setError("Network error. Please check your connection.");
@@ -316,10 +316,21 @@ const Summary = () => {
   };
 
   return (
-    <Container fluid
+    <Container
+      fluid
       className="container-fluid"
-      style={{ backgroundImage: `url(${emvLogo})`, backgroundSize: 'auto', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', minHeight: '100vh', opacity: '0.9' }}>
-      <h2 className="mb-4 text-center" style={{ paddingTop: '20px' }}>Filtered Attendance Summary</h2>
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+      }}
+    >
+      <h2 className="mb-4 text-center" style={{ paddingTop: "20px" }}>
+        Filtered Attendance Summary
+      </h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -328,100 +339,106 @@ const Summary = () => {
       )}
 
       <div className="glass-card p-4 mb-4">
-      {/* ✅ Updated Form with From Date and To Date */}
-      <Row className="mb-3">
-        <Col md={3}>
-          <Form.Label>From Date *</Form.Label>
-          <Form.Control
-            type="date"
-            className="form-control glass-input"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            max={toDate}
-          />
-        </Col>
-
-        <Col md={3}>
-          <Form.Label>To Date *</Form.Label>
-          <Form.Control
-            type="date"
-            className="form-control glass-input"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            min={fromDate}
-            max={DateTime.now().toISODate()}
-          />
-        </Col>
-
-        <Col md={3}>
-          <Form.Label>Shift *</Form.Label>
-          <MultiSelectDropdown
-            options={shiftOptions}
-            selectedValues={selectedShifts}
-            onSelectionChange={setSelectedShifts}
-            placeholder="Select Shift"
-            labelKey="SHIFT_ID"
-            valueKey="SHIFT_ID"
-          />
-          {selectedShifts.length > 0 && (
-            <small className="text-muted mt-1 d-block">
-              <strong>Selected:</strong>{" "}
-              {selectedShifts.includes("ALL")
-                ? "ALL"
-                : selectedShifts.join(", ")}
-            </small>
-          )}
-        </Col>
-
-        <Col md={3}>
-          <Form.Label>Line *</Form.Label>
-          <MultiSelectDropdown
-            options={lineOptions}
-            selectedValues={selectedLines}
-            onSelectionChange={setSelectedLines}
-            placeholder="Select Line"
-            labelKey="LINE"
-            valueKey="LINE"
+        {/* ✅ Updated Form with From Date and To Date */}
+        <Row className="mb-3">
+          <Col md={3}>
+            <Form.Label>From Date *</Form.Label>
+            <Form.Control
+              type="date"
+              className="form-control glass-input"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              max={toDate}
             />
-          {selectedLines.length > 0 && (
-            <small className="text-muted mt-1 d-block">
-              <strong>Selected:</strong>{" "}
-              {selectedLines.includes("ALL") ? "ALL" : selectedLines.join(", ")}
-            </small>
-          )}
-        </Col>
-      </Row>
+          </Col>
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <Button onClick={handleSubmit} disabled={loading} className="me-2 btn-primary">
-            {loading ? (
-              <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
-                Loading...
-              </>
-            ) : (
-              "Show Summary"
+          <Col md={3}>
+            <Form.Label>To Date *</Form.Label>
+            <Form.Control
+              type="date"
+              className="form-control glass-input"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              min={fromDate}
+              max={DateTime.now().toISODate()}
+            />
+          </Col>
+
+          <Col md={3}>
+            <Form.Label>Shift *</Form.Label>
+            <MultiSelectDropdown
+              options={shiftOptions}
+              selectedValues={selectedShifts}
+              onSelectionChange={setSelectedShifts}
+              placeholder="Select Shift"
+              labelKey="SHIFT_ID"
+              valueKey="SHIFT_ID"
+            />
+            {selectedShifts.length > 0 && (
+              <small className="text-muted mt-1 d-block">
+                <strong>Selected:</strong>{" "}
+                {selectedShifts.includes("ALL")
+                  ? "ALL"
+                  : selectedShifts.join(", ")}
+              </small>
             )}
-          </Button>
-          <Button variant="outline-secondary" onClick={resetFilters}>
-            Reset Filters
-          </Button>
-        </div>
+          </Col>
 
-        {summaryData.length > 0 && (
-          <Button variant="success" onClick={exportToExcel}>
-            📥 Download Excel
-          </Button>
-        )}
-      </div>
+          <Col md={3}>
+            <Form.Label>Line *</Form.Label>
+            <MultiSelectDropdown
+              options={lineOptions}
+              selectedValues={selectedLines}
+              onSelectionChange={setSelectedLines}
+              placeholder="Select Line"
+              labelKey="LINE"
+              valueKey="LINE"
+            />
+            {selectedLines.length > 0 && (
+              <small className="text-muted mt-1 d-block">
+                <strong>Selected:</strong>{" "}
+                {selectedLines.includes("ALL")
+                  ? "ALL"
+                  : selectedLines.join(", ")}
+              </small>
+            )}
+          </Col>
+        </Row>
+
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="me-2 btn-primary"
+            >
+              {loading ? (
+                <>
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    role="status"
+                    aria-hidden="true"
+                    className="me-2"
+                  />
+                  Loading...
+                </>
+              ) : (
+                "Show Summary"
+              )}
+            </Button>
+            <Button variant="outline-secondary" onClick={resetFilters}>
+              Reset Filters
+            </Button>
+          </div>
+
+          {summaryData.length > 0 && (
+            <Button variant="success" onClick={exportToExcel}>
+              📥 Download Excel
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -469,7 +486,7 @@ const Summary = () => {
                     <td>
                       {item.DATE
                         ? DateTime.fromJSDate(new Date(item.DATE)).toFormat(
-                            "yyyy-MM-dd"
+                            "yyyy-MM-dd",
                           )
                         : "N/A"}
                     </td>
@@ -499,7 +516,7 @@ const Summary = () => {
                     <td>
                       {summaryData.reduce(
                         (sum, item) => sum + (item.ALLOTTED || 0),
-                        0
+                        0,
                       )}
                     </td>
                   </tr>
@@ -510,7 +527,7 @@ const Summary = () => {
                     <td className="text-success">
                       {summaryData.reduce(
                         (sum, item) => sum + (item.PRESENT || 0),
-                        0
+                        0,
                       )}
                     </td>
                   </tr>
@@ -521,7 +538,7 @@ const Summary = () => {
                     <td className="text-danger">
                       {summaryData.reduce(
                         (sum, item) => sum + (item.ABSENT || 0),
-                        0
+                        0,
                       )}
                     </td>
                   </tr>
@@ -533,11 +550,11 @@ const Summary = () => {
                       {(() => {
                         const totalAllotted = summaryData.reduce(
                           (sum, item) => sum + (item.ALLOTTED || 0),
-                          0
+                          0,
                         );
                         const totalPresent = summaryData.reduce(
                           (sum, item) => sum + (item.PRESENT || 0),
-                          0
+                          0,
                         );
                         const percentage =
                           totalAllotted > 0

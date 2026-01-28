@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import { useTable } from 'react-table';
-import axios from 'axios';
-import { FaFileDownload, FaEye, FaEyeSlash, FaSave } from 'react-icons/fa';
-import { Container, Button, CircularProgress, Snackbar } from '@mui/material'; // Import Material-UI components
-import '../styles/UserShiftUpload.css'; // Import the CSS file
-import emvLogo from '../pictures/emvlogo.png';
+import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
+import { useTable } from "react-table";
+import axios from "axios";
+import { FaFileDownload, FaEye, FaEyeSlash, FaSave } from "react-icons/fa";
+import { Container, Button, CircularProgress, Snackbar } from "@mui/material"; // Import Material-UI components
+import "../styles/UserShiftUpload.css"; // Import the CSS file
+import emvLogo from "../pictures/emvlogo.png";
 
 const UserSkillsUpload = () => {
   const [data, setData] = useState([]);
@@ -49,8 +49,8 @@ const UserSkillsUpload = () => {
             acc[`col${colIndex}`] = cell;
             return acc;
           },
-          { id: rowIndex }
-        )
+          { id: rowIndex },
+        ),
       );
 
       setColumns(columns);
@@ -173,7 +173,7 @@ const UserSkillsUpload = () => {
           batches[i],
           {
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
 
         if (response.data.invalidRows && response.data.invalidRows.length > 0) {
@@ -183,8 +183,8 @@ const UserSkillsUpload = () => {
         setMessage(
           `Processed ${Math.min(
             (i + 1) * batchSize,
-            totalRecords
-          )} of ${totalRecords} records...`
+            totalRecords,
+          )} of ${totalRecords} records...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 200)); // To avoid server overload
       }
@@ -255,7 +255,7 @@ const UserSkillsUpload = () => {
             {
               headers: { "Content-Type": "application/json" },
               responseType: "blob", // Important for Excel download
-            }
+            },
           );
 
           if (
@@ -281,8 +281,8 @@ const UserSkillsUpload = () => {
           setMessage(
             `Saved ${Math.min(
               i + batchSize,
-              totalRecords
-            )} of ${totalRecords} records...`
+              totalRecords,
+            )} of ${totalRecords} records...`,
           );
 
           await new Promise((resolve) => setTimeout(resolve, 200));
@@ -340,42 +340,45 @@ const UserSkillsUpload = () => {
           message={notification}
         />
       )}
-      
+
       <div className="glass-card p-4 mb-4">
-      {data.length > 0 && (
-        <div className="d-flex justify-content-between mb-3">
-          <Button variant="contained" onClick={() => setShowTable(!showTable)}>
-            {showTable ? (
-              <>
-                <FaEyeSlash className="icon" /> Hide Data
-              </>
-            ) : (
-              <>
-                <FaEye className="icon" /> View Data
-              </>
-            )}
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUserSkills}
-            disabled={loading}
-          >
-            {loading ? (
-              <CircularProgress size={24} />
-            ) : (
-              <>
-                <FaSave className="icon" /> Save
-              </>
-            )}
+        {data.length > 0 && (
+          <div className="d-flex justify-content-between mb-3">
+            <Button
+              variant="contained"
+              onClick={() => setShowTable(!showTable)}
+            >
+              {showTable ? (
+                <>
+                  <FaEyeSlash className="icon" /> Hide Data
+                </>
+              ) : (
+                <>
+                  <FaEye className="icon" /> View Data
+                </>
+              )}
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleUserSkills}
+              disabled={loading}
+            >
+              {loading ? (
+                <CircularProgress size={24} />
+              ) : (
+                <>
+                  <FaSave className="icon" /> Save
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+        <div className="d-flex justify-content-first mb-3">
+          <Button variant="contained" onClick={downloadTemplate}>
+            <FaFileDownload className="icon" /> Download Sample Template
           </Button>
         </div>
-      )}
-      <div className="d-flex justify-content-first mb-3">
-        <Button variant="contained" onClick={downloadTemplate}>
-          <FaFileDownload className="icon" /> Download Sample Template
-        </Button>
-      </div>
       </div>
 
       {message && <div className="message">{message}</div>}

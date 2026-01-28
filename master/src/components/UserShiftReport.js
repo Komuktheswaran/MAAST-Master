@@ -22,7 +22,7 @@ import moment from "moment";
 import * as FileSaver from "file-saver";
 import * as XLSX from "xlsx";
 import "../styles/UserShiftReport.css";
-import emvLogo from '../pictures/emvlogo.png';
+import emvLogo from "../pictures/emvlogo.png";
 
 const baseURL = "https://192.168.2.54/api";
 
@@ -36,22 +36,25 @@ const UserShiftReport = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
   const [showShiftDetails, setShowShiftDetails] = useState(false);
-const [shiftMasterDetails, setShiftMasterDetails] = useState([]);
-const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
-
+  const [shiftMasterDetails, setShiftMasterDetails] = useState([]);
+  const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
 
   // Debounce Logic
   useEffect(() => {
     const handler = setTimeout(() => {
-        setDebouncedSearchUserShift(searchUserShift);
+      setDebouncedSearchUserShift(searchUserShift);
     }, 300);
     return () => clearTimeout(handler);
   }, [searchUserShift]);
   const pageSize = 100;
 
   // Filter States
-  const [selectedFromDate, setSelectedFromDate] = useState(moment().format("YYYY-MM-DD"));
-  const [selectedToDate, setSelectedToDate] = useState(moment().format("YYYY-MM-DD"));
+  const [selectedFromDate, setSelectedFromDate] = useState(
+    moment().format("YYYY-MM-DD"),
+  );
+  const [selectedToDate, setSelectedToDate] = useState(
+    moment().format("YYYY-MM-DD"),
+  );
   const [selectedShiftIds, setSelectedShiftIds] = useState([]);
   const [selectedStages, setSelectedStages] = useState([]);
   const [selectedLines, setSelectedLines] = useState([]);
@@ -99,12 +102,12 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
       };
 
       const response = await axios.get(`${baseURL}/getUserShifts`, { params });
-      
+
       if (response.data.length === 0) {
         setNotification("No records found matching the selected filters.");
       } else {
-         // console.log("Fetched User Shifts:", response.data);
-      setUserShifts(response.data);
+        // console.log("Fetched User Shifts:", response.data);
+        setUserShifts(response.data);
       }
     } catch (error) {
       console.error("Error fetching user shifts:", error);
@@ -137,11 +140,14 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
 
     if (debouncedSearchUserShift) {
       const lowerSearch = debouncedSearchUserShift.toLowerCase();
-      filtered = filtered.filter((shift) =>
-        Object.values(shift).some(
-          (val) => val && val.toString().toLowerCase().includes(lowerSearch)
-        )
-      );
+      filtered = filtered.filter((shift) => {
+        return (
+          (shift.userid &&
+            shift.userid.toString().toLowerCase().startsWith(lowerSearch)) ||
+          (shift.user_name &&
+            shift.user_name.toString().toLowerCase().startsWith(lowerSearch))
+        );
+      });
     }
 
     if (sortConfig.key) {
@@ -160,7 +166,7 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
 
   const paginatedData = getFilteredAndSortedData().slice(
     (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    currentPage * pageSize,
   );
 
   const totalPages = Math.ceil(getFilteredAndSortedData().length / pageSize);
@@ -174,7 +180,7 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
       "Stage Name": shift.Stage_name || "",
       "Shift Date From": formatDate(shift.Shift_date_from) || "",
       "Shift Date To": formatDate(shift.Shift_date_to) || "",
-      "Line": shift.LINE || "",
+      Line: shift.LINE || "",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(formattedData);
@@ -211,18 +217,18 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
   };
 
   const fetchShiftMasterDetails = async () => {
-  setLoadingShiftDetails(true);
-  try {
-    const response = await axios.get(`${baseURL}/shifts_master_details`);
-    setShiftMasterDetails(response.data);
-    setShowShiftDetails(true);
-  } catch (error) {
-    console.error("Error fetching shift master details:", error);
-    setNotification("Error loading shift details. Please try again.");
-  } finally {
-    setLoadingShiftDetails(false);
-  }
-};
+    setLoadingShiftDetails(true);
+    try {
+      const response = await axios.get(`${baseURL}/shifts_master_details`);
+      setShiftMasterDetails(response.data);
+      setShowShiftDetails(true);
+    } catch (error) {
+      console.error("Error fetching shift master details:", error);
+      setNotification("Error loading shift details. Please try again.");
+    } finally {
+      setLoadingShiftDetails(false);
+    }
+  };
 
   const highlightText = (text, highlight) => {
     if (!highlight.trim()) return text;
@@ -234,12 +240,12 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
         </span>
       ) : (
         part
-      )
+      ),
     );
   };
 
   return (
-    <Container 
+    <Container
       fluid
       className="container-fluid"
       style={{
@@ -259,7 +265,9 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
             <h2>User Shift Details</h2>
             <div style={{ width: "300px" }}>
               <InputGroup>
-                <InputGroup.Text><SearchIcon /></InputGroup.Text>
+                <InputGroup.Text>
+                  <SearchIcon />
+                </InputGroup.Text>
                 <FormControl
                   placeholder="Search in loaded data..."
                   value={searchUserShift}
@@ -273,103 +281,151 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
           <Card className="mb-4 glass-card">
             <Card.Body>
               <Row className="align-items-end g-3 mb-3">
-                 <Col md={3}>
-                    <Form.Label><strong>From Date</strong></Form.Label>
-                    <FormControl
-                      type="date"
-                      value={selectedFromDate}
-                      onChange={(e) => setSelectedFromDate(e.target.value)}
-                      className="glass-input"
-                    />
-                 </Col>
-                 <Col md={3}>
-                    <Form.Label><strong>To Date</strong></Form.Label>
-                    <FormControl
-                      type="date"
-                      value={selectedToDate}
-                      onChange={(e) => setSelectedToDate(e.target.value)}
-                      className="glass-input"
-                    />
-                 </Col>
-                 <Col md={2}>
-                    <Button variant="primary" className="w-100" onClick={handleShowReport} disabled={loading}>
-                        {loading ? <Spinner animation="border" size="sm" /> : "Show"}
-                    </Button>
-                 </Col>
+                <Col md={3}>
+                  <Form.Label>
+                    <strong>From Date</strong>
+                  </Form.Label>
+                  <FormControl
+                    type="date"
+                    value={selectedFromDate}
+                    onChange={(e) => setSelectedFromDate(e.target.value)}
+                    className="glass-input"
+                  />
+                </Col>
+                <Col md={3}>
+                  <Form.Label>
+                    <strong>To Date</strong>
+                  </Form.Label>
+                  <FormControl
+                    type="date"
+                    value={selectedToDate}
+                    onChange={(e) => setSelectedToDate(e.target.value)}
+                    className="glass-input"
+                  />
+                </Col>
+                <Col md={2}>
+                  <Button
+                    variant="primary"
+                    className="w-100"
+                    onClick={handleShowReport}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Spinner animation="border" size="sm" />
+                    ) : (
+                      "Show"
+                    )}
+                  </Button>
+                </Col>
               </Row>
 
-<div className="d-flex align-items-center mb-3">
-  <h5 className="mb-0 me-2">Filters (Shifts, Stages, Lines)</h5>
-  <Button 
-    variant="link" 
-    size="sm" 
-    onClick={fetchShiftMasterDetails}
-    disabled={loadingShiftDetails}
-    className="p-0 text-info"
-    title="View Shift Master Details"
-  >
-    {loadingShiftDetails ? (
-      <Spinner animation="border" size="sm" />
-    ) : (
-      <FaInfoCircle size={20} />
-    )}
-  </Button>
-</div>
+              <div className="d-flex align-items-center mb-3">
+                <h5 className="mb-0 me-2">Filters (Shifts, Stages, Lines)</h5>
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={fetchShiftMasterDetails}
+                  disabled={loadingShiftDetails}
+                  className="p-0 text-info"
+                  title="View Shift Master Details"
+                >
+                  {loadingShiftDetails ? (
+                    <Spinner animation="border" size="sm" />
+                  ) : (
+                    <FaInfoCircle size={20} />
+                  )}
+                </Button>
+              </div>
 
               <Row>
                 <Col md={4}>
                   <h6>Shifts</h6>
-                  <div className="filter-box" style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid #ddd", padding: "10px" }}>
-                      {shiftOptions.map((shift) => (
-                          <Form.Check 
-                              key={shift.SFTID}
-                              type="checkbox"
-                              label={shift.SFTID}
-                              checked={selectedShiftIds.includes(shift.SFTID)}
-                              onChange={() => {
-                                  setSelectedShiftIds(prev => prev.includes(shift.SFTID) ? prev.filter(id => id !== shift.SFTID) : [...prev, shift.SFTID])
-                              }}
-                          />
-                      ))}
-                  </div>
-                </Col>
-                 <Col md={4}>
-                  <h6>Stages</h6>
-                  <div className="filter-box" style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid #ddd", padding: "10px" }}>
-                       {stageOptions.map((stage) => (
-                          <Form.Check 
-                              key={stage.Stage_id}
-                              type="checkbox"
-                              label={stage.Stage_name}
-                              checked={selectedStages.includes(stage.Stage_name)}
-                              onChange={() => {
-                                  setSelectedStages(prev => prev.includes(stage.Stage_name) ? prev.filter(n => n !== stage.Stage_name) : [...prev, stage.Stage_name])
-                              }}
-                          />
-                      ))}
-                  </div>
-                </Col>
-                 <Col md={4}>
-                  <h6>Lines</h6>
-                  <div className="filter-box" style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid #ddd", padding: "10px" }}>
-                       {lineOptions.filter(l => l.LINE || l.LineName || l.lineName).map((line) => {
-                          const lineName = line.LINE || line.LineName || line.lineName;
-                          return (
-                          <Form.Check 
-                              key={line.id || lineName}
-                              type="checkbox"
-                              label={lineName}
-                              checked={selectedLines.includes(lineName)}
-                               onChange={() => {
-                                  setSelectedLines((prev) =>
-                                    prev.includes(lineName)
-                                      ? prev.filter((name) => name !== lineName)
-                                      : [...prev, lineName]
-                                  );
-                                }}
-                          />
+                  <div
+                    className="filter-box"
+                    style={{
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                      border: "1px solid #ddd",
+                      padding: "10px",
+                    }}
+                  >
+                    {shiftOptions.map((shift) => (
+                      <Form.Check
+                        key={shift.SFTID}
+                        type="checkbox"
+                        label={shift.SFTID}
+                        checked={selectedShiftIds.includes(shift.SFTID)}
+                        onChange={() => {
+                          setSelectedShiftIds((prev) =>
+                            prev.includes(shift.SFTID)
+                              ? prev.filter((id) => id !== shift.SFTID)
+                              : [...prev, shift.SFTID],
                           );
-                       })}
+                        }}
+                      />
+                    ))}
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <h6>Stages</h6>
+                  <div
+                    className="filter-box"
+                    style={{
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                      border: "1px solid #ddd",
+                      padding: "10px",
+                    }}
+                  >
+                    {stageOptions.map((stage) => (
+                      <Form.Check
+                        key={stage.Stage_id}
+                        type="checkbox"
+                        label={stage.Stage_name}
+                        checked={selectedStages.includes(stage.Stage_name)}
+                        onChange={() => {
+                          setSelectedStages((prev) =>
+                            prev.includes(stage.Stage_name)
+                              ? prev.filter((n) => n !== stage.Stage_name)
+                              : [...prev, stage.Stage_name],
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <h6>Lines</h6>
+                  <div
+                    className="filter-box"
+                    style={{
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                      border: "1px solid #ddd",
+                      padding: "10px",
+                    }}
+                  >
+                    {lineOptions
+                      .filter((l) => l.LINE || l.LineName || l.lineName)
+                      .map((line) => {
+                        const lineName =
+                          line.LINE || line.LineName || line.lineName;
+                        return (
+                          <Form.Check
+                            key={line.id || lineName}
+                            type="checkbox"
+                            label={lineName}
+                            checked={selectedLines.includes(lineName)}
+                            onChange={() => {
+                              setSelectedLines((prev) =>
+                                prev.includes(lineName)
+                                  ? prev.filter((name) => name !== lineName)
+                                  : [...prev, lineName],
+                              );
+                            }}
+                          />
+                        );
+                      })}
                   </div>
                 </Col>
               </Row>
@@ -379,72 +435,118 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
           {notification && <Alert variant="info">{notification}</Alert>}
 
           {userShifts.length > 0 && (
-              <>
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5>Total Records: <strong>{userShifts.length}</strong></h5>
-                    <Button variant="success" size="sm" onClick={handleDownload}>
-                        <FaDownload /> Download Excel
-                    </Button>
-                </div>
-                <Table striped bordered hover responsive className="glass-table">
-                    <thead>
-                    <tr>
-                        <th onClick={() => handleSort("userid")}>User ID <SortIcon columnKey="userid" /></th>
-                        <th onClick={() => handleSort("user_name")}>User Name <SortIcon columnKey="user_name" /></th>
-                        <th onClick={() => handleSort("SHIFT_ID")}>
-                          Shift ID <SortIcon columnKey="SHIFT_ID" /> 
-                          <Button variant="link" size="sm" onClick={() => setShowShiftInfo(true)} className="p-0 ms-1 text-info">
-                            <FaInfoCircle />
-                          </Button>
-                        </th>
-                        <th onClick={() => handleSort("Stage_name")}>Stage Name <SortIcon columnKey="Stage_name" /></th>
-                        <th onClick={() => handleSort("Shift_date_from")}>From Date <SortIcon columnKey="Shift_date_from" /></th>
-                        <th onClick={() => handleSort("Shift_date_to")}>To Date <SortIcon columnKey="Shift_date_to" /></th>
-                        <th onClick={() => handleSort("LINE")}>Line <SortIcon columnKey="LINE" /></th>
+            <>
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <h5>
+                  Total Records: <strong>{userShifts.length}</strong>
+                </h5>
+                <Button variant="success" size="sm" onClick={handleDownload}>
+                  <FaDownload /> Download Excel
+                </Button>
+              </div>
+              <Table striped bordered hover responsive className="glass-table">
+                <thead>
+                  <tr>
+                    <th onClick={() => handleSort("userid")}>
+                      User ID <SortIcon columnKey="userid" />
+                    </th>
+                    <th onClick={() => handleSort("user_name")}>
+                      User Name <SortIcon columnKey="user_name" />
+                    </th>
+                    <th onClick={() => handleSort("SHIFT_ID")}>
+                      Shift ID <SortIcon columnKey="SHIFT_ID" />
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => setShowShiftInfo(true)}
+                        className="p-0 ms-1 text-info"
+                      >
+                        <FaInfoCircle />
+                      </Button>
+                    </th>
+                    <th onClick={() => handleSort("Stage_name")}>
+                      Stage Name <SortIcon columnKey="Stage_name" />
+                    </th>
+                    <th onClick={() => handleSort("Shift_date_from")}>
+                      From Date <SortIcon columnKey="Shift_date_from" />
+                    </th>
+                    <th onClick={() => handleSort("Shift_date_to")}>
+                      To Date <SortIcon columnKey="Shift_date_to" />
+                    </th>
+                    <th onClick={() => handleSort("LINE")}>
+                      Line <SortIcon columnKey="LINE" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedData.map((shift, index) => (
+                    <tr key={index}>
+                      <td>
+                        {highlightText(shift.userid || "", searchUserShift)}
+                      </td>
+                      <td>
+                        {highlightText(shift.user_name || "", searchUserShift)}
+                      </td>
+                      <td>
+                        {highlightText(shift.SHIFT_ID || "", searchUserShift)}
+                      </td>
+                      <td>
+                        {highlightText(shift.Stage_name || "", searchUserShift)}
+                      </td>
+                      <td>
+                        {highlightText(
+                          formatDate(shift.Shift_date_from),
+                          searchUserShift,
+                        )}
+                      </td>
+                      <td>
+                        {highlightText(
+                          formatDate(shift.Shift_date_to),
+                          searchUserShift,
+                        )}
+                      </td>
+                      <td>
+                        {highlightText(shift.LINE || "", searchUserShift)}
+                      </td>
                     </tr>
-                    </thead>
-                    <tbody>
-                    {paginatedData.map((shift, index) => (
-                        <tr key={index}>
-                            <td>{highlightText(shift.userid || "", searchUserShift)}</td>
-                            <td>{highlightText(shift.user_name || "", searchUserShift)}</td>
-                            <td>{highlightText(shift.SHIFT_ID || "", searchUserShift)}</td>
-                            <td>{highlightText(shift.Stage_name || "", searchUserShift)}</td>
-                            <td>{highlightText(formatDate(shift.Shift_date_from), searchUserShift)}</td>
-                            <td>{highlightText(formatDate(shift.Shift_date_to), searchUserShift)}</td>
-                            <td>{highlightText(shift.LINE || "", searchUserShift)}</td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </Table>
-                
-                 <div className="d-flex justify-content-between table-controls">
-                    <Button
-                    variant="primary"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    >
-                    Prev
-                    </Button>
-                    <span>
-                    Page {currentPage} of {totalPages || 1}
-                    </span>
-                    <Button
-                    variant="primary"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage >= totalPages}
-                    >
-                    Next
-                    </Button>
-                </div>
-              </>
-          )}
+                  ))}
+                </tbody>
+              </Table>
 
+              <div className="d-flex justify-content-between table-controls">
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                >
+                  Prev
+                </Button>
+                <span>
+                  Page {currentPage} of {totalPages || 1}
+                </span>
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </>
+          )}
         </Col>
       </Row>
 
       {/* Shift Info Modal */}
-      <Modal show={showShiftInfo} onHide={() => setShowShiftInfo(false)} size="lg">
+      <Modal
+        show={showShiftInfo}
+        onHide={() => setShowShiftInfo(false)}
+        size="lg"
+      >
         <Modal.Header closeButton>
           <Modal.Title>Shift Master Details</Modal.Title>
         </Modal.Header>
@@ -478,7 +580,12 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
       </Modal>
 
       {/* Shift Details Modal */}
-      <Modal show={showShiftDetails} onHide={() => setShowShiftDetails(false)} size="lg" centered>
+      <Modal
+        show={showShiftDetails}
+        onHide={() => setShowShiftDetails(false)}
+        size="lg"
+        centered
+      >
         <Modal.Header closeButton>
           <Modal.Title>Shift Master Details</Modal.Title>
         </Modal.Header>
@@ -499,13 +606,23 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
                     <tr key={index}>
                       <td>{shift.SFTID}</td>
                       <td>{shift.SFTName}</td>
-                      <td>{moment(shift.SFTSTTime).isValid() ? moment(shift.SFTSTTime).format("HH:mm:ss") : shift.SFTSTTime}</td>
-                      <td>{moment(shift.SFTEDTime).isValid() ? moment(shift.SFTEDTime).format("HH:mm:ss") : shift.SFTEDTime}</td>
+                      <td>
+                        {moment(shift.SFTSTTime).isValid()
+                          ? moment(shift.SFTSTTime).format("HH:mm:ss")
+                          : shift.SFTSTTime}
+                      </td>
+                      <td>
+                        {moment(shift.SFTEDTime).isValid()
+                          ? moment(shift.SFTEDTime).format("HH:mm:ss")
+                          : shift.SFTEDTime}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="text-center">No Shift Details Found</td>
+                    <td colSpan="4" className="text-center">
+                      No Shift Details Found
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -513,7 +630,10 @@ const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
           </div>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowShiftDetails(false)}>
+          <Button
+            variant="secondary"
+            onClick={() => setShowShiftDetails(false)}
+          >
             Close
           </Button>
         </Modal.Footer>

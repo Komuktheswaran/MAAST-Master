@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -14,24 +14,19 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  LinearProgress
-} from '@mui/material';
-import {
-  CloudUpload,
-  Delete,
-  Edit,
-  DragIndicator
-} from '@mui/icons-material';
-import axios from 'axios';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+  LinearProgress,
+} from "@mui/material";
+import { CloudUpload, Delete, Edit, DragIndicator } from "@mui/icons-material";
+import axios from "axios";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 const ImageUpload = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [description, setDescription] = useState(''); // New state for description
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [description, setDescription] = useState(""); // New state for description
   const [editDialog, setEditDialog] = useState({ open: false, image: null });
 
   useEffect(() => {
@@ -42,7 +37,7 @@ const ImageUpload = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "https://192.168.2.54/api/carousel-images"
+        "https://192.168.2.54/api/carousel-images",
       );
       setImages(response.data);
     } catch (error) {
@@ -87,7 +82,7 @@ const ImageUpload = () => {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       setSuccess("Image uploaded successfully!");
@@ -104,15 +99,15 @@ const ImageUpload = () => {
   };
 
   const handleDeleteImage = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this image?')) return;
+    if (!window.confirm("Are you sure you want to delete this image?")) return;
 
     try {
       await axios.delete(`https://192.168.2.54/api/carousel-images/${id}`);
-      setSuccess('Image deleted successfully!');
+      setSuccess("Image deleted successfully!");
       fetchImages();
     } catch (error) {
-      console.error('Error deleting image:', error);
-      setError('Failed to delete image');
+      console.error("Error deleting image:", error);
+      setError("Failed to delete image");
     }
   };
 
@@ -128,29 +123,26 @@ const ImageUpload = () => {
     // Update display orders in the database
     try {
       const updatePromises = items.map((item, index) =>
-        axios.put(
-          `https://192.168.2.54/api/carousel-images/${item.id}/order`,
-          {
-            displayOrder: index,
-          }
-        )
+        axios.put(`https://192.168.2.54/api/carousel-images/${item.id}/order`, {
+          displayOrder: index,
+        }),
       );
-      
+
       await Promise.all(updatePromises);
-      setSuccess('Image order updated successfully!');
+      setSuccess("Image order updated successfully!");
     } catch (error) {
-      console.error('Error updating image order:', error);
-      setError('Failed to update image order');
+      console.error("Error updating image order:", error);
+      setError("Failed to update image order");
       fetchImages(); // Revert changes
     }
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   return (
@@ -160,13 +152,13 @@ const ImageUpload = () => {
       </Typography>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>
           {success}
         </Alert>
       )}
@@ -179,16 +171,16 @@ const ImageUpload = () => {
           </Typography>
 
           <TextField
-              fullWidth
-              label="Image Description"
-              variant="outlined"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              sx={{ mb: 2 }}
-              placeholder="Enter a description for the image (optional)"
+            fullWidth
+            label="Image Description"
+            variant="outlined"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            sx={{ mb: 2 }}
+            placeholder="Enter a description for the image (optional)"
           />
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Button
               variant="contained"
               component="label"
@@ -203,7 +195,7 @@ const ImageUpload = () => {
                 onChange={handleFileUpload}
               />
             </Button>
-            
+
             {uploading && (
               <Box sx={{ flexGrow: 1 }}>
                 <LinearProgress />
@@ -213,7 +205,7 @@ const ImageUpload = () => {
               </Box>
             )}
           </Box>
-          
+
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             Supported formats: JPEG, PNG, GIF, WebP (Max size: 10MB)
           </Typography>
@@ -250,36 +242,38 @@ const ImageUpload = () => {
                       >
                         <Card
                           sx={{
-                            transform: snapshot.isDragging ? 'rotate(5deg)' : 'none',
+                            transform: snapshot.isDragging
+                              ? "rotate(5deg)"
+                              : "none",
                             opacity: snapshot.isDragging ? 0.8 : 1,
                           }}
                         >
-                          <Box sx={{ position: 'relative' }}>
+                          <Box sx={{ position: "relative" }}>
                             <CardMedia
                               component="img"
                               height="200"
                               image={image.image_data}
                               alt={image.image_name}
-                              sx={{ objectFit: 'cover' }}
+                              sx={{ objectFit: "cover" }}
                             />
-                            
+
                             <IconButton
                               {...provided.dragHandleProps}
                               sx={{
-                                position: 'absolute',
+                                position: "absolute",
                                 top: 8,
                                 left: 8,
-                                backgroundColor: 'rgba(0,0,0,0.5)',
-                                color: 'white',
-                                '&:hover': {
-                                  backgroundColor: 'rgba(0,0,0,0.7)',
-                                }
+                                backgroundColor: "rgba(0,0,0,0.5)",
+                                color: "white",
+                                "&:hover": {
+                                  backgroundColor: "rgba(0,0,0,0.7)",
+                                },
                               }}
                             >
                               <DragIndicator />
                             </IconButton>
                           </Box>
-                          
+
                           <CardContent>
                             <Typography variant="subtitle1" noWrap>
                               {image.image_name}
@@ -290,8 +284,8 @@ const ImageUpload = () => {
                             <Typography variant="body2" color="text.secondary">
                               Order: {index + 1}
                             </Typography>
-                            
-                            <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+
+                            <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
                               <IconButton
                                 color="error"
                                 onClick={() => handleDeleteImage(image.id)}
@@ -313,7 +307,7 @@ const ImageUpload = () => {
       )}
 
       {images.length === 0 && !loading && (
-        <Typography variant="body1" sx={{ textAlign: 'center', mt: 4 }}>
+        <Typography variant="body1" sx={{ textAlign: "center", mt: 4 }}>
           No images uploaded yet. Upload your first image to get started!
         </Typography>
       )}

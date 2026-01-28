@@ -1,0 +1,15 @@
+Monthly Job Card Excel Request: {
+  fromMonth: '2025-01',
+  toMonth: '2025-06',
+  employeeId: null,
+  line: null
+}
+Generating Monthly Report from 2025-01-01 to 2025-06-30 for Emp: ALL
+Monthly Job Card Report Request: {
+  fromMonth: '2025-01',
+  toMonth: '2025-06',
+  employeeId: null,
+  line: null
+}
+Generating Monthly Report from 2025-01-01 to 2025-06-30 for Emp: ALL, Line: ALL
+Monthly Report Row Count: 429147

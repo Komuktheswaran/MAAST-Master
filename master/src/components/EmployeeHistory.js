@@ -13,8 +13,8 @@ import axios from "axios";
 
 import * as XLSX from "xlsx";
 import Select from "react-select";
-import emvLogo from '../pictures/emvlogo.png';
-import '../styles/UserSkills.css'; // Ensure we have access to glass styles
+import emvLogo from "../pictures/emvlogo.png";
+import "../styles/UserSkills.css"; // Ensure we have access to glass styles
 
 const EmployeeHistory = () => {
   const [fromDate, setFromDate] = useState(new Date());
@@ -27,39 +27,38 @@ const EmployeeHistory = () => {
   const [allEmployees, setAllEmployees] = useState([]); // Store all employees
   const [employeeOptions, setEmployeeOptions] = useState([]); // Filtered options for react-select
   const [employeeIdInput, setEmployeeIdInput] = useState(""); // Input for react-select search
-  const [Pagination,setPagination]=useState([]);
-const formatDate = (date) => {
-  if (!date) return ""; // avoid invalid value
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return ""; // handle invalid date
-  return d.toISOString().split("T")[0]; // yyyy-MM-dd
-}
-const formatDateforexcel = (date) => {
-  if (!date) return ""; // avoid invalid value
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return ""; // handle invalid date
-  
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0'); // getMonth() returns 0-11
-  const year = d.getFullYear();
-  
-  return `${day}-${month}-${year}`; // dd-mm-yyyy
-}
+  const [Pagination, setPagination] = useState([]);
+  const formatDate = (date) => {
+    if (!date) return ""; // avoid invalid value
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return ""; // handle invalid date
+    return d.toISOString().split("T")[0]; // yyyy-MM-dd
+  };
+  const formatDateforexcel = (date) => {
+    if (!date) return ""; // avoid invalid value
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return ""; // handle invalid date
 
-const formatDatefordisplay = (dateStr) => {
-  if (!dateStr || typeof dateStr !== "string" || dateStr.trim() === "") {
-    return "N/A";
-  }
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0"); // getMonth() returns 0-11
+    const year = d.getFullYear();
 
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) {
-    return "N/A";
-  }
+    return `${day}-${month}-${year}`; // dd-mm-yyyy
+  };
 
-  const [day, month, year] = parts;
-  return `${day}-${month}-${year}`; // dd-mm-yyyy
-};
+  const formatDatefordisplay = (dateStr) => {
+    if (!dateStr || typeof dateStr !== "string" || dateStr.trim() === "") {
+      return "N/A";
+    }
 
+    const parts = dateStr.split("/");
+    if (parts.length !== 3) {
+      return "N/A";
+    }
+
+    const [day, month, year] = parts;
+    return `${day}-${month}-${year}`; // dd-mm-yyyy
+  };
 
   useEffect(() => {
     // Fetch employee list for dropdown
@@ -87,13 +86,16 @@ const formatDatefordisplay = (dateStr) => {
   // Filter options based on input
   useEffect(() => {
     if (employeeIdInput.length > 0) {
-      const filtered = allEmployees.filter(emp => 
-        emp.label.toLowerCase().includes(employeeIdInput.toLowerCase())
-      );
+      const filtered = allEmployees.filter((emp) => {
+        const search = employeeIdInput.toLowerCase();
+        const id = String(emp.value).toLowerCase();
+        const name = String(emp.name).toLowerCase();
+        return id.startsWith(search) || name.startsWith(search);
+      });
       setEmployeeOptions(filtered);
     } else {
-        // Option to clear or show limited, user requested "wait for 5 digits"
-        setEmployeeOptions([]); 
+      // Option to clear or show limited, user requested "wait for 5 digits"
+      setEmployeeOptions([]);
     }
   }, [employeeIdInput, allEmployees]);
 
@@ -118,7 +120,7 @@ const formatDatefordisplay = (dateStr) => {
           toDate: formatDate(toDate),
           employeeId: employeeId, // ✅ send employeeId instead of name
         },
-        { timeout: 330000 }
+        { timeout: 330000 },
       );
       console.log("fromdate", fromDate);
 
@@ -137,7 +139,7 @@ const formatDatefordisplay = (dateStr) => {
         setError("Request timeout. Please try again.");
       } else if (error.response) {
         setError(
-          `Server error: ${error.response.data || error.response.statusText}`
+          `Server error: ${error.response.data || error.response.statusText}`,
         );
       } else if (error.request) {
         setError("Network error. Please check your connection.");
@@ -150,64 +152,77 @@ const formatDatefordisplay = (dateStr) => {
     }
   };
 
+  const downloadExcel = () => {
+    if (!Array.isArray(historyData) || historyData.length === 0) {
+      setError("No history data to export.");
+      return;
+    }
 
-const downloadExcel = () => {
-  if (!Array.isArray(historyData) || historyData.length === 0) {
-    setError("No history data to export.");
-    return;
-  }
+    try {
+      const worksheetData = [
+        ["EMPLOYEE HISTORY"], // Main title
+        [
+          "NAME: ",
+          employeeName,
+          "",
+          "DATE:",
+          "FROM",
+          formatDateforexcel(fromDate),
+        ],
+        ["ID NO.", employeeId || "", "", "", "TO", formatDateforexcel(toDate)], // You can pass employeeId
+        [], // Empty row
+        [
+          "SL NO.",
+          "DATE",
+          "SHIFT",
+          "LINE",
+          "STAGE",
+          "ATTENDANCE",
+          "PUNCTUALITY",
+        ], // Table Header
+        ...historyData.map((item, index) => [
+          index + 1,
+          formatDatefordisplay(item.DATE),
+          item.SHIFT || "",
+          item.LINE || "",
+          item.STAGE || "",
+          item.ATTENDANCE || "",
+          item.PUNCTUALITY || "",
+        ]),
+      ];
 
-  try {
-    const worksheetData = [
-      ["EMPLOYEE HISTORY"], // Main title
-      ["NAME: ",employeeName, "",  "DATE:","FROM", formatDateforexcel(fromDate)],
-      ["ID NO.", employeeId || "", "","", "TO",formatDateforexcel(toDate)], // You can pass employeeId
-      [], // Empty row
-      ["SL NO.", "DATE", "SHIFT", "LINE", "STAGE", "ATTENDANCE", "PUNCTUALITY"], // Table Header
-      ...historyData.map((item, index) => [
-        index + 1,
-        formatDatefordisplay(item.DATE)
-         ,
-        item.SHIFT || "",
-        item.LINE || "",
-        item.STAGE || "",
-        item.ATTENDANCE || "",
-        item.PUNCTUALITY || "",
-      ]),
-    ];
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      // Merge cells for title and headers
+      worksheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // EMPLOYEE HISTORY merged across 7 columns
+      ];
 
-    // Merge cells for title and headers
-    worksheet["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // EMPLOYEE HISTORY merged across 7 columns
-    ];
+      // Set column widths
+      worksheet["!cols"] = [
+        { wch: 8 }, // SL NO.
+        { wch: 12 }, // DATE
+        { wch: 15 }, // SHIFT
+        { wch: 12 }, // LINE
+        { wch: 15 }, // STAGE
+        { wch: 15 }, // ATTENDANCE
+        { wch: 20 }, // PUNCTUALITY
+      ];
 
-    // Set column widths
-    worksheet["!cols"] = [
-      { wch: 8 }, // SL NO.
-      { wch: 12 }, // DATE
-      { wch: 15 }, // SHIFT
-      { wch: 12 }, // LINE
-      { wch: 15 }, // STAGE
-      { wch: 15 }, // ATTENDANCE
-      { wch: 20 }, // PUNCTUALITY
-    ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Employee History");
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Employee History");
+      const fileName = `EmployeeHistory_${formatDate(fromDate)}_${formatDate(
+        toDate,
+      )}_${employeeName}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
 
-    const fileName = `EmployeeHistory_${formatDate(fromDate)}_${formatDate(
-      toDate
-    )}_${employeeName}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-
-    setError("");
-  } catch (error) {
-    console.error("Error downloading Excel:", error);
-    setError("Failed to download Excel file. Please try again.");
-  }
-};
+      setError("");
+    } catch (error) {
+      console.error("Error downloading Excel:", error);
+      setError("Failed to download Excel file. Please try again.");
+    }
+  };
 
   const resetFilters = () => {
     setFromDate(new Date());
@@ -221,10 +236,21 @@ const downloadExcel = () => {
   };
 
   return (
-    <Container fluid
+    <Container
+      fluid
       className="container-fluid"
-      style={{ backgroundImage: `url(${emvLogo})`, backgroundSize: 'auto', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', minHeight: '100vh', opacity: '0.9' }}>
-      <h2 className="mb-4 text-center" style={{ paddingTop: '20px' }}>Employee History</h2>
+      style={{
+        backgroundImage: `url(${emvLogo})`,
+        backgroundSize: "auto",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        minHeight: "100vh",
+        opacity: "0.9",
+      }}
+    >
+      <h2 className="mb-4 text-center" style={{ paddingTop: "20px" }}>
+        Employee History
+      </h2>
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError("")}>
@@ -233,13 +259,14 @@ const downloadExcel = () => {
       )}
 
       <div className="glass-card p-4 mb-4">
-      <Row className="mb-3">
-
-        <Col md={4}>
+        <Row className="mb-3">
+          <Col md={4}>
             <label className="form-label">Select Employee</label>
             <Select
               options={employeeOptions}
-              value={allEmployees.find((opt) => opt.value === employeeId) || null}
+              value={
+                allEmployees.find((opt) => opt.value === employeeId) || null
+              }
               onChange={(selected) => {
                 setEmployeeId(selected ? selected.value : null);
                 setEmployeeName(selected ? selected.name : "");
@@ -250,77 +277,79 @@ const downloadExcel = () => {
               noOptionsMessage={() => "No matching employees"}
               classNamePrefix="react-select"
               styles={{
-                  control: (base) => ({
-                      ...base,
-                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      color: 'black'
-                  }),
-                  menu: (base) => ({
-                      ...base,
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                      backdropFilter: 'blur(10px)',
-                  })
+                control: (base) => ({
+                  ...base,
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid rgba(255, 255, 255, 0.3)",
+                  color: "black",
+                }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                  backdropFilter: "blur(10px)",
+                }),
               }}
             />
-        </Col>
+          </Col>
 
-        <Col md={4}>
-          <Form.Label>From Date *</Form.Label>
-          <Form.Control
-            type="date"
-            className="form-control glass-input"
-            value={formatDate(fromDate)}
-            onChange={(e) => setFromDate(new Date(e.target.value))}
-            max={formatDate(new Date())}
-          />
-        </Col>
+          <Col md={4}>
+            <Form.Label>From Date *</Form.Label>
+            <Form.Control
+              type="date"
+              className="form-control glass-input"
+              value={formatDate(fromDate)}
+              onChange={(e) => setFromDate(new Date(e.target.value))}
+              max={formatDate(new Date())}
+            />
+          </Col>
 
-        <Col md={4}>
-          <Form.Label>To Date *</Form.Label>
-          <Form.Control
-            type="date"
-            className="form-control glass-input"
-            value={formatDate(toDate)}
-            onChange={(e) => setToDate(new Date(e.target.value))}
-            max={formatDate(new Date())}
-          />
-        </Col>
+          <Col md={4}>
+            <Form.Label>To Date *</Form.Label>
+            <Form.Control
+              type="date"
+              className="form-control glass-input"
+              value={formatDate(toDate)}
+              onChange={(e) => setToDate(new Date(e.target.value))}
+              max={formatDate(new Date())}
+            />
+          </Col>
+        </Row>
 
-        
-      </Row>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <Button
+              onClick={fetchHistory}
+              disabled={loading}
+              className="me-2 btn-primary"
+            >
+              {loading ? (
+                <>
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    role="status"
+                    aria-hidden="true"
+                    className="me-2"
+                  />
+                  Loading...
+                </>
+              ) : (
+                "Show History"
+              )}
+            </Button>
+            <Button variant="outline-secondary" onClick={resetFilters}>
+              Reset Filters
+            </Button>
+          </div>
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <Button onClick={fetchHistory} disabled={loading} className="me-2 btn-primary">
-            {loading ? (
-              <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
-                Loading...
-              </>
-            ) : (
-              "Show History"
-            )}
-          </Button>
-          <Button variant="outline-secondary" onClick={resetFilters}>
-            Reset Filters
-          </Button>
+          {historyData.length > 0 && (
+            <Button variant="success" onClick={downloadExcel}>
+              📥 Download Excel
+            </Button>
+          )}
         </div>
-
-        {historyData.length > 0 && (
-          <Button variant="success" onClick={downloadExcel}>
-            📥 Download Excel
-          </Button>
-        )}
-      </div>
       </div>
 
       {loading ? (
@@ -346,7 +375,7 @@ const downloadExcel = () => {
               {historyData.map((item, index) => (
                 <tr key={index}>
                   <td>{index + 1}</td>
-                 <td>{formatDatefordisplay(item.DATE)}</td>
+                  <td>{formatDatefordisplay(item.DATE)}</td>
 
                   <td>{item.SHIFT || "N/A"}</td>
                   <td>{item.LINE || "N/A"}</td>

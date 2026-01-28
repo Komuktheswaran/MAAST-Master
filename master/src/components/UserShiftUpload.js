@@ -51,63 +51,63 @@ const UserShiftUpload = () => {
   }
 
   const handleFileUpload = (event) => {
-  const file = event.target.files[0];
-  if (!file) {
-    setMessage("No file selected.");
-    setSnackbarOpen(true);
-    return;
-  }
-  const reader = new FileReader();
+    const file = event.target.files[0];
+    if (!file) {
+      setMessage("No file selected.");
+      setSnackbarOpen(true);
+      return;
+    }
+    const reader = new FileReader();
 
-  reader.onload = (e) => {
-    const binaryStr = e.target.result;
-    const workbook = XLSX.read(binaryStr, { type: "binary" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    // Use raw: false to get formatted strings, ensuring dates are strings like "dd-mm-yyyy"
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-      header: 1, 
-      raw: false, 
-      dateNF: "dd-mm-yyyy" 
-    });
+    reader.onload = (e) => {
+      const binaryStr = e.target.result;
+      const workbook = XLSX.read(binaryStr, { type: "binary" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      // Use raw: false to get formatted strings, ensuring dates are strings like "dd-mm-yyyy"
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        raw: false,
+        dateNF: "dd-mm-yyyy",
+      });
 
-    // Extract headers (dates start from index 4 assuming fixed format)
-    const headers = jsonData[0];
-    console.log("Headers detected:", headers); // DEBUG LOG
+      // Extract headers (dates start from index 4 assuming fixed format)
+      const headers = jsonData[0];
+      console.log("Headers detected:", headers); // DEBUG LOG
 
-    // Rows without header row
-    const rows = jsonData.slice(1);
+      // Rows without header row
+      const rows = jsonData.slice(1);
 
-    // Transform wide format data to long array of shifts expected by backend
-    const transformedData = [];
+      // Transform wide format data to long array of shifts expected by backend
+      const transformedData = [];
 
-    rows.forEach((row, rowIndex) => {
-      const userid = row[0];
-      const userName = row[1]; // optional
-      const stageName = row[2];
-      const line = row[3];
-      // Dates start from col index 4 in your sample
-      for (let colIdx = 4; colIdx < row.length; colIdx++) {
-        const shiftId = row[colIdx];
-        const dateRaw = headers[colIdx];
-        if (shiftId && shiftId !== "") {
-          // Normalize date format (dd-MM-yyyy to yyyy-MM-dd)
-          let normalizedDate = "";
-              if (typeof dateRaw === "string") {
-                 // Try parsing with likely formats
-                 let dt = DateTime.fromFormat(dateRaw, "d-M-yyyy");
-                 if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "dd-MM-yyyy");
-                 if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "d/M/yyyy");
-                 if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "dd/MM/yyyy");
-                 
-                 if (dt.isValid) {
-                     normalizedDate = dt.toFormat("yyyy-MM-dd");
-                 } else {
-                     console.warn("Invalid date format:", dateRaw);
-                 }
+      rows.forEach((row, rowIndex) => {
+        const userid = row[0];
+        const userName = row[1]; // optional
+        const stageName = row[2];
+        const line = row[3];
+        // Dates start from col index 4 in your sample
+        for (let colIdx = 4; colIdx < row.length; colIdx++) {
+          const shiftId = row[colIdx];
+          const dateRaw = headers[colIdx];
+          if (shiftId && shiftId !== "") {
+            // Normalize date format (dd-MM-yyyy to yyyy-MM-dd)
+            let normalizedDate = "";
+            if (typeof dateRaw === "string") {
+              // Try parsing with likely formats
+              let dt = DateTime.fromFormat(dateRaw, "d-M-yyyy");
+              if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "dd-MM-yyyy");
+              if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "d/M/yyyy");
+              if (!dt.isValid) dt = DateTime.fromFormat(dateRaw, "dd/MM/yyyy");
+
+              if (dt.isValid) {
+                normalizedDate = dt.toFormat("yyyy-MM-dd");
+              } else {
+                console.warn("Invalid date format:", dateRaw);
               }
+            }
 
-          if (normalizedDate) {
+            if (normalizedDate) {
               // Create shift object matching backend expected keys
               transformedData.push({
                 userid: userid,
@@ -117,43 +117,48 @@ const UserShiftUpload = () => {
                 Shift_date_to: normalizedDate,
                 SHIFT_ID: shiftId,
               });
+            }
           }
         }
-      }
-    });
+      });
 
-    console.log("Transformed Data Count:", transformedData.length); // DEBUG LOG
-    console.log("Sample Transformed Data:", transformedData.slice(0, 3)); // DEBUG LOG
+      console.log("Transformed Data Count:", transformedData.length); // DEBUG LOG
+      console.log("Sample Transformed Data:", transformedData.slice(0, 3)); // DEBUG LOG
 
-    // Now set transformed data for use in UI and for sending to backend
-    setData(transformedData);
+      // Now set transformed data for use in UI and for sending to backend
+      setData(transformedData);
 
-    // Columns for display can also be updated as needed, e.g.:
-    setColumns([
-      { Header: "User ID", accessor: "userid" },
-      { Header: "Stage Name", accessor: "STAGE_NAME" },
-      { Header: "Line", accessor: "LINE" },
-      { 
-        Header: "Shift Date From", 
-        accessor: "Shift_date_from",
-        Cell: ({ value }) => value ? DateTime.fromFormat(value, "yyyy-MM-dd").toFormat("dd-MM-yyyy") : ""
-      },
-      { 
-        Header: "Shift Date To", 
-        accessor: "Shift_date_to",
-        Cell: ({ value }) => value ? DateTime.fromFormat(value, "yyyy-MM-dd").toFormat("dd-MM-yyyy") : ""
-      },
-      { Header: "Shift ID", accessor: "SHIFT_ID" },
-    ]);
+      // Columns for display can also be updated as needed, e.g.:
+      setColumns([
+        { Header: "User ID", accessor: "userid" },
+        { Header: "Stage Name", accessor: "STAGE_NAME" },
+        { Header: "Line", accessor: "LINE" },
+        {
+          Header: "Shift Date From",
+          accessor: "Shift_date_from",
+          Cell: ({ value }) =>
+            value
+              ? DateTime.fromFormat(value, "yyyy-MM-dd").toFormat("dd-MM-yyyy")
+              : "",
+        },
+        {
+          Header: "Shift Date To",
+          accessor: "Shift_date_to",
+          Cell: ({ value }) =>
+            value
+              ? DateTime.fromFormat(value, "yyyy-MM-dd").toFormat("dd-MM-yyyy")
+              : "",
+        },
+        { Header: "Shift ID", accessor: "SHIFT_ID" },
+      ]);
 
-    setNotification("File uploaded and data transformed successfully");
-    setShowTable(true);
+      setNotification("File uploaded and data transformed successfully");
+      setShowTable(true);
+    };
+
+    reader.readAsBinaryString(file);
   };
 
-  reader.readAsBinaryString(file);
-};
-
-  
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => {
@@ -196,7 +201,7 @@ const UserShiftUpload = () => {
         const response = await axios.post(
           "https://192.168.2.54/api/saveUserShifts",
           currentBatch,
-          { headers: { "Content-Type": "application/json" } }
+          { headers: { "Content-Type": "application/json" } },
         );
         if (response.data.invalidRows && response.data.invalidRows.length > 0) {
           allInvalidRows = [...allInvalidRows, ...response.data.invalidRows];
@@ -207,8 +212,8 @@ const UserShiftUpload = () => {
         setMessage(
           `Processed ${Math.min(
             i + batchSize,
-            totalRecords
-          )} of ${totalRecords} records...`
+            totalRecords,
+          )} of ${totalRecords} records...`,
         );
         await new Promise((resolve) => setTimeout(resolve, 200));
       } catch (error) {
@@ -226,7 +231,7 @@ const UserShiftUpload = () => {
       XLSX.utils.book_append_sheet(wb, ws, "Failed Rows");
       XLSX.writeFile(wb, "FailedUserShifts.xlsx");
       setMessage(
-        `⚠️ ${allFailedRows.length} rows failed. Downloaded "FailedUserShifts.xlsx" with details.`
+        `⚠️ ${allFailedRows.length} rows failed. Downloaded "FailedUserShifts.xlsx" with details.`,
       );
     } else {
       setMessage("✅ All shifts processed successfully!");
@@ -234,7 +239,6 @@ const UserShiftUpload = () => {
     setLoading(false);
     setTimeout(() => setMessage(""), 5000);
   };
-
 
   // Export conflicts as Excel
   const handleDownloadConflictReport = () => {
@@ -246,7 +250,8 @@ const UserShiftUpload = () => {
 
   const downloadTemplate = () => {
     // Trigger download from backend
-    window.location.href = "https://192.168.2.54/api/download-sample-user-shift";
+    window.location.href =
+      "https://192.168.2.54/api/download-sample-user-shift";
   };
 
   const tableInstance = useTable({ columns, data });
@@ -293,41 +298,43 @@ const UserShiftUpload = () => {
       )}
 
       <div className="glass-card p-4 mb-4">
-
-      {data.length > 0 && (
-        <div className="d-flex justify-content-between mb-3">
-          <Button variant="contained" onClick={() => setShowTable(!showTable)}>
-            {showTable ? (
-              <>
-                <FaEyeSlash className="icon" /> Hide Data
-              </>
-            ) : (
-              <>
-                <FaEye className="icon" /> View Data
-              </>
-            )}
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUserShifts}
-            disabled={loading}
-          >
-            {loading ? (
-              <CircularProgress size={24} />
-            ) : (
-              <>
-                <FaSave className="icon" /> Save
-              </>
-            )}
+        {data.length > 0 && (
+          <div className="d-flex justify-content-between mb-3">
+            <Button
+              variant="contained"
+              onClick={() => setShowTable(!showTable)}
+            >
+              {showTable ? (
+                <>
+                  <FaEyeSlash className="icon" /> Hide Data
+                </>
+              ) : (
+                <>
+                  <FaEye className="icon" /> View Data
+                </>
+              )}
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleUserShifts}
+              disabled={loading}
+            >
+              {loading ? (
+                <CircularProgress size={24} />
+              ) : (
+                <>
+                  <FaSave className="icon" /> Save
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+        <div className="d-flex justify-content-first mb-3">
+          <Button variant="contained" onClick={downloadTemplate}>
+            <FaFileDownload className="icon" /> Download Sample Template
           </Button>
         </div>
-      )}
-      <div className="d-flex justify-content-first mb-3">
-        <Button variant="contained" onClick={downloadTemplate}>
-          <FaFileDownload className="icon" /> Download Sample Template
-        </Button>
-      </div>
       </div>
 
       {/* Conflict/Warning Banner */}
@@ -436,37 +443,34 @@ const UserShiftUpload = () => {
 
       {message && <div className="message">{message}</div>}
       {showTable && data.length > 0 && (
-      <div className="glass-card p-4">
+        <div className="glass-card p-4">
           <table className="glass-table" {...tableInstance.getTableProps()}>
             <thead>
               {tableInstance.headerGroups.map((headerGroup) => (
                 <tr {...headerGroup.getHeaderGroupProps()} key={headerGroup.id}>
                   {headerGroup.headers.map((column) => (
-                    <th
-                      {...column.getHeaderProps()}
-                      key={column.id}
-                    >
-                    {column.render("Header")}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody {...tableInstance.getTableBodyProps()}>
-            {tableInstance.rows.map((row) => {
-              tableInstance.prepareRow(row);
-              return (
-                <tr {...row.getRowProps()} key={row.id}>
-                  {row.cells.map((cell) => (
-                    <td {...cell.getCellProps()} key={cell.column.id}>
-                      {cell.render("Cell")}
-                    </td>
+                    <th {...column.getHeaderProps()} key={column.id}>
+                      {column.render("Header")}
+                    </th>
                   ))}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </thead>
+            <tbody {...tableInstance.getTableBodyProps()}>
+              {tableInstance.rows.map((row) => {
+                tableInstance.prepareRow(row);
+                return (
+                  <tr {...row.getRowProps()} key={row.id}>
+                    {row.cells.map((cell) => (
+                      <td {...cell.getCellProps()} key={cell.column.id}>
+                        {cell.render("Cell")}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </Container>

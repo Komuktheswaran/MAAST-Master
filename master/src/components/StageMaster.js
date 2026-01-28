@@ -38,11 +38,9 @@ const StageMaster = () => {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get(
-        "https://192.168.2.54/api/stage-master"
-      );
+      const response = await axios.get("https://192.168.2.54/api/stage-master");
       const sorted = response.data.sort(
-        (a, b) => a.Stage_Serial - b.Stage_Serial
+        (a, b) => a.Stage_Serial - b.Stage_Serial,
       );
       setStages(sorted);
     } catch (error) {
@@ -53,7 +51,7 @@ const StageMaster = () => {
   const fetchStageTypes = async () => {
     try {
       const response = await axios.get(
-        "https://192.168.2.54/api/stage-master/types"
+        "https://192.168.2.54/api/stage-master/types",
       );
       setStageTypes(response.data);
     } catch (error) {
@@ -80,7 +78,7 @@ const StageMaster = () => {
     try {
       const response = await axios.post(
         "https://192.168.2.54/api/stage-master",
-        newStage
+        newStage,
       );
       setStages([...stages, response.data]);
       setNewStage({ Stage_name: "", Stage_Type: "", Stage_Serial: "" });
@@ -92,7 +90,7 @@ const StageMaster = () => {
       setNotification(
         error.response?.status === 409
           ? "Stage Name already exists"
-          : "Error adding stage"
+          : "Error adding stage",
       );
       setSnackbarOpen(true);
     }
@@ -102,7 +100,7 @@ const StageMaster = () => {
     try {
       await axios.put(
         `https://192.168.2.54/api/stage-master/${editingStage.Stage_id}`,
-        newStage
+        newStage,
       );
       setNewStage({ Stage_name: "", Stage_Type: "", Stage_Serial: "" });
       setEditingStage(null);
@@ -118,9 +116,7 @@ const StageMaster = () => {
 
   const deleteStage = async (Stage_id) => {
     try {
-      await axios.delete(
-        `https://192.168.2.54/api/stage-master/${Stage_id}`
-      );
+      await axios.delete(`https://192.168.2.54/api/stage-master/${Stage_id}`);
       setStages(stages.filter((stage) => stage.Stage_id !== Stage_id));
       fetchData();
       setNotification("Stage deleted successfully");
@@ -161,7 +157,7 @@ const StageMaster = () => {
   const handleDeleteStageType = (type) => {
     if (
       window.confirm(
-        `Are you sure you want to delete the stage type: "${type}"?`
+        `Are you sure you want to delete the stage type: "${type}"?`,
       )
     ) {
       setStageTypes(stageTypes.filter((stageType) => stageType !== type));
@@ -188,126 +184,126 @@ const StageMaster = () => {
       </Typography>
 
       <div className="glass-card p-4 mb-4">
-      <form onSubmit={handleSubmit} className="form-container">
-        <TextField
-          label="S.No"
-          name="Stage_Serial"
-          type="number"
-          value={newStage.Stage_Serial}
-          onChange={handleChange}
-          className="form-input glass-input-mui"
-          InputProps={{ className: "glass-input" }}
-          required
-          fullWidth
-          margin="normal"
-        />
+        <form onSubmit={handleSubmit} className="form-container">
+          <TextField
+            label="S.No"
+            name="Stage_Serial"
+            type="number"
+            value={newStage.Stage_Serial}
+            onChange={handleChange}
+            className="form-input glass-input-mui"
+            InputProps={{ className: "glass-input" }}
+            required
+            fullWidth
+            margin="normal"
+          />
 
-        <TextField
-          label="Stage Name"
-          name="Stage_name"
-          value={newStage.Stage_name}
-          onChange={handleChange}
-          className="form-input glass-input-mui"
-          InputProps={{ className: "glass-input" }}
-          required
-          fullWidth
-          margin="normal"
-        />
+          <TextField
+            label="Stage Name"
+            name="Stage_name"
+            value={newStage.Stage_name}
+            onChange={handleChange}
+            className="form-input glass-input-mui"
+            InputProps={{ className: "glass-input" }}
+            required
+            fullWidth
+            margin="normal"
+          />
 
-        <Select
-          name="Stage_Type"
-          value={newStage.Stage_Type}
-          onChange={handleChange}
-          className="form-select glass-input my-3"
-          fullWidth
-          required
-        >
-          {stageTypes.map((type, index) => (
-            <MenuItem key={index} value={type}>
-              {type}
-              {type !== newStage.Stage_Type && (
-                <Button
-                  onClick={() => handleDeleteStageType(type)}
-                  color="secondary"
-                  size="small"
-                  style={{ marginLeft: "10px" }}
-                >
-                  <MdDelete />
-                </Button>
-              )}
-            </MenuItem>
-          ))}
-        </Select>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            marginTop: "10px",
-          }}
-        >
-          <div
-            className="button-group"
-            style={{ display: "flex", gap: "10px" }}
+          <Select
+            name="Stage_Type"
+            value={newStage.Stage_Type}
+            onChange={handleChange}
+            className="form-select glass-input my-3"
+            fullWidth
+            required
           >
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              className="form-button"
-            >
-              {editingStage ? "Update Stage" : "Add Stage"}
-            </Button>
-            {editingStage && (
-              <Button
-                variant="outlined"
-                onClick={cancelEdit}
-                className="form-button"
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="contained"
-            color="primary"
-            onClick={() => setShowAddStageType(!showAddStageType)}
-          >
-            {showAddStageType ? "Cancel" : "Add New Stage Type"}
-          </Button>
-        </div>
+            {stageTypes.map((type, index) => (
+              <MenuItem key={index} value={type}>
+                {type}
+                {type !== newStage.Stage_Type && (
+                  <Button
+                    onClick={() => handleDeleteStageType(type)}
+                    color="secondary"
+                    size="small"
+                    style={{ marginLeft: "10px" }}
+                  >
+                    <MdDelete />
+                  </Button>
+                )}
+              </MenuItem>
+            ))}
+          </Select>
 
-        {showAddStageType && (
           <div
             style={{
-              marginTop: "10px",
               display: "flex",
-              gap: "10px",
               alignItems: "center",
+              gap: "10px",
+              marginTop: "10px",
             }}
           >
-            <TextField
-              label="Enter New Stage Type"
-              value={newStageType}
-              onChange={(e) => setNewStageType(e.target.value)}
-              fullWidth
-              margin="normal"
-              className="glass-input-mui"
-              InputProps={{ className: "glass-input" }}
-            />
+            <div
+              className="button-group"
+              style={{ display: "flex", gap: "10px" }}
+            >
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                className="form-button"
+              >
+                {editingStage ? "Update Stage" : "Add Stage"}
+              </Button>
+              {editingStage && (
+                <Button
+                  variant="outlined"
+                  onClick={cancelEdit}
+                  className="form-button"
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
             <Button
+              type="button"
               variant="contained"
               color="primary"
-              className="form-button"
-              onClick={handleAddStageType}
+              onClick={() => setShowAddStageType(!showAddStageType)}
             >
-              Add
+              {showAddStageType ? "Cancel" : "Add New Stage Type"}
             </Button>
           </div>
-        )}
-      </form>
+
+          {showAddStageType && (
+            <div
+              style={{
+                marginTop: "10px",
+                display: "flex",
+                gap: "10px",
+                alignItems: "center",
+              }}
+            >
+              <TextField
+                label="Enter New Stage Type"
+                value={newStageType}
+                onChange={(e) => setNewStageType(e.target.value)}
+                fullWidth
+                margin="normal"
+                className="glass-input-mui"
+                InputProps={{ className: "glass-input" }}
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                className="form-button"
+                onClick={handleAddStageType}
+              >
+                Add
+              </Button>
+            </div>
+          )}
+        </form>
       </div>
 
       <Table

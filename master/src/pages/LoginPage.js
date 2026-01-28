@@ -1,61 +1,61 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button, Form, Container, Card, Alert } from 'react-bootstrap';
-import axios from 'axios';
-import { styled } from '@mui/system';
-import { Typography } from '@mui/material';
-import 'font-awesome/css/font-awesome.min.css';
-import '@fortawesome/fontawesome-free/css/all.min.css';
-import '../styles/LoginPage.css';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button, Form, Container, Card, Alert } from "react-bootstrap";
+import axios from "axios";
+import { styled } from "@mui/system";
+import { Typography } from "@mui/material";
+import "font-awesome/css/font-awesome.min.css";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import "../styles/LoginPage.css";
 
 const StyledCard = styled(Card)({
-  background: '#1A2226',
-  borderRadius: '15px',
-  border: 'none',
-  boxShadow: '0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23)',
+  background: "#1A2226",
+  borderRadius: "15px",
+  border: "none",
+  boxShadow: "0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23)",
 });
 
 const InputField = styled(Form.Control)({
-  backgroundColor: '#ECF0F5',
-  border: 'none',
-  borderBottom: '2px solid #6C6C6C',
-  borderRadius: '0px',
-  fontWeight: 'bold',
+  backgroundColor: "#ECF0F5",
+  border: "none",
+  borderBottom: "2px solid #6C6C6C",
+  borderRadius: "0px",
+  fontWeight: "bold",
   outline: 0,
-  marginBottom: '20px',
-  color: '#333',
-  '&::placeholder': {
-    color: '#888',
+  marginBottom: "20px",
+  color: "#333",
+  "&::placeholder": {
+    color: "#888",
   },
 });
 
-const LoginButton = styled(Button)(({
-  backgroundColor: 'transparent',
-  borderColor: '#0DB8DE',
-  color: '#0DB8DE',
-  borderRadius: '0px',
-  fontWeight: 'bold',
-  letterSpacing: '1px',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)',
-  '&:hover': {
-    backgroundColor: '#0DB8DE',
+const LoginButton = styled(Button)({
+  backgroundColor: "transparent",
+  borderColor: "#0DB8DE",
+  color: "#0DB8DE",
+  borderRadius: "0px",
+  fontWeight: "bold",
+  letterSpacing: "1px",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)",
+  "&:hover": {
+    backgroundColor: "#0DB8DE",
   },
-}));
+});
 
 const LoginPage = () => {
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
+  const [userId, setUserId] = useState("");
+  const [password, setPassword] = useState("");
   const [isValid, setIsValid] = useState({ userId: null, password: null });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [alertMessage, setAlertMessage] = useState('');
+  const [alertMessage, setAlertMessage] = useState("");
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [loginerror, setLoginError] = useState(false);
-  
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState('');
+
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
   const [passwordTimeout, setPasswordTimeout] = useState(null); // State for timeout
   const navigate = useNavigate();
 
@@ -70,23 +70,23 @@ const LoginPage = () => {
     const passwordValid = value.length >= 8 && /\d/.test(value);
     setIsValid((prevState) => ({ ...prevState, password: passwordValid }));
     setPassword(value);
-    setError('')
+    setError("");
 
     if (!passwordValid) {
-      setAlertMessage('Password is required !...');
-      
+      setAlertMessage("Password is required !...");
+
       // Clear previous timeout if any
       if (passwordTimeout) clearTimeout(passwordTimeout);
-      
+
       // Set timeout to clear the alert message
       const timer = setTimeout(() => {
-        setAlertMessage('');
+        setAlertMessage("");
       }, 2000);
-      
+
       // Store the timer ID so it can be cleared later
       setPasswordTimeout(timer);
     } else {
-      setAlertMessage('');
+      setAlertMessage("");
     }
   };
 
@@ -94,59 +94,51 @@ const LoginPage = () => {
     e.preventDefault();
     if (isValid.userId && isValid.password) {
       setLoading(true);
-      setError(''); 
+      setError("");
       try {
+        const response = await axios.post("https://192.168.2.54/api/login", {
+          userId,
+          password,
+        });
 
-        const response = await axios.post(
-          "https://192.168.2.54/api/login",
-          {
-            userId,
-            password,
+        if (response.data.success) {
+          const user = response.data.user;
+
+          // store user data in session
+          sessionStorage.setItem("authToken", response.data.token);
+          localStorage.setItem("Token", response.data.token);
+          // Store as string directly (no quotes)
+          sessionStorage.setItem("AdminFlag", user.Adminflag);
+          sessionStorage.setItem("Line", user.LINE);
+          console.log("User data stored in sessionStorage:", {
+            authToken: response.data.token,
+            AdminFlag: user.Adminflag,
+            Line: user.LINE,
+          });
+
+          // Check role
+          if (user.Adminflag === "1") {
+            navigate("/home"); // route for admin
+          } else {
+            navigate("/user-shift-upload"); // route for employee
           }
-        );
-
-        if (response.data.success)
-          {
-            const user = response.data.user;
-
-        // store user data in session
-        sessionStorage.setItem('authToken', response.data.token);
-        localStorage.setItem("Token",response.data.token);
-       // Store as string directly (no quotes)
-sessionStorage.setItem("AdminFlag", user.Adminflag);
-sessionStorage.setItem("Line", user.LINE);
-console.log('User data stored in sessionStorage:', {
-  authToken: response.data.token,
-  AdminFlag: user.Adminflag,
-  Line: user.LINE,
-});
-
-
-
-        // Check role
-        if (user.Adminflag === '1') {
-          navigate("/home"); // route for admin
         } else {
-          navigate("/user-shift-upload"); // route for employee
-        }
-      } 
-            else {
-          setError(response.data.message || 'Invalid credentials.');
+          setError(response.data.message || "Invalid credentials.");
         }
       } catch (error) {
-         setError('Invalid credentials.');
+        setError("Invalid credentials.");
       } finally {
         setLoading(false);
       }
     } else {
-      setError('Please provide valid userId and password.');
+      setError("Please provide valid userId and password.");
     }
   };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setMessage('New passwords do not match.');
+      setMessage("New passwords do not match.");
       return;
     }
     console.log(userId, oldPassword, newPassword);
@@ -157,46 +149,54 @@ console.log('User data stored in sessionStorage:', {
           userId,
           oldPassword,
           newPassword,
-        }
+        },
       );
 
       const data = response.data;
 
       if (data.success) {
-        setMessage('Password changed successfully!');
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
+        setMessage("Password changed successfully!");
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
         setTimeout(() => {
-          navigate('/home');
+          navigate("/home");
         }, 1000);
       } else {
-        
         setError(data.message);
       }
     } catch (error) {
-      setMessage('An error occurred.');
-      console.error('Error:', error);
+      setMessage("An error occurred.");
+      console.error("Error:", error);
     }
   };
 
   return (
-    <Container className="d-flex align-items-center justify-content-center"
-      style={{ minHeight: '100vh', maxWidth: '100%', background: '#222D32' }}>
-      <StyledCard class='p-4 login-box'>
-        <div class='col-lg-12 login-key'>
+    <Container
+      className="d-flex align-items-center justify-content-center"
+      style={{ minHeight: "100vh", maxWidth: "100%", background: "#222D32" }}
+    >
+      <StyledCard class="p-4 login-box">
+        <div class="col-lg-12 login-key">
           <i class="fa fa-key" aria-hidden="true"></i>
         </div>
-        <Typography variant="h4" align="center" gutterBottom style={{ color: '#ECF0F5' }}>
-          {showChangePassword ? 'CHANGE PASSWORD' : 'LOGIN'}
+        <Typography
+          variant="h4"
+          align="center"
+          gutterBottom
+          style={{ color: "#ECF0F5" }}
+        >
+          {showChangePassword ? "CHANGE PASSWORD" : "LOGIN"}
           {}
         </Typography>
-        <div class='col-lg-12 login-form'>
-
+        <div class="col-lg-12 login-form">
           {!showChangePassword ? (
             <Form noValidate onSubmit={handleLogin} class="mb-3">
               <Form.Group controlId="formUserId">
-                <Form.Label class='form-control-label' style={{ color: '#6C6C6C' }}>
+                <Form.Label
+                  class="form-control-label"
+                  style={{ color: "#6C6C6C" }}
+                >
                   User ID
                 </Form.Label>
                 <InputField
@@ -206,16 +206,26 @@ console.log('User data stored in sessionStorage:', {
                   value={userId}
                   onChange={(e) => validateUserId(e.target.value)}
                   style={{
-                    borderColor: isValid.userId === null ? 'gray' : isValid.userId ? 'green' : 'red',
+                    borderColor:
+                      isValid.userId === null
+                        ? "gray"
+                        : isValid.userId
+                          ? "green"
+                          : "red",
                   }}
                 />
                 {isValid.userId === false && (
-                  <p class='error' style={{ color: 'red' }}>User ID is required !..</p>
+                  <p class="error" style={{ color: "red" }}>
+                    User ID is required !..
+                  </p>
                 )}
               </Form.Group>
 
               <Form.Group controlId="formPassword">
-                <Form.Label class='form-control-label' style={{ color: '#6C6C6C' }}>
+                <Form.Label
+                  class="form-control-label"
+                  style={{ color: "#6C6C6C" }}
+                >
                   Password
                 </Form.Label>
                 <InputField
@@ -225,24 +235,33 @@ console.log('User data stored in sessionStorage:', {
                   value={password}
                   onChange={(e) => validatePassword(e.target.value)}
                   style={{
-                    borderColor: isValid.password === null ? 'gray' : isValid.password ? 'green' : 'red',
+                    borderColor:
+                      isValid.password === null
+                        ? "gray"
+                        : isValid.password
+                          ? "green"
+                          : "red",
                   }}
                 />
               </Form.Group>
-              {alertMessage && <p class='alert' style={{ color: 'red' }}>{alertMessage}</p>}
+              {alertMessage && (
+                <p class="alert" style={{ color: "red" }}>
+                  {alertMessage}
+                </p>
+              )}
               {error && (
-                <Alert variant="danger" className="text-center mb-3" style={{background:'#f8d7da', color:'#58151c'}}>
+                <Alert
+                  variant="danger"
+                  className="text-center mb-3"
+                  style={{ background: "#f8d7da", color: "#58151c" }}
+                >
                   {error}
                 </Alert>
               )}
-              <div class='loginbttm' >
-                <div class='login-button' type="submit">
-                  <LoginButton
-                    class='w-100'
-                    type="submit"
-                    disabled={loading}
-                  >
-                    {loading ? 'Logging In...' : 'Login'}
+              <div class="loginbttm">
+                <div class="login-button" type="submit">
+                  <LoginButton class="w-100" type="submit" disabled={loading}>
+                    {loading ? "Logging In..." : "Login"}
                   </LoginButton>
                 </div>
               </div>
@@ -250,7 +269,10 @@ console.log('User data stored in sessionStorage:', {
           ) : (
             <Form noValidate onSubmit={handleChangePassword}>
               <Form.Group controlId="formOldPassword">
-                <Form.Label class='form-control-label' style={{ color: '#6C6C6C' }}>
+                <Form.Label
+                  class="form-control-label"
+                  style={{ color: "#6C6C6C" }}
+                >
                   Old Password
                 </Form.Label>
                 <InputField
@@ -263,7 +285,10 @@ console.log('User data stored in sessionStorage:', {
               </Form.Group>
 
               <Form.Group controlId="formNewPassword">
-                <Form.Label class='form-control-label' style={{ color: '#6C6C6C' }}>
+                <Form.Label
+                  class="form-control-label"
+                  style={{ color: "#6C6C6C" }}
+                >
                   New Password
                 </Form.Label>
                 <InputField
@@ -276,7 +301,10 @@ console.log('User data stored in sessionStorage:', {
               </Form.Group>
 
               <Form.Group controlId="formConfirmPassword">
-                <Form.Label class='form-control-label' style={{ color: '#6C6C6C' }}>
+                <Form.Label
+                  class="form-control-label"
+                  style={{ color: "#6C6C6C" }}
+                >
                   Confirm Password
                 </Form.Label>
                 <InputField
@@ -288,12 +316,16 @@ console.log('User data stored in sessionStorage:', {
                 />
               </Form.Group>
               {message && (
-                <Alert variant="info" className="text-center mb-3" style={{background:'#f8d7da', color:'#58151c'}}>
+                <Alert
+                  variant="info"
+                  className="text-center mb-3"
+                  style={{ background: "#f8d7da", color: "#58151c" }}
+                >
                   {message}
                 </Alert>
               )}
-              <div class='loginbttm'>
-                <div class='login-button'>
+              <div class="loginbttm">
+                <div class="login-button">
                   <LoginButton class="w-100" type="submit">
                     Change Password
                   </LoginButton>

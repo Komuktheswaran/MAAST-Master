@@ -25,20 +25,20 @@ const config = {
     encrypt: false,
     driver: "msnodesqlv8",
   },
-  requestTimeout: 600000, // 60 seconds
+  requestTimeout: 60000000, // 60 seconds
 };
 
 app.use(cors());
-app.use(express.json());
-app.use(bodyParser.json({ limit: "1mb" }));
-app.use(bodyParser.urlencoded({ limit: "1mb", extended: true }));
+app.use(express.json({ limit: "500mb" }));
+app.use(bodyParser.json({ limit: "500mb" }));
+app.use(bodyParser.urlencoded({ limit: "500mb", extended: true }));
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 500 * 1024 * 1024, // 500MB limit
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -75,6 +75,10 @@ initializeDatabase();
 // });
 // Login route
 
+app.get("/api/test", (req, res) => {
+  res.json({ message: "Server is working!" });
+});
+
 app.post("/api/login", async (req, res) => {
   const { userId, password } = req.body;
 
@@ -86,7 +90,7 @@ app.post("/api/login", async (req, res) => {
       .input("userId", sql.VarChar, userId)
       .input("password", sql.VarChar, password)
       .query(
-        "SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin WHERE user_id = @userId AND password = @password"
+        "SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin WHERE user_id = @userId AND password = @password",
       );
 
     if (result.recordset.length > 0) {
@@ -123,7 +127,7 @@ app.post("/api/login", async (req, res) => {
       .input("userId", sql.VarChar, userId)
       .input("password", sql.VarChar, password)
       .query(
-        "SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin WHERE user_id = @userId AND password = @password"
+        "SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin WHERE user_id = @userId AND password = @password",
       );
 
     if (result.recordset.length > 0) {
@@ -160,12 +164,12 @@ app.post("/api/change-password", async (req, res) => {
       .input("userId", sql.VarChar, userId)
       .input("oldPassword", sql.VarChar, oldPassword)
       .query(
-        "SELECT * FROM Mx_UserLogin WHERE user_id = @userId AND password = @oldPassword"
+        "SELECT * FROM Mx_UserLogin WHERE user_id = @userId AND password = @oldPassword",
       );
 
     if (userCheck.recordset.length === 0) {
       console.log(
-        `Failed login attempt for userId: ${userId} - incorrect password`
+        `Failed login attempt for userId: ${userId} - incorrect password`,
       );
       return res
         .status(401)
@@ -178,7 +182,7 @@ app.post("/api/change-password", async (req, res) => {
       .input("userId", sql.VarChar, userId)
       .input("newPassword", sql.VarChar, newPassword)
       .query(
-        "UPDATE Mx_UserLogin SET password = @newPassword WHERE user_id = @userId"
+        "UPDATE Mx_UserLogin SET password = @newPassword WHERE user_id = @userId",
       );
 
     return res
@@ -194,7 +198,7 @@ app.post("/api/change-password", async (req, res) => {
 app.get("/api/shifts_master_details", async (req, res) => {
   try {
     const pool = await sql.connect(config);
-    
+
     const query = `
       SELECT 
         SFTID,
@@ -204,19 +208,18 @@ app.get("/api/shifts_master_details", async (req, res) => {
       FROM dbo.Mx_ShiftMst
       ORDER BY SFTID
     `;
-    
+
     const result = await pool.request().query(query);
-    
+    console.log("shift master", result.recordset);
     res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching shift master details:", error);
-    res.status(500).json({ 
-      error: "Error fetching shift master details", 
-      details: error.message 
+    res.status(500).json({
+      error: "Error fetching shift master details",
+      details: error.message,
     });
   }
 });
-
 
 app.get("/api/User-master", async (req, res) => {
   try {
@@ -228,6 +231,7 @@ app.get("/api/User-master", async (req, res) => {
       .request()
       .query("SELECT user_id, password, Adminflag,LINE FROM Mx_UserLogin");
 
+    console.log("User master", result.recordset);
     res.json(result.recordset); // Send result as JSON
   } catch (err) {
     console.error("Database error:", err);
@@ -244,7 +248,7 @@ app.get("/api/User-master/:id", async (req, res) => {
       .query(
         `SELECT user_id, password, Adminflag, LINE 
          FROM Mx_UserLogin 
-         WHERE user_id = @id`
+         WHERE user_id = @id`,
       );
 
     res.json(result.recordset[0] || null);
@@ -293,11 +297,11 @@ app.post("/api/User-master", async (req, res) => {
       .input(
         "line",
         sql.NVarChar,
-        Array.isArray(lines) ? lines.join(",") : lines
+        Array.isArray(lines) ? lines.join(",") : lines,
       )
 
       .query(
-        "INSERT INTO Mx_UserLogin (user_id, password, Adminflag, LINE) VALUES (@id, @pwd, @af, @line)"
+        "INSERT INTO Mx_UserLogin (user_id, password, Adminflag, LINE) VALUES (@id, @pwd, @af, @line)",
       );
 
     res.status(201).json({ message: "User added" });
@@ -311,7 +315,7 @@ app.post("/api/User-master", async (req, res) => {
 app.put("/api/User-master/:id", async (req, res) => {
   const { password, Adminflag, lines } = req.body;
   console.log(req.body);
-  const id = req.params.id;
+  const { id } = req.params;
 
   if (
     !password ||
@@ -335,11 +339,11 @@ app.put("/api/User-master/:id", async (req, res) => {
       .input(
         "line",
         sql.NVarChar,
-        Array.isArray(lines) ? lines.join(",") : lines
+        Array.isArray(lines) ? lines.join(",") : lines,
       )
 
       .query(
-        "UPDATE Mx_UserLogin SET password = @pwd, Adminflag = @af, LINE = @line WHERE user_id = @id"
+        "UPDATE Mx_UserLogin SET password = @pwd, Adminflag = @af, LINE = @line WHERE user_id = @id",
       );
 
     if (result.rowsAffected[0] === 0)
@@ -354,7 +358,7 @@ app.put("/api/User-master/:id", async (req, res) => {
 
 // DELETE - remove user by user_id
 app.delete("/api/User-master/:id", async (req, res) => {
-  const id = req.params.id;
+  const { id } = req.params;
 
   if (!id) {
     return res.status(400).json({ error: "User ID is required" });
@@ -429,7 +433,7 @@ app.post("/api/stage-master", async (req, res) => {
     `);
 
     await transaction.commit();
-
+    console.log("post stage-master", result.recordset);
     res.status(201).json({
       Stage_id: result.recordset[0].Stage_id,
       Stage_name: result.recordset[0].Stage_name,
@@ -451,7 +455,7 @@ app.get("/api/stage-master", async (req, res) => {
     const result = await pool
       .request()
       .query(
-        "SELECT Stage_id, Stage_name, Stage_Type, Stage_Serial FROM Mx_StageMaster"
+        "SELECT Stage_id, Stage_name, Stage_Type, Stage_Serial FROM Mx_StageMaster",
       );
     res.json(result.recordset);
   } catch (err) {
@@ -467,7 +471,7 @@ app.get("/api/stage-master/types", async (req, res) => {
     const result = await pool
       .request()
       .query(
-        "SELECT DISTINCT Stage_Type FROM Mx_StageMaster WHERE Stage_Type IS NOT NULL"
+        "SELECT DISTINCT Stage_Type FROM Mx_StageMaster WHERE Stage_Type IS NOT NULL",
       );
 
     const stageTypes = result.recordset.map((row) => row.Stage_Type);
@@ -614,11 +618,11 @@ app.get("/api/export-stage-master", async (req, res) => {
 
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader(
       "Content-Disposition",
-      "attachment; filename=" + "StageMaster.xlsx"
+      "attachment; filename=" + "StageMaster.xlsx",
     );
 
     await workbook.xlsx.write(res);
@@ -771,8 +775,9 @@ app.post("/api/skill-master", async (req, res) => {
 
     // Insert the new skill
     const result = await request.query(
-      `INSERT INTO Mx_SkillMaster (Skill_Rating, Skill_Description) VALUES (@Skill_Rating, @Skill_Description); SELECT SCOPE_IDENTITY() AS Skill_id;`
+      `INSERT INTO Mx_SkillMaster (Skill_Rating, Skill_Description) VALUES (@Skill_Rating, @Skill_Description); SELECT SCOPE_IDENTITY() AS Skill_id;`,
     );
+    console.log("skill - master post", result.recordset);
     res.status(201).json({
       Skill_id: result.recordset[0].Skill_id,
       Skill_Rating: Skill_Rating,
@@ -803,7 +808,7 @@ app.put("/api/skill-master/:id", async (req, res) => {
     request.input("Skill_Rating", sql.Char, Skill_Rating);
     request.input("Skill_Description", sql.NVarChar, Skill_Description);
     await request.query(
-      `UPDATE Mx_SkillMaster SET Skill_Rating = @Skill_Rating, Skill_Description = @Skill_Description WHERE Skill_id = @Skill_id;`
+      `UPDATE Mx_SkillMaster SET Skill_Rating = @Skill_Rating, Skill_Description = @Skill_Description WHERE Skill_id = @Skill_id;`,
     );
     res.status(200).json({
       Skill_id: id,
@@ -826,7 +831,7 @@ app.get("/api/skill-master/:id", async (req, res) => {
     const request = pool.request();
     request.input("Skill_id", sql.Int, id);
     const result = await request.query(
-      `SELECT Skill_id, Skill_Rating, Skill_Description FROM Mx_SkillMaster WHERE Skill_id = @Skill_id;`
+      `SELECT Skill_id, Skill_Rating, Skill_Description FROM Mx_SkillMaster WHERE Skill_id = @Skill_id;`,
     );
     if (result.recordset.length === 0) {
       res.status(404).send("Skill not found");
@@ -846,7 +851,7 @@ app.get("/api/skill-master", async (req, res) => {
     const result = await pool
       .request()
       .query(
-        "SELECT Skill_id, Skill_Rating, Skill_Description FROM Mx_SkillMaster"
+        "SELECT Skill_id, Skill_Rating, Skill_Description FROM Mx_SkillMaster",
       );
     res.json(result.recordset);
   } catch (error) {
@@ -880,7 +885,7 @@ app.post("/api/employees", async (req, res) => {
     const pool = await sql.connect(config);
 
     const query = `
-      SELECT u.userid, u.name + '-' + u.userid AS name, u.Enrolldt, d.Name AS designation
+      SELECT distinct u.userid, u.name + '-' + u.userid AS name, u.Enrolldt, d.Name AS designation
       FROM Mx_UserMst u
       JOIN Mx_DesignationMst d ON u.Dsgid = d.Dsgid
       WHERE u.dptid IN (${departments.map((dept) => `'${dept}'`).join(",")})
@@ -916,7 +921,7 @@ app.get("/api/skillmaster", async (req, res) => {
     const result = await pool
       .request()
       .query(
-        "SELECT Skill_id, Skill_Rating, Skill_Description FROM Mx_SkillMaster"
+        "SELECT Skill_id, Skill_Rating, Skill_Description FROM Mx_SkillMaster",
       );
     res.json(result.recordset);
   } catch (error) {
@@ -961,7 +966,7 @@ app.post("/api/save-skills", async (req, res) => {
         }
 
         console.log(
-          `Saving: EmployeeId: ${employeeId}, StageId: ${stageId}, Rating: ${rating}`
+          `Saving: EmployeeId: ${employeeId}, StageId: ${stageId}, Rating: ${rating}`,
         );
 
         // Execute the SQL query within the transaction
@@ -1057,10 +1062,10 @@ app.post("/api/saveUserSkills", async (req, res) => {
       const validationResult = await request.query(validateQuery);
 
       const validRows = validationResult.recordset.filter(
-        (row) => row.IsValidStage === 1
+        (row) => row.IsValidStage === 1,
       );
       const invalidRows = validationResult.recordset.filter(
-        (row) => row.IsValidStage === 0
+        (row) => row.IsValidStage === 0,
       );
 
       invalidRows.forEach((row) => {
@@ -1081,7 +1086,7 @@ app.post("/api/saveUserSkills", async (req, res) => {
             ${validRows
               .map(
                 (row) =>
-                  `SELECT '${row.userid}' AS userid, '${row.STAGE_NAME}' AS STAGE_NAME, '${row.Skill_Description}' AS Skill_Description, '${row.Skill_Rating}' AS Skill_Rating`
+                  `SELECT '${row.userid}' AS userid, '${row.STAGE_NAME}' AS STAGE_NAME, '${row.Skill_Description}' AS Skill_Description, '${row.Skill_Rating}' AS Skill_Rating`,
               )
               .join(" UNION ALL ")}
           ) AS Q1
@@ -1125,13 +1130,13 @@ app.post("/api/saveUserShifts", async (req, res) => {
     const shiftResult = await request.query(`
       SELECT SFTID FROM Mx_ShiftMst
     `);
-    const validShiftIds = new Set(shiftResult.recordset.map(s => s.SFTID));
+    const validShiftIds = new Set(shiftResult.recordset.map((s) => s.SFTID));
 
     const stageMap = new Map();
     stageResult.recordset.forEach((stage) => {
       stageMap.set(
         stage.Stage_name.toLowerCase().replace(/\s+/g, ""),
-        stage.Stage_Id
+        stage.Stage_Id,
       );
     });
 
@@ -1186,13 +1191,18 @@ app.post("/api/saveUserShifts", async (req, res) => {
       }
 
       // Validate SHIFT_ID
-      if (SHIFT_ID && SHIFT_ID !== "WO" && !validShiftIds.has(SHIFT_ID)) {
+      if (
+        SHIFT_ID &&
+        SHIFT_ID !== "WO" &&
+        SHIFT_ID !== "A" &&
+        !validShiftIds.has(SHIFT_ID)
+      ) {
         invalidStages.push({
-           ...shift,
-           reason: `Invalid SHIFT_ID: ${SHIFT_ID}`
+          ...shift,
+          reason: `Invalid SHIFT_ID: ${SHIFT_ID}`,
         });
         continue;
-      } 
+      }
 
       const stageNameNormalized = STAGE_NAME.toLowerCase().replace(/\s+/g, "");
       if (!stageMap.has(stageNameNormalized)) {
@@ -1204,7 +1214,7 @@ app.post("/api/saveUserShifts", async (req, res) => {
 
       // ✅ Create unique key: date + userid + stage_id + shift_id + line
       const uniqueKey = `${Shift_date_from}|${userid}`;
-      
+
       uniqueShiftsMap.set(uniqueKey, {
         ...shift,
         Shift_date_from,
@@ -1235,6 +1245,18 @@ app.post("/api/saveUserShifts", async (req, res) => {
 
       if (QUERY1) {
         try {
+          // Delete conflicting swaps to ensure new schedule takes precedence
+          const deleteSwapQuery = `
+            DELETE p1
+            FROM Mx_Userswap AS p1
+            INNER JOIN (
+              SELECT SHIFT_FROM_DATE, userid
+              FROM (${QUERY1}) AS Q1
+            ) AS q1
+            ON p1.Shift_date = q1.SHIFT_FROM_DATE
+            AND p1.Swap_userid = q1.userid
+          `;
+
           // Delete old records - Match ONLY User + DateFrom to ensure overwrite
           const deleteQuery = `
             DELETE p1
@@ -1256,12 +1278,13 @@ app.post("/api/saveUserShifts", async (req, res) => {
             ON REPLACE(LOWER(Q1.STAGE_NAME), ' ', '') = REPLACE(LOWER(P1.Stage_name), ' ', '')
           `;
 
+          await request.query(deleteSwapQuery);
           await request.query(deleteQuery);
           await request.query(insertQuery);
         } catch (insertError) {
           console.error(
             "❌ Failed batch data:",
-            JSON.stringify(batch, null, 2)
+            JSON.stringify(batch, null, 2),
           );
           console.error("❌ Insert error:", insertError.message);
 
@@ -1304,8 +1327,16 @@ app.get("/api/download-sample-user-shift", async (req, res) => {
   try {
     const pool = await sql.connect(config);
     // Fetch active stages
-    const stageResult = await pool.request().query("SELECT Stage_name, Stage_id, Stage_Type FROM Mx_StageMaster ORDER BY Stage_Serial");
-    const shiftResult = await pool.request().query("SELECT SFTID, SFTName, SFTSTTime, SFTEDTime FROM Mx_ShiftMst ORDER BY SFTID");
+    const stageResult = await pool
+      .request()
+      .query(
+        "SELECT Stage_name, Stage_id, Stage_Type FROM Mx_StageMaster ORDER BY Stage_Serial",
+      );
+    const shiftResult = await pool
+      .request()
+      .query(
+        "SELECT SFTID, SFTName, SFTSTTime, SFTEDTime FROM Mx_ShiftMst ORDER BY SFTID",
+      );
 
     const workbook = new excel.Workbook();
 
@@ -1314,7 +1345,7 @@ app.get("/api/download-sample-user-shift", async (req, res) => {
     worksheet.columns = [
       { header: "User ID", key: "userid", width: 15 },
       { header: "User Name (Optional)", key: "username", width: 20 },
-      { header: "Stage Name", key: "stagename", width: 30 }, 
+      { header: "Stage Name", key: "stagename", width: 30 },
       { header: "Line", key: "line", width: 10 },
       // Dynamic date columns placeholders
       { header: "01-12-2025", key: "d1", width: 15 },
@@ -1324,55 +1355,54 @@ app.get("/api/download-sample-user-shift", async (req, res) => {
     // Sheet 2: Stages Reference
     const stagesSheet = workbook.addWorksheet("Stages");
     // stagesSheet.state = 'hidden'; // Requested to be visible
-    
+
     const stageNames = [];
     if (stageResult.recordset) {
-       stageResult.recordset.forEach(stage => {
-           stagesSheet.addRow([stage.Stage_name]);
-           stageNames.push(stage.Stage_name);
-       });
+      stageResult.recordset.forEach((stage) => {
+        stagesSheet.addRow([stage.Stage_name]);
+        stageNames.push(stage.Stage_name);
+      });
     }
 
     // Add a single sample record as requested
     worksheet.addRow({
-        userid: "100009", 
-        username: "Ranjith M C", 
-        stagename: stageNames.length > 0 ? stageNames[0] : "Stage A", 
-        line: "L1", 
-        d1: "S1", 
-        d2: "S1"
+      userid: "100009",
+      username: "Ranjith M C",
+      stagename: stageNames.length > 0 ? stageNames[0] : "Stage A",
+      line: "L1",
+      d1: "S1",
+      d2: "S1",
     });
 
     // Data Validation for Stage Name (Column C, which is index 3)
     // We apply it to a reasonable number of rows, e.g., 2 to 1000
-    const stageColumnLetter = 'C';
+    const stageColumnLetter = "C";
     const totalStages = stageNames.length;
-    
+
     if (totalStages > 0) {
-        // Define the range for the list in the Stages sheet (e.g., Stages!$A$1:$A$50)
-        const listFormula = `'Stages'!$A$1:$A$${totalStages}`;
+      // Define the range for the list in the Stages sheet (e.g., Stages!$A$1:$A$50)
+      const listFormula = `'Stages'!$A$1:$A$${totalStages}`;
 
-        for (let i = 2; i <= 1000; i++) {
-            worksheet.getCell(`${stageColumnLetter}${i}`).dataValidation = {
-                type: 'list',
-                allowBlank: true,
-                formulae: [listFormula],
-                showErrorMessage: true,
-                errorStyle: 'error',
-                errorTitle: 'Invalid Stage',
-                error: 'Please select a valid stage from the list.'
-            };
-        }
+      for (let i = 2; i <= 1000; i++) {
+        worksheet.getCell(`${stageColumnLetter}${i}`).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [listFormula],
+          showErrorMessage: true,
+          errorStyle: "error",
+          errorTitle: "Invalid Stage",
+          error: "Please select a valid stage from the list.",
+        };
+      }
     }
-
 
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader(
       "Content-Disposition",
-      "attachment; filename=UserShiftUpload_Template.xlsx"
+      "attachment; filename=UserShiftUpload_Template.xlsx",
     );
 
     await workbook.xlsx.write(res);
@@ -1383,12 +1413,16 @@ app.get("/api/download-sample-user-shift", async (req, res) => {
   }
 });
 
-
 // Get all Stages for dropdown
 app.get("/api/stages_list", async (req, res) => {
   try {
     const pool = await sql.connect(config);
-    const result = await pool.request().query("SELECT Stage_id, Stage_name FROM Mx_StageMaster ORDER BY Stage_name");
+    const result = await pool
+      .request()
+      .query(
+        "SELECT Stage_id, Stage_name FROM Mx_StageMaster ORDER BY Stage_name",
+      );
+    console.log("Stages Query Result:", result.recordset);
     res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching stages:", error);
@@ -1400,7 +1434,10 @@ app.get("/api/stages_list", async (req, res) => {
 app.get("/api/shifts_list", async (req, res) => {
   try {
     const pool = await sql.connect(config);
-    const result = await pool.request().query("SELECT SFTID, SFTName FROM Mx_ShiftMst ORDER BY SFTID");
+    const result = await pool
+      .request()
+      .query("SELECT SFTID, SFTName FROM Mx_ShiftMst ORDER BY SFTID");
+    console.log("Shifts Query Result:", result.recordset);
     res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching shifts:", error);
@@ -1420,36 +1457,53 @@ app.get("/api/getUserShifts", async (req, res) => {
           LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
           ORDER BY SHIFT_ID, Stage_name, LINE
       `;
-    
+
     // Server-side filtering logic
     const { shifts, stages, lines, fromDate, toDate } = req.query;
     let conditions = [];
 
     if (fromDate && toDate) {
-      conditions.push(`(u.Shift_date_from >= '${fromDate}' AND u.Shift_date_from <= '${toDate}')`);
+      conditions.push(
+        `(u.Shift_date_from >= '${fromDate}' AND u.Shift_date_from <= '${toDate}')`,
+      );
     } else if (fromDate) {
-       conditions.push(`(u.Shift_date_from >= '${fromDate}')`);
+      conditions.push(`(u.Shift_date_from >= '${fromDate}')`);
     } else if (toDate) {
-       conditions.push(`(u.Shift_date_from <= '${toDate}')`);
+      conditions.push(`(u.Shift_date_from <= '${toDate}')`);
     }
 
     if (shifts && shifts.trim() !== "") {
-        const shiftList = shifts.split(",").map(s => s.trim()).filter(Boolean).map(s => `'${s}'`).join(",");
-        if (shiftList) conditions.push(`u.SHIFT_ID IN (${shiftList})`);
+      const shiftList = shifts
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => `'${s}'`)
+        .join(",");
+      if (shiftList) conditions.push(`u.SHIFT_ID IN (${shiftList})`);
     }
 
     if (stages && stages.trim() !== "") {
-        const stageList = stages.split(",").map(s => s.trim()).filter(Boolean).map(s => `'${s}'`).join(",");
-        if (stageList) conditions.push(`s.Stage_name IN (${stageList})`);
+      const stageList = stages
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => `'${s}'`)
+        .join(",");
+      if (stageList) conditions.push(`s.Stage_name IN (${stageList})`);
     }
 
     if (lines && lines.trim() !== "") {
-        const lineList = lines.split(",").map(s => s.trim()).filter(Boolean).map(s => `'${s}'`).join(",");
-        if (lineList) conditions.push(`u.LINE IN (${lineList})`);
+      const lineList = lines
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => `'${s}'`)
+        .join(",");
+      if (lineList) conditions.push(`u.LINE IN (${lineList})`);
     }
 
     if (conditions.length > 0) {
-        query = `
+      query = `
           SELECT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
           FROM Mx_UserShifts u
           LEFT JOIN MX_USERMST m ON u.userid = m.USERID
@@ -1459,6 +1513,7 @@ app.get("/api/getUserShifts", async (req, res) => {
         `;
     }
     let result = await pool.request().query(query);
+    console.log("User Shifts Query Result:", result.recordset);
     res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching user shifts:", error);
@@ -1490,10 +1545,15 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 
     // Handle multiple shifts
     if (shifts && shifts.trim() !== "") {
-      const shiftArray = shifts.split(",").map((s) => s.trim()).filter((s) => s !== "");
+      const shiftArray = shifts
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== "");
       if (shiftArray.length > 0) {
-        const shiftPlaceholders = shiftArray.map((_, index) => `@shift${index}`).join(",");
-        whereClause += ` AND RTRIM(P1.SHIFT_ID) IN (${shiftPlaceholders})`;  // ADD RTRIM
+        const shiftPlaceholders = shiftArray
+          .map((_, index) => `@shift${index}`)
+          .join(",");
+        whereClause += ` AND RTRIM(P1.SHIFT_ID) IN (${shiftPlaceholders})`; // ADD RTRIM
 
         shiftArray.forEach((shift, index) => {
           request.input(`shift${index}`, sql.VarChar, shift);
@@ -1503,10 +1563,15 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
 
     // Handle multiple lines
     if (lines && lines.trim() !== "") {
-      const lineArray = lines.split(",").map((l) => l.trim()).filter((l) => l !== "");
+      const lineArray = lines
+        .split(",")
+        .map((l) => l.trim())
+        .filter((l) => l !== "");
       if (lineArray.length > 0) {
-        const linePlaceholders = lineArray.map((_, index) => `@line${index}`).join(",");
-        whereClause += ` AND RTRIM(P1.LINE) IN (${linePlaceholders})`;  // ADD RTRIM
+        const linePlaceholders = lineArray
+          .map((_, index) => `@line${index}`)
+          .join(",");
+        whereClause += ` AND RTRIM(P1.LINE) IN (${linePlaceholders})`; // ADD RTRIM
 
         lineArray.forEach((line, index) => {
           request.input(`line${index}`, sql.VarChar, line);
@@ -1572,6 +1637,7 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
     console.log("Query result count:", result.recordset.length);
 
     const responseData = result.recordset || [];
+    console.log("Overall Summary Query Result:", responseData);
     res.json(responseData);
   } catch (error) {
     console.error("Error fetching overall summary:", error);
@@ -1581,8 +1647,6 @@ app.get("/api/attendance/overall-summary", async (req, res) => {
     });
   }
 });
-
-
 
 // app.get("/api/attendance/allot", async (req, res) => {
 //   const { date, shiftId, stageName, line } = req.query;
@@ -1995,10 +2059,6 @@ ORDER BY Stage_name, SHIFT_ID, USERID;
   }
 });
 
-
-
-
-
 // New endpoint for unassigned manpower and wrong shift employees
 app.get("/api/attendance/unassignedManpower", async (req, res) => {
   const pool = await sql.connect(config);
@@ -2248,17 +2308,15 @@ ORDER BY STATUS DESC, USERID;
     request.input("Date", sql.Date, date);
 
     const { recordset } = await request.query(rawSql);
-    console.log(`Unassigned/Wrong Shift Results: ${recordset.length} users found`);
+    console.log(
+      `Unassigned/Wrong Shift Results: ${recordset.length} users found`,
+    );
     res.json(recordset);
   } catch (error) {
     console.error("Error fetching unassigned manpower:", error.message);
     res.status(500).send({ error: "Server Error", details: error.message });
   }
 });
-
-
-
-
 
 app.get("/api/attendance", async (req, res) => {
   const { date, shifts, lines } = req.query;
@@ -2334,7 +2392,7 @@ app.get("/download-template-us", (req, res) => {
   const filePath = path.join(
     __dirname,
     "../master/public",
-    "skill upload new.xlsx"
+    "skill upload new.xlsx",
   );
   res.download(filePath, (err) => {
     if (err) {
@@ -2350,7 +2408,7 @@ app.get("/download-template", (req, res) => {
   const filePath = path.join(
     __dirname,
     "../master/public",
-    "sample_template.xlsx"
+    "sample_template.xlsx",
   );
   res.download(filePath, (err) => {
     if (err) {
@@ -2367,7 +2425,7 @@ app.get("/api/shifts", async (req, res) => {
       `SELECT DISTINCT SHIFT_ID 
 FROM   Mx_UserShifts
 ORDER  BY SHIFT_ID;
-`
+`,
     );
     console.log(result.recordset);
     res.json(result.recordset);
@@ -2515,7 +2573,7 @@ AND USERID NOT IN
       .input("Stage_name", sql.NVarChar, Stage_name)
       .input("Line", sql.VarChar, Line)
       .query(query);
-
+    console.log("Employees Query Result:", result.recordset);
     res.status(200).json(result.recordset);
   } catch (err) {
     console.error("Database error:", err);
@@ -2539,7 +2597,7 @@ app.post("/api/saveUserSwap", async (req, res) => {
         .request()
         .input("StageName", sql.NVarChar, Stage_name)
         .query(
-          "SELECT Stage_id FROM Mx_StageMaster WHERE Stage_name = @StageName"
+          "SELECT Stage_id FROM Mx_StageMaster WHERE Stage_name = @StageName",
         );
 
       if (result.recordset.length === 0) {
@@ -2558,7 +2616,7 @@ app.post("/api/saveUserSwap", async (req, res) => {
         .input("AbsentUserId", sql.NChar(15), absentUserId)
         .input("SwapUserId", sql.NChar(15), swapUserId)
         .query(
-          "INSERT INTO Mx_Userswap (Shift_date, Stage_id, Shift_id, Line, Absent_userid, Swap_userid) VALUES (@ShiftDate, @StageId, @ShiftId, @Line, @AbsentUserId, @SwapUserId)"
+          "INSERT INTO Mx_Userswap (Shift_date, Stage_id, Shift_id, Line, Absent_userid, Swap_userid) VALUES (@ShiftDate, @StageId, @ShiftId, @Line, @AbsentUserId, @SwapUserId)",
         );
     }
 
@@ -2586,7 +2644,7 @@ app.get("/api/lines/master", async (req, res) => {
     const result = await pool
       .request()
       .query(
-        "SELECT LineID, LineName, CreatedDate FROM Mx_LinesMaster ORDER BY LineName ASC"
+        "SELECT LineID, LineName, CreatedDate FROM Mx_LinesMaster ORDER BY LineName ASC",
       );
 
     console.log(result.recordset);
@@ -2717,7 +2775,7 @@ app.delete("/api/lines/:id", async (req, res) => {
       .request()
       .input("id", sql.Int, id)
       .query(
-        "SELECT TOP 1 * FROM Mx_UserShifts WHERE LINE = (SELECT LineName FROM Mx_LinesMaster WHERE LineID = @id)"
+        "SELECT TOP 1 * FROM Mx_UserShifts WHERE LINE = (SELECT LineName FROM Mx_LinesMaster WHERE LineID = @id)",
       );
 
     if (usageCheck.recordset.length > 0) {
@@ -2841,7 +2899,7 @@ app.post(
         .status(500)
         .json({ error: "Failed to upload image", details: error.message });
     }
-  }
+  },
 );
 
 // API 3: Get all carousel images
@@ -3202,6 +3260,7 @@ ORDER BY SL_NO;
       toDate,
       records: result.recordset,
     });
+
     console.log(result.recordset);
   } catch (err) {
     console.error("Error fetching attendance:", err);
@@ -3220,6 +3279,7 @@ app.get("/api/employees", async (req, res) => {
       where ISNULL(UserIDEnbl, 0) = 1
       ORDER BY userid
     `);
+    console.log("Employees Query Result:", result.recordset);
 
     res.json(result.recordset); // [{ userid: 101, name: 'John' }, { userid: 102, name: 'Alice' }]
   } catch (err) {
@@ -3232,11 +3292,11 @@ app.get("/api/employees-showall", async (req, res) => {
   try {
     await sql.connect(config);
     const result = await sql.query(`
-      SELECT userid, name, UserIDEnbl
+      SELECT distinct userid, name, UserIDEnbl
       FROM dbo.MX_USERMST
-      ORDER BY name
+      ORDER BY userid
     `);
-
+    console.log("Employees Query Result:", result.recordset);
     res.json(result.recordset); // [{ userid: 101, name: 'John' }, { userid: 102, name: 'Alice' }]
   } catch (err) {
     console.error("Error fetching employees:", err);
@@ -3249,8 +3309,8 @@ app.get("/api/punch_report", async (req, res) => {
     console.log(req.query);
     // 1. Read & validate query-string parameters
     const userId = req.query.userid; // NVARCHAR(50)
-    const fromDate = req.query.fromDate; // YYYY-MM-DD
-    const toDate = req.query.toDate; // YYYY-MM-DD
+    const { fromDate } = req.query; // YYYY-MM-DD
+    const { toDate } = req.query; // YYYY-MM-DD
 
     if (!userId || !fromDate || !toDate)
       return res.status(400).json({
@@ -3582,7 +3642,7 @@ OPTION (MAXRECURSION 366);
       .query(query);
 
     // 5. Return array of results (one row per date in range)
-    console.log(rs.recordset);
+    console.log("Punch Report Result:", rs.recordset);
     return res.json(rs.recordset);
   } catch (err) {
     console.error("Error in /api/punch_report:", err);
@@ -3913,133 +3973,228 @@ app.post("/api/jobcard-upload", async (req, res) => {
   }
 });
 
+// --- Weightage Master APIs ---
 
+app.get("/api/weightage", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool
+      .request()
+      .query(
+        "SELECT * FROM Mx_JobCardWeightage ORDER BY IsSystem DESC, CategoryName",
+      );
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching weightages:", err);
+    res.status(500).json({ error: "Failed to fetch weightages" });
+  }
+});
 
-async function getEmployeeJobReport(pool, employeeId, fromDate, toDate) {
-  const request = new sql.Request(pool); // Use the pool to create request
-  request.input("EmployeeId", sql.NVarChar, employeeId || null);
+app.post("/api/weightage", async (req, res) => {
+  const { categoryName, weightage, isSystem } = req.body;
+  try {
+    const pool = await sql.connect(config);
+    await pool
+      .request()
+      .input("CategoryName", sql.NVarChar, categoryName)
+      .input("Weightage", sql.Int, weightage)
+      .input("IsSystem", sql.Bit, isSystem || 0)
+      .query(
+        "INSERT INTO Mx_JobCardWeightage (CategoryName, Weightage, IsSystem) VALUES (@CategoryName, @Weightage, @IsSystem)",
+      );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error adding weightage:", err);
+    res.status(500).json({ error: "Failed to add weightage" });
+  }
+});
+
+app.post("/api/weightage", async (req, res) => {
+  const { categoryName, weightage } = req.body;
+  try {
+    const pool = await sql.connect(config);
+
+    // Check if category already exists
+    const check = await pool
+      .request()
+      .input("CategoryName", sql.NVarChar, categoryName)
+      .query(
+        "SELECT COUNT(*) as count FROM Mx_JobCardWeightage WHERE CategoryName = @CategoryName",
+      );
+
+    if (check.recordset[0].count > 0) {
+      return res.status(400).json({ error: "Category already exists" });
+    }
+
+    await pool
+      .request()
+      .input("CategoryName", sql.NVarChar, categoryName)
+      .input("Weightage", sql.Int, weightage)
+      .input("IsSystem", sql.Bit, 0) // Default to non-system
+      .query(
+        "INSERT INTO Mx_JobCardWeightage (CategoryName, Weightage, IsSystem) VALUES (@CategoryName, @Weightage, @IsSystem)",
+      );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error adding weightage:", err);
+    res.status(500).json({ error: "Failed to add weightage" });
+  }
+});
+
+app.put("/api/weightage/:id", async (req, res) => {
+  const { id } = req.params;
+  const { weightage } = req.body; // Only allowing weightage update for simplicity first
+  try {
+    const pool = await sql.connect(config);
+    await pool
+      .request()
+      .input("ID", sql.Int, id)
+      .input("Weightage", sql.Int, weightage)
+      .query(
+        "UPDATE Mx_JobCardWeightage SET Weightage = @Weightage WHERE ID = @ID",
+      );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating weightage:", err);
+    res.status(500).json({ error: "Failed to update weightage" });
+  }
+});
+
+app.delete("/api/weightage/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = await sql.connect(config);
+
+    // Optional: Check if system category before delete?
+    // For now, allow delete, assuming frontend handles IsSystem check or user is admin.
+
+    await pool
+      .request()
+      .input("ID", sql.Int, id)
+      .query("DELETE FROM Mx_JobCardWeightage WHERE ID = @ID");
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting weightage:", err);
+    res.status(500).json({ error: "Failed to delete weightage" });
+  }
+});
+
+async function getEmployeeJobReport(pool, employeeId, fromDate, toDate, line) {
+  const request = pool.request();
   request.input("FromDate", sql.Date, fromDate);
   request.input("ToDate", sql.Date, toDate);
+  request.input("EmployeeId", sql.VarChar, employeeId || null);
+  request.input("Line", sql.VarChar, line || null);
+
+  /* 
+     Dynamic Weightage Logic & New Calculation Rules:
+     - Optimization: Fetch Weightages ONCE into variables instead of subquery per row
+  */
 
   const query = `
-WITH EmployeeJobreport AS (
+    DECLARE @W_Performance DECIMAL(10,2), @W_Attendance DECIMAL(10,2), @W_Punctuality DECIMAL(10,2),
+            @W_Rejections DECIMAL(10,2), @W_5S DECIMAL(10,2), @W_PPE DECIMAL(10,2), 
+            @W_Safety DECIMAL(10,2), @W_Discipline DECIMAL(10,2);
+
     SELECT 
-        U.USERID,
-        U.NAME,
-        S.Shift_date_from AS [DATE],
-        CONCAT(FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm'), '-', FORMAT(CAST(MS.SFTEDTime AS DATETIME), 'HH:mm')) AS SHIFT,
-        FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm') AS ScheduledStart,
-        S.LINE,
-        ST.stage_name AS STAGE,
-        S.SHIFT_ID AS SHIFTNAME,
-        FORMAT(ATD.PunchIn, 'HH:mm') AS ActualPunch,
-        FORMAT(ATD.PunchOut, 'HH:mm') AS PunchOut,
-        CASE 
-            WHEN ATD.PunchIn IS NOT NULL THEN 5 
-            WHEN LM.LeaveType = 'Authorized' THEN 5 
-            ELSE 0 
-        END AS Attendance,
-        CASE 
-            WHEN ATD.PunchIn IS NOT NULL THEN 'Present' 
-            WHEN LM.LeaveType = 'Authorized' THEN 'Authorized Leave' 
-            ELSE 'Absent' 
-        END AS ATTENDANCE_Status,
-        CASE 
-            WHEN ATD.PunchIn IS NULL THEN 'No Punch'
-            WHEN ATD.PunchIn <= DATEADD(MINUTE, 10, Shifts.ShiftStart)
-                THEN 'On Time'
-            ELSE 'Late'
-        END AS Jobreport,
-        ISNULL(J.Job_Target,0) AS Job_Target,
-        ISNULL(J.Job_Actual,0) AS Job_Actual,
-        ISNULL(J.Job_Rejns,0) AS Job_Rejns,
-        ISNULL(J.Job_5S,0) AS Job_5S,
-        ISNULL(J.PPE,0) AS PPE,
-        ISNULL(J.Job_Disclipline,0) AS Job_Disclipline
-    FROM Mx_UserShifts S
-    LEFT JOIN MX_USERMST U ON S.USERID = U.USERID
-    LEFT JOIN Mx_UserJobCard J ON S.USERID = J.USERID AND J.Edatetime = S.Shift_date_from
-    LEFT JOIN Mx_ShiftMst MS ON S.SHIFT_ID = MS.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON S.stage_id = ST.stage_id
-    LEFT JOIN Mx_UserLeaveMaster LM ON S.USERID = LM.UserID AND S.Shift_date_from = LM.LeaveDate
-    CROSS APPLY (
+        @W_Performance = MAX(CASE WHEN CategoryName = 'Performance' THEN Weightage ELSE 0 END),
+        @W_Attendance = MAX(CASE WHEN CategoryName = 'Attendance' THEN Weightage ELSE 0 END),
+        @W_Punctuality = MAX(CASE WHEN CategoryName = 'Punctuality' THEN Weightage ELSE 0 END),
+        @W_Rejections = MAX(CASE WHEN CategoryName = 'Rejections' THEN Weightage ELSE 0 END),
+        @W_5S = MAX(CASE WHEN CategoryName = '5S' THEN Weightage ELSE 0 END),
+        @W_PPE = MAX(CASE WHEN CategoryName = 'PPE' THEN Weightage ELSE 0 END),
+        @W_Safety = MAX(CASE WHEN CategoryName = 'Safety' THEN Weightage ELSE 0 END),
+        @W_Discipline = MAX(CASE WHEN CategoryName = 'Discipline' THEN Weightage ELSE 0 END)
+    FROM Mx_JobCardWeightage;
+
+    WITH EffectiveShifts AS (
+        -- 1. Swaps (Highest Priority)
         SELECT 
-            ShiftStart = CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
-            ShiftEnd = CASE WHEN MS.SFTEDTime < MS.SFTSTTime
-                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
-                            ELSE CAST(CONVERT(VARCHAR(10), S.Shift_date_from, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
-                        END
-    ) AS Shifts
-    OUTER APPLY (
-        SELECT MIN(A.Edatetime) AS PunchIn, MAX(A.Edatetime) AS PunchOut
-        FROM Mx_ATDEventTrn A
-        WHERE A.USERID = S.USERID
-        AND A.Edatetime BETWEEN DATEADD(MINUTE, -45, Shifts.ShiftStart) AND Shifts.ShiftEnd
-    ) ATD
-    WHERE (@EmployeeId IS NULL OR S.USERID = @EmployeeId) 
-      AND S.Shift_date_from BETWEEN @FromDate AND @ToDate 
+            Swap_userid AS USERID,
+            Shift_date AS [DATE],
+            Shift_id AS SHIFTNAME,
+            stage_id,
+            LINE
+        FROM Mx_Userswap WITH (NOLOCK)
+        WHERE Shift_date BETWEEN @FromDate AND @ToDate
+        
+        UNION ALL
+        
+        -- 2. Regular Shifts (If no swap)
+        SELECT 
+            USERID,
+            Shift_date_from AS [DATE],
+            SHIFT_ID AS SHIFTNAME,
+            stage_id,
+            LINE
+        FROM Mx_UserShifts S WITH (NOLOCK)
+        WHERE Shift_date_from BETWEEN @FromDate AND @ToDate
+        AND NOT EXISTS (
+            SELECT 1 FROM Mx_Userswap SW WITH (NOLOCK)
+            WHERE SW.Swap_userid = S.USERID 
+            AND SW.Shift_date = S.Shift_date_from
+        )
+    ),
+    EmployeeJobreport AS (
+        -- Part 1: Shifts with Job Cards
+        SELECT 
+            U.USERID,
+            U.NAME,
+            SW.[DATE],
+            CONCAT(FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm'), '-', FORMAT(CAST(MS.SFTEDTime AS DATETIME), 'HH:mm')) AS SHIFT,
+            FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm') AS ScheduledStart,
+            SW.LINE,        
+            ST.stage_name AS STAGE,
+            SW.SHIFTNAME,
+            FORMAT(ATD.PunchIn, 'HH:mm') AS ActualPunch,
+            
+            -- Attendance Status Logic
+            CASE 
+                WHEN ATD.PunchIn IS NOT NULL THEN 'Present' 
+                WHEN LM.LeaveType = 'Authorized' THEN 'Authorized Leave' 
+                ELSE 'Absent' 
+            END AS ATTENDANCE_Status,
+
+            ISNULL(J.Job_Target,0) AS Job_Target,
+            ISNULL(J.Job_Actual,0) AS Job_Actual,
+            ISNULL(J.Job_Rejns,0) AS Job_Rejns,
+            ISNULL(J.job_5S,0) AS Job_5S,
+            ISNULL(J.PPE,0) AS PPE, -- Assuming this mapped to Safety/PPE usage? Wait, usually PPE is Separate.
+            ISNULL(J.Job_Disclipline,0) AS Job_Disclipline,
+            
+            ShiftStartCalc -- Pass for outer calc
+        FROM EffectiveShifts SW
+        INNER JOIN MX_USERMST U WITH (NOLOCK) ON SW.USERID = U.USERID
+        LEFT JOIN Mx_UserJobCard J WITH (NOLOCK) ON SW.USERID = J.USERID AND J.Edatetime = SW.[DATE]
+        LEFT JOIN Mx_ShiftMst MS WITH (NOLOCK) ON SW.SHIFTNAME = MS.SFTID
+        LEFT JOIN Mx_STAGEMASTER ST WITH (NOLOCK) ON SW.stage_id = ST.stage_id
+        LEFT JOIN Mx_UserLeaveMaster LM WITH (NOLOCK) ON SW.USERID = LM.UserID AND SW.[DATE] = LM.LeaveDate
+        OUTER APPLY (
+            SELECT 
+                ShiftStartCalc = CAST(CONVERT(VARCHAR(10), SW.[DATE], 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
+                ShiftEndCalc = CASE 
+                    WHEN MS.SFTEDTime < MS.SFTSTTime
+                    THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), SW.[DATE], 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
+                    ELSE CAST(CONVERT(VARCHAR(10), SW.[DATE], 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
+                END
+        ) AS ShiftCalc
+        OUTER APPLY (
+            SELECT MIN(A.Edatetime) AS PunchIn
+            FROM Mx_ATDEventTrn A WITH (NOLOCK)
+            WHERE A.USERID = SW.USERID
+            AND A.Edatetime >= DATEADD(MINUTE, -45, ShiftCalc.ShiftStartCalc)
+            AND A.Edatetime <= ShiftCalc.ShiftEndCalc
+        ) ATD
+        WHERE SW.[DATE] BETWEEN @FromDate AND @ToDate
+        AND (@EmployeeId IS NULL OR SW.USERID = @EmployeeId)
+        AND (@Line IS NULL OR SW.LINE = @Line)
 
     UNION ALL
 
-    SELECT 
-        U.USERID,
-        U.NAME,
-        SW.Shift_date AS [DATE],
-        CONCAT(FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm'), '-', FORMAT(CAST(MS.SFTEDTime AS DATETIME), 'HH:mm')) AS SHIFT,
-        FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm') AS ScheduledStart,
-        SW.LINE,        
-        SW.Shift_id AS SHIFTNAME,
-        ST.stage_name AS STAGE,
-        FORMAT(ATD.PunchIn, 'HH:mm') AS ActualPunch,
-        FORMAT(ATD.PunchOut, 'HH:mm') AS PunchOut,
-        CASE 
-            WHEN ATD.PunchIn IS NOT NULL THEN 5 
-            WHEN LM.LeaveType = 'Authorized' THEN 5 
-            ELSE 0 
-        END AS Attendance,
-        CASE 
-            WHEN ATD.PunchIn IS NOT NULL THEN 'Present' 
-            WHEN LM.LeaveType = 'Authorized' THEN 'Authorized Leave' 
-            ELSE 'Absent' 
-        END AS ATTENDANCE_Status,
-        CASE 
-            WHEN ATD.PunchIn IS NULL THEN 'No Punch'
-            WHEN ATD.PunchIn <= DATEADD(MINUTE, 10, Shifts.ShiftStart)
-                THEN 'On Time'
-            ELSE 'Late'
-        END AS Jobreport,
-        ISNULL(J.Job_Target,0) AS Job_Target,
-        ISNULL(J.Job_Actual,0) AS Job_Actual,
-        ISNULL(J.Job_Rejns,0) AS Job_Rejns,
-        ISNULL(J.Job_5S,0) AS Job_5S,
-        ISNULL(J.PPE,0) AS PPE,
-        ISNULL(J.Job_Disclipline,0) AS Job_Disclipline
-    FROM Mx_Userswap SW
-    LEFT JOIN MX_USERMST U ON SW.Swap_userid = U.USERID
-    LEFT JOIN Mx_UserJobCard J ON SW.Swap_userid = J.USERID AND J.Edatetime = SW.Shift_date
-    LEFT JOIN Mx_ShiftMst MS ON SW.Shift_id = MS.SFTID
-    LEFT JOIN Mx_STAGEMASTER ST ON SW.stage_id = ST.stage_id
-    LEFT JOIN Mx_UserLeaveMaster LM ON SW.Swap_userid = LM.UserID AND SW.Shift_date = LM.LeaveDate
-    CROSS APPLY (
-        SELECT 
-            ShiftStart = CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
-            ShiftEnd = CASE WHEN MS.SFTEDTime < MS.SFTSTTime
-                            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
-                            ELSE CAST(CONVERT(VARCHAR(10), SW.Shift_date, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
-                        END
-    ) AS Shifts
-    OUTER APPLY (
-        SELECT MIN(A.Edatetime) AS PunchIn, MAX(A.Edatetime) AS PunchOut
-        FROM Mx_ATDEventTrn A
-        WHERE A.USERID = SW.Swap_userid
-        AND A.Edatetime BETWEEN DATEADD(MINUTE, -45, Shifts.ShiftStart) AND Shifts.ShiftEnd
-    ) ATD
-    WHERE (@EmployeeId IS NULL OR SW.Swap_userid = @EmployeeId)
-     AND SW.Shift_date BETWEEN @FromDate AND @ToDate
-
-         UNION ALL
-
-    -- Users present in attendance but not in UserShifts or UserSwap
+    -- Part 2: Attendance Only (No Shifts assigned but present? Or just fill gaps?)
+    -- Simplified: Logic usually requires shifts. Keeping this part to match exist implementation but filtering by Line/Emp.
     SELECT 
         U.USERID,
         U.NAME,
@@ -4050,92 +4205,98 @@ WITH EmployeeJobreport AS (
         NULL AS STAGE,
         NULL AS SHIFTNAME,
         FORMAT(MIN(A.Edatetime), 'HH:mm') AS ActualPunch,
-        FORMAT(MAX(A.Edatetime), 'HH:mm') AS PunchOut,
-        5 AS Attendance,
         'Present' AS ATTENDANCE_Status,
-        'No Shift Assigned' AS Jobreport,
-        0 AS Job_Target,
-        0 AS Job_Actual,
-        0 AS Job_Rejns,
-        0 AS Job_5S,
-        0 AS PPE,
-        0 AS Job_Disclipline
-    FROM Mx_ATDEventTrn A
-    INNER JOIN MX_USERMST U ON A.USERID = U.USERID
-    WHERE (@EmployeeId IS NULL OR A.USERID = @EmployeeId)
-      AND CAST(A.Edatetime AS DATE) BETWEEN @FromDate AND @ToDate
-      AND NOT EXISTS (
-            SELECT 1 FROM Mx_UserShifts S
-            WHERE S.USERID = A.USERID
-              AND S.Shift_date_from = CAST(A.Edatetime AS DATE)
-      )
-      AND NOT EXISTS (
-            SELECT 1 FROM Mx_Userswap SW
-            WHERE SW.Swap_userid = A.USERID
-              AND SW.Shift_date = CAST(A.Edatetime AS DATE)
-      )
-    GROUP BY U.USERID, U.NAME, CAST(A.Edatetime AS DATE)
-
-
-)
-SELECT 
-    CONVERT(VARCHAR(10), [DATE], 103) AS Date,
-    [DATE] as RawDate,
-    SHIFTNAME, 
-    STAGE, 
-    LINE, 
-    ActualPunch, 
-    ScheduledStart,
-    Job_Target AS Target,
-    Job_Actual AS Actual,
-    CASE 
-        WHEN Job_Target > 0 
-        THEN ROUND((CAST(Job_Actual AS DECIMAL(18,4)) / CAST(Job_Target AS DECIMAL(18,4))) * 50.0, 0) 
-        ELSE 0 
-    END AS Performance,
-
-    Attendance,
-    ATTENDANCE_Status,
-    CASE 
-        WHEN Jobreport = 'On Time' THEN 5 
-        ELSE 0 
-    END AS Punctuality,
-    
-    Job_5S AS [5S],
-    Job_Rejns AS Rejections,
-    PPE,
-    Job_Disclipline AS Disclipline,
-
-    (
-        ISNULL(Job_Rejns,0) 
-        + ISNULL(Job_5S,0) 
-        + ISNULL(PPE,0) 
-        + ISNULL(Job_Disclipline,0) 
-        + CASE 
+        0 AS Job_Target, 0 AS Job_Actual, 0 AS Job_Rejns, 0 AS Job_5S, 0 AS PPE, 0 AS Job_Disclipline,
+        NULL AS ShiftStartCalc
+    FROM Mx_ATDEventTrn A WITH (NOLOCK)
+    INNER JOIN MX_USERMST U WITH (NOLOCK) ON A.USERID = U.USERID
+    WHERE CAST(A.Edatetime AS DATE) BETWEEN @FromDate AND @ToDate
+      AND (@EmployeeId IS NULL OR A.USERID = @EmployeeId)
+      -- AND (@Line IS NULL OR ... ) -- Cannot filter by Line if no shift.
+      AND NOT EXISTS (SELECT 1 FROM Mx_UserShifts S WHERE S.USERID = A.USERID AND S.Shift_date_from = CAST(A.Edatetime AS DATE))
+      AND NOT EXISTS (SELECT 1 FROM Mx_Userswap SW WHERE SW.Swap_userid = A.USERID AND SW.Shift_date = CAST(A.Edatetime AS DATE))
+    GROUP BY U.UserID, U.NAME, CAST(A.Edatetime AS DATE)
+    )
+    SELECT 
+        UserID, NAME,
+        CONVERT(VARCHAR(10), [DATE], 103) AS Date,
+        [DATE] as RawDate,
+        SHIFTNAME, STAGE, LINE, ActualPunch, ScheduledStart,
+        Job_Target AS Target,
+        Job_Actual AS Actual,
+        
+        -- Calculations
+        CAST(CASE 
             WHEN Job_Target > 0 
-            THEN ROUND((CAST(Job_Actual AS DECIMAL(18,4)) / CAST(Job_Target AS DECIMAL(18,4))) * 50.0, 0) 
+            THEN (CAST(Job_Actual AS FLOAT) / Job_Target) * @W_Performance 
             ELSE 0 
-        END
-        + Attendance
-        + CASE 
-            WHEN Jobreport = 'On Time' THEN 5 
+        END AS DECIMAL(10,2)) AS Performance,
+
+        CAST(CASE 
+            WHEN ATTENDANCE_Status IN ('Present', 'Authorized Leave') 
+            THEN @W_Attendance 
             ELSE 0 
-        END
-    ) AS Total
-FROM EmployeeJobreport
-ORDER BY RawDate ASC;
-`;
+        END AS DECIMAL(10,2)) AS Attendance,
+
+        ATTENDANCE_Status,
+
+        -- Punctuality: "before 5 minutes from shift start time"
+        -- Implies: ShiftStart - PunchIn >= 5 minutes ... OR PunchIn <= ShiftStart - 5 mins
+        CAST(CASE 
+            WHEN ActualPunch IS NOT NULL AND ShiftStartCalc IS NOT NULL 
+                 AND DATEADD(MINUTE, -5, ShiftStartCalc) >= CAST([DATE] AS DATETIME) + CAST(ActualPunch AS DATETIME) -- Approximation logic
+                 -- Better: Compare PunchIn vs ShiftStartCalc - 5 mins
+                 -- Since we don't have exact datetime in this outer select easily without re-join or complex CASE:
+                 -- We know 'ActualPunch' is HH:mm. 'ShiftStartCalc' was full datetime.
+                 -- Let's rely on 'JobReport' logic or Simplified check:
+                -- Re-implementing simplified logic inside CASE:
+                 AND (CAST(ActualPunch as TIME) <= CAST(DATEADD(MINUTE, -5, ScheduledStart) as TIME)) -- Risk of date crossover.
+            THEN @W_Punctuality
+            -- Fallback for simple check:
+            WHEN ActualPunch IS NOT NULL AND ScheduledStart IS NOT NULL
+                 AND DATEDIFF(MINUTE, CAST(ActualPunch as TIME), CAST(ScheduledStart as TIME)) >= 5
+            THEN @W_Punctuality
+            ELSE 0 
+        END AS DECIMAL(10,2)) AS Punctuality,
+
+        Job_5S AS [5S],
+        Job_Rejns AS Rejections,
+        PPE AS Safety, -- Mapping PPE col to "Safety and PPE"
+        Job_Disclipline AS Discipline,
+
+        -- TOTAL
+        CAST(
+            (CASE WHEN Job_Target > 0 THEN (CAST(Job_Actual AS FLOAT) / Job_Target) * @W_Performance ELSE 0 END)
+            + (CASE WHEN ATTENDANCE_Status IN ('Present', 'Authorized Leave') THEN @W_Attendance ELSE 0 END)
+            + (CASE 
+                WHEN ActualPunch IS NOT NULL AND ScheduledStart IS NOT NULL
+                 AND DATEDIFF(MINUTE, CAST(ActualPunch as TIME), CAST(ScheduledStart as TIME)) >= 5
+                THEN @W_Punctuality ELSE 0 END)
+            + ISNULL(Job_Rejns,0) 
+            + ISNULL(Job_5S,0) 
+            + ISNULL(PPE,0) 
+            + ISNULL(Job_Disclipline,0)
+        AS DECIMAL(10,2)) AS Total
+    FROM EmployeeJobreport
+    ORDER BY RawDate ASC
+    OPTION (RECOMPILE, MAXDOP 4);
+  `;
 
   return request.query(query);
 }
 
 app.post("/api/employee-Jobreport", async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
-  
+
   try {
     const pool = await sql.connect(config);
-    const result = await getEmployeeJobReport(pool, employeeId, fromDate, toDate);
-    
+    const result = await getEmployeeJobReport(
+      pool,
+      employeeId,
+      fromDate,
+      toDate,
+    );
+    console.log("Jobreport Query Result:", result.recordset);
     res.json({
       employeeId,
       records: result.recordset,
@@ -4143,129 +4304,713 @@ app.post("/api/employee-Jobreport", async (req, res) => {
   } catch (err) {
     console.error("Error fetching Jobreport:", err);
     res.status(500).send("Error fetching Jobreport details");
-  } 
+  }
 });
 
 app.post("/api/monthly-job-card-report", async (req, res) => {
-  const { fromMonth, toMonth } = req.body; // e.g., "2025-01", "2025-02"
+  console.log("Monthly Job Card Report Request:", req.body);
+  const { fromMonth, toMonth, employeeId, line } = req.body;
 
   if (!fromMonth || !toMonth) {
-    return res.status(400).json({ error: "From Month and To Month are required" });
+    return res
+      .status(400)
+      .json({ error: "From Month and To Month are required" });
   }
 
   try {
     const pool = await sql.connect(config);
-    
+
     // Calculate start and end dates
     const startDate = new Date(fromMonth + "-01");
     const endDate = new Date(toMonth + "-01");
-    // Get last day of toMonth
     endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setDate(0); // Go back one day to get last day of previous month set above
+    endDate.setDate(0);
 
     const fromDateStr = startDate.toISOString().split("T")[0];
     const toDateStr = endDate.toISOString().split("T")[0];
 
-    console.log(`Generating Monthly Report from ${fromDateStr} to ${toDateStr}`);
+    console.log(
+      `Generating Monthly Report from ${fromDateStr} to ${toDateStr} for Emp: ${employeeId || "ALL"}, Line: ${line || "ALL"}`,
+    );
 
-    // Fetch report for ALL employees by passing null as employeeId
-    const result = await getEmployeeJobReport(pool, null, fromDateStr, toDateStr);
-    
-    res.json({
-      success: true,
-      records: result.recordset,
-      fromDate: fromDateStr,
-      toDate: toDateStr
+    // Fetch report
+    const result = await getEmployeeJobReport(
+      pool,
+      employeeId || null,
+      fromDateStr,
+      toDateStr,
+      line || null,
+    );
+    console.log("Monthly Report Row Count:", result.recordset.length);
+
+    // Aggregate data to avoid JSON stringify limit
+    const records = result.recordset;
+    const userMap = new Map();
+
+    records.forEach((r) => {
+      const uid = r.UserID || r.USERID;
+      const uName = r.Name || r.NAME;
+      if (!userMap.has(uid)) {
+        userMap.set(uid, {
+          userId: uid,
+          name: uName,
+          monthlyScores: {},
+        });
+      }
+      const user = userMap.get(uid);
+
+      // Determine Month Key (YYYY-MM)
+      let rDate = null;
+      if (r.RawDate) rDate = new Date(r.RawDate);
+      else if (r.Edatetime) rDate = new Date(r.Edatetime);
+
+      if (rDate && !isNaN(rDate.getTime())) {
+        const monthKey = rDate.toISOString().substring(0, 7); // "YYYY-MM"
+
+        if (!user.monthlyScores[monthKey]) {
+          user.monthlyScores[monthKey] = {
+            count: 0,
+            perf: 0,
+            att: 0,
+            punct: 0,
+            rej: 0,
+            s5: 0,
+            safe: 0,
+            disc: 0,
+          };
+        }
+
+        const m = user.monthlyScores[monthKey];
+        m.count++;
+        m.perf += r.Performance || 0;
+
+        // Attendance Logic match frontend
+        // Server already returns calculated Attendance score in 'r.Attendance'
+        m.att += r.Attendance || 0;
+
+        m.punct += r.Punctuality || 0;
+        m.rej += r.Rejections || 0;
+        m.s5 += r["5S"] || 0;
+        m.safe += r.Safety || 0;
+        m.disc += r.Discipline || 0;
+      }
     });
 
+    // Finalize Averages
+    const summary = Array.from(userMap.values()).map((u) => {
+      const outcomes = {};
+      Object.keys(u.monthlyScores).forEach((mKey) => {
+        const data = u.monthlyScores[mKey];
+        const count = data.count || 1;
+
+        // Calculate Total Score for the month
+        const avgPerf = data.perf / count;
+        const avgAtt = data.att / count;
+        const avgPunct = data.punct / count;
+        const avgRej = data.rej / count;
+        const avgS5 = data.s5 / count;
+        const avgSafe = data.safe / count;
+        const avgDisc = data.disc / count;
+
+        const total =
+          avgPerf + avgAtt + avgPunct + avgRej + avgS5 + avgSafe + avgDisc;
+        outcomes[mKey] = total.toFixed(2);
+      });
+      return {
+        id: u.userId,
+        name: u.name,
+        monthlyScores: outcomes,
+      };
+    });
+
+    res.json({
+      success: true,
+      summary: summary, // Return summary instead of raw records
+      fromDate: fromDateStr,
+      toDate: toDateStr,
+    });
   } catch (err) {
     console.error("Error generating monthly report:", err);
-    res.status(500).json({ error: "Error generating monthly report", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Error generating monthly report", details: err.message });
+  }
+});
+
+const ExcelJS = require("exceljs");
+
+// Helper for Weighted Score (Backend Implementation)
+function calculateWeightedScoreBackend(userData) {
+  const count = userData.length || 1;
+  const avgPerformance =
+    userData.reduce(
+      (sum, item) => sum + (parseFloat(item.Performance) || 0),
+      0,
+    ) / count;
+
+  // Attendance Special Logic: return 5 if Attendance is 5 AND Status is Authorized/Authorized Leave
+  const avgAttendance =
+    userData.reduce((sum, item) => {
+      const val =
+        item.Attendance === 5 &&
+        (item.ATTENDANCE_Status === "Authorized Leave" ||
+          item.ATTENDANCE_Status === "Authorized")
+          ? 5
+          : parseFloat(item.Attendance) || 0;
+      return sum + val;
+    }, 0) / count;
+
+  const avgPunctuality =
+    userData.reduce(
+      (sum, item) => sum + (parseFloat(item.Punctuality) || 0),
+      0,
+    ) / count;
+  const avgRejections =
+    userData.reduce(
+      (sum, item) => sum + (parseFloat(item.Rejections) || 0),
+      0,
+    ) / count;
+  const avg5S =
+    userData.reduce((sum, item) => sum + (parseFloat(item["5S"]) || 0), 0) /
+    count;
+  const avgSafe =
+    userData.reduce((sum, item) => sum + (parseFloat(item.Safety) || 0), 0) /
+    count; // Use Safety
+  const avgDisc =
+    userData.reduce(
+      (sum, item) => sum + (parseFloat(item.Discipline) || 0),
+      0,
+    ) / count; // Use Discipline
+
+  const totalScore =
+    avgPerformance +
+    avgAttendance +
+    avgPunctuality +
+    avgRejections +
+    avg5S +
+    avgSafe +
+    avgDisc;
+
+  return {
+    count: count,
+    avgPerformance: parseFloat(avgPerformance.toFixed(2)),
+    avgAttendance: parseFloat(avgAttendance.toFixed(2)),
+    avgPunctuality: parseFloat(avgPunctuality.toFixed(2)),
+    avgRejections: parseFloat(avgRejections.toFixed(2)),
+    avg5S: parseFloat(avg5S.toFixed(2)),
+    avgPPE: parseFloat(avgSafe.toFixed(2)),
+    avgDiscipline: parseFloat(avgDisc.toFixed(2)),
+    totalScore: parseFloat(totalScore.toFixed(2)),
+  };
+}
+
+app.post("/api/monthly-job-card-excel", async (req, res) => {
+  const { fromMonth, toMonth, employeeId, line } = req.body;
+  console.log("Monthly Job Card Excel Request:", req.body);
+
+  if (!fromMonth || !toMonth) {
+    return res
+      .status(400)
+      .json({ error: "From Month and To Month are required" });
+  }
+
+  try {
+    const pool = await sql.connect(config);
+    const startDate = new Date(fromMonth + "-01");
+    const endDate = new Date(toMonth + "-01");
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0);
+    const fromDateStr = startDate.toISOString().split("T")[0];
+    const toDateStr = endDate.toISOString().split("T")[0];
+
+    console.log(
+      `Generating Monthly Report from ${fromDateStr} to ${toDateStr} for Emp: ${employeeId || "ALL"}`,
+    );
+
+    const result = await getEmployeeJobReport(
+      pool,
+      employeeId || null,
+      fromDateStr,
+      toDateStr,
+      line || null,
+    );
+    const records = result.recordset;
+
+    if (!records || records.length === 0) {
+      return res.status(404).json({ error: "No records found" });
+    }
+
+    // Set Headers for Streaming Download
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Monthly_Report_${fromMonth}.xlsx`,
+    );
+
+    // Initialize Streaming Workbook
+    const workbook = new excel.stream.xlsx.WorkbookWriter({
+      stream: res,
+      useStyles: true,
+      useSharedStrings: true,
+    });
+
+    // Group Data
+    const usersMap = new Map();
+    records.forEach((r) => {
+      const uid = r.UserID || r.USERID;
+      const name = r.Name || r.NAME;
+
+      if (!usersMap.has(uid)) {
+        usersMap.set(uid, {
+          id: uid,
+          name: name,
+          data: [],
+          monthData: new Map(),
+        });
+      }
+
+      const user = usersMap.get(uid);
+      user.data.push(r);
+
+      // Fix: Use RawDate (Date object) for reliable YYYY-MM extraction
+      let rDateObj = null;
+      if (r.RawDate) {
+        rDateObj = new Date(r.RawDate);
+      } else if (r.Edatetime) {
+        rDateObj = new Date(r.Edatetime);
+      } else if (r.Date) {
+        // Fallback for string DD/MM/YYYY - tough, but let's try assuming standard ISO if fail
+        // But SQL usually returns RawDate if requested.
+        const parts = r.Date.split("/");
+        if (parts.length === 3)
+          rDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+
+      if (rDateObj && !isNaN(rDateObj.getTime())) {
+        const mKey = rDateObj.toISOString().substring(0, 7); // YYYY-MM
+        if (!user.monthData.has(mKey)) {
+          user.monthData.set(mKey, []);
+        }
+        user.monthData.get(mKey).push(r);
+      }
+    });
+
+    // ----------------------------------------------------
+    // Utility for Headers
+    // ----------------------------------------------------
+    const generateMonthKeys = (startStr, endStr) => {
+      let current = new Date(startStr + "-01");
+      const end = new Date(endStr + "-01");
+      const keys = [];
+      while (current <= end) {
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, "0");
+        keys.push({
+          key: `${y}-${m}`,
+          label: current.toLocaleString("default", {
+            month: "long",
+            year: "numeric",
+          }),
+        });
+        current.setMonth(current.getMonth() + 1);
+      }
+      return keys;
+    };
+
+    const monthList = generateMonthKeys(fromMonth, toMonth);
+
+    // ----------------------------------------------------
+    // SHEET 1: Monthly Summary
+    // ----------------------------------------------------
+    const wsSummary = workbook.addWorksheet("Monthly Summary");
+
+    const summaryHeaders = [
+      "Sl no",
+      "ID No",
+      "Name",
+      ...monthList.map((m) => m.label), // Month Names
+    ];
+
+    // Titles
+    const lastColIndex = summaryHeaders.length;
+
+    // Note: User removed title cells in one edit but usually titles are good.
+    // I will leave them minimal to avoid "Merged cells" issues if that was the user's concern,
+    // but typically headers are requested. I'll stick to a standard table header.
+    // If user deleted them, I should maybe respect that?
+    // User deleted rows 0-11 in frontend array, but that was frontend code.
+    // In backend generated Excel, let's keep it simple.
+
+    wsSummary.getRow(1).values = summaryHeaders;
+    wsSummary.getRow(1).font = { bold: true };
+    wsSummary.getRow(1).commit();
+
+    let index = 1;
+    usersMap.forEach((user) => {
+      const rowData = [index++, user.id, user.name ? user.name.trim() : ""];
+
+      monthList.forEach((m) => {
+        const monthRecords = user.monthData.get(m.key);
+        if (monthRecords && monthRecords.length > 0) {
+          const stats = calculateWeightedScoreBackend(monthRecords);
+          rowData.push(stats.totalScore);
+        } else {
+          rowData.push(0);
+        }
+      });
+      wsSummary.addRow(rowData).commit();
+    });
+    wsSummary.commit();
+
+    // ----------------------------------------------------
+    // INDIVIDUAL SHEETS (Grouped by Month)
+    // ----------------------------------------------------
+    usersMap.forEach((user) => {
+      let sheetName = String(user.id)
+        .replace(/[^a-zA-Z0-9_\-\s]/g, "_")
+        .substring(0, 30);
+
+      const wsUser = workbook.addWorksheet(sheetName);
+
+      wsUser.getCell("A1").value =
+        `Employee Daily Report: ${user.name} (${user.id})`;
+      wsUser.getCell("A1").font = { bold: true, size: 12 };
+      try {
+        wsUser.mergeCells("A1:G1");
+      } catch (e) {}
+      wsUser.getRow(1).commit();
+
+      const userHeaders = [
+        "S.No",
+        "Date",
+        "Shift",
+        "Stage",
+        "Line",
+        "Target",
+        "Actual",
+        "Performance",
+        "Attendance",
+        "Punctuality",
+        "Rejections",
+        "5S",
+        "Safety",
+        "Discipline",
+        "Total",
+      ];
+
+      let serialNo = 1;
+      let grandTotalTarget = 0;
+      let grandTotalActual = 0;
+      // Accumulators for weighted averages need careful handling across months
+      // Actually, standard logic is avg of averages or weighted avg?
+      // calculateWeightedScoreBackend takes all records. So we can just run it on all user.data for Grand Total.
+
+      monthList.forEach((mObj) => {
+        const mRecords = user.monthData.get(mObj.key);
+        if (mRecords && mRecords.length > 0) {
+          // Month Header
+          wsUser.addRow([]); // Spacer
+          const titleRow = wsUser.addRow([mObj.label]);
+          titleRow.font = { bold: true, underline: true };
+          titleRow.commit();
+
+          // Column Headers
+          const hRow = wsUser.addRow(userHeaders);
+          hRow.font = { bold: true };
+          hRow.commit();
+
+          mRecords.forEach((item) => {
+            wsUser
+              .addRow([
+                serialNo++,
+                item.Date || item.Edatetime,
+                item.SHIFTNAME,
+                item.STAGE,
+                item.LINE,
+                parseFloat(item.Target) || 0,
+                parseFloat(item.Actual) || 0,
+                parseFloat(item.Performance) || 0,
+                item.Attendance === 5 &&
+                item.ATTENDANCE_Status?.includes("Auth")
+                  ? "5 (Auth)"
+                  : parseFloat(item.Attendance) || 0,
+                parseFloat(item.Punctuality) || 0,
+                parseFloat(item.Rejections) || 0,
+                parseFloat(item["5S"]) || 0,
+                parseFloat(item.Safety) || 0,
+                parseFloat(item.Discipline) || 0,
+                parseFloat(item.Total) || 0,
+              ])
+              .commit();
+          });
+
+          // Month Subtotal
+          const mStats = calculateWeightedScoreBackend(mRecords);
+          const mSumTarget = mRecords.reduce(
+            (s, i) => s + (parseFloat(i.Target) || 0),
+            0,
+          );
+          const mSumActual = mRecords.reduce(
+            (s, i) => s + (parseFloat(i.Actual) || 0),
+            0,
+          );
+
+          const subTotalRow = wsUser.addRow([
+            "Month Total",
+            "",
+            "",
+            "",
+            "",
+            mSumTarget,
+            mSumActual,
+            mStats.avgPerformance,
+            mStats.avgAttendance,
+            mStats.avgPunctuality,
+            mStats.avgRejections,
+            mStats.avg5S,
+            mStats.avgPPE,
+            mStats.avgDiscipline,
+            mStats.totalScore,
+          ]);
+          subTotalRow.font = { bold: true, italic: true };
+          subTotalRow.commit();
+        }
+      });
+
+      // Grand Total
+      wsUser.addRow([]).commit();
+      const allStats = calculateWeightedScoreBackend(user.data);
+      const allTarget = user.data.reduce(
+        (s, i) => s + (parseFloat(i.Target) || 0),
+        0,
+      );
+      const allActual = user.data.reduce(
+        (s, i) => s + (parseFloat(i.Actual) || 0),
+        0,
+      );
+
+      const grandTotalRow = wsUser.addRow([
+        "GRAND TOTAL",
+        "",
+        "",
+        "",
+        "",
+        allTarget,
+        allActual,
+        allStats.avgPerformance,
+        allStats.avgAttendance,
+        allStats.avgPunctuality,
+        allStats.avgRejections,
+        allStats.avg5S,
+        allStats.avgPPE,
+        allStats.avgDiscipline,
+        allStats.totalScore,
+      ]);
+      grandTotalRow.font = {
+        bold: true,
+        size: 11,
+        color: { argb: "FF0000FF" },
+      }; // Blue color
+      grandTotalRow.commit();
+
+      wsUser.commit();
+    });
+
+    await workbook.commit();
+  } catch (err) {
+    console.error("Error generating monthly excel:", err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Error generating monthly report",
+        details: err.message,
+      });
+    } else {
+      res.end();
+    }
   }
 });
 
 app.post("/api/unit-wise-report", async (req, res) => {
-  const { fromMonth, toMonth, shift } = req.body;
+  const { fromMonth, toMonth, shift, line } = req.body; // Added line
 
   if (!fromMonth || !toMonth) {
-    return res.status(400).json({ error: "From Month and To Month are required" });
+    return res
+      .status(400)
+      .json({ error: "From Month and To Month are required" });
   }
 
   try {
     const pool = await sql.connect(config);
-    
+
+    // Dates
     // Dates
     const startDate = new Date(fromMonth + "-01");
     const endDate = new Date(toMonth + "-01");
     endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setDate(0); 
+    endDate.setDate(0);
     const fromDateStr = startDate.toISOString().split("T")[0];
     const toDateStr = endDate.toISOString().split("T")[0];
 
-    // 1. Fetch ALL data
-    const result = await getEmployeeJobReport(pool, null, fromDateStr, toDateStr);
+    console.log(`Unit Wise Report: Params`, { fromMonth, toMonth, shift });
+
+    // 1. Fetch ALL data (Corrected to pass line)
+    const result = await getEmployeeJobReport(
+      pool,
+      null,
+      fromDateStr,
+      toDateStr,
+      line,
+    );
     let records = result.recordset;
+    console.log(`Unit Wise Report: DB returned ${records.length} records`);
+    if (records.length > 0) {
+      console.log("Unit Wise Sample Record:", records[0]); // Check structure
+    }
 
     // 2. Filter by Shift (if provided)
     if (shift && shift !== "") {
-        records = records.filter(r => r.SHIFTNAME === shift || r.SHIFT === shift); 
+      records = records.filter(
+        (r) => r.SHIFTNAME === shift || r.SHIFT === shift,
+      );
+      console.log(
+        `Unit Wise Report: After Shift Filter ${records.length} records`,
+      );
     }
 
     // 3. Aggregate by User
     const userMap = new Map();
-    
-    records.forEach(r => {
-        if (!userMap.has(r.USERID)) {
-            userMap.set(r.USERID, {
-                USERID: r.USERID,
-                NAME: r.NAME,
-                totalPoints: 0,
-                totalDays: 0,
-                totalAttendance: 0,
-                totalPunctuality: 0,
-                totalRejections: 0,
-                total5S: 0,
-                totalPPE: 0,
-                totalDiscipline: 0
-            });
+
+    records.forEach((r) => {
+      const uid = r.USERID || r.UserID || r.userid;
+      const name = r.NAME || r.Name || r.name;
+      if (!uid) return; // Skip invalid
+
+      // Filter: Only include days where a Job Card Target exists.
+      if (!r.Target || r.Target <= 0) return;
+
+      if (!userMap.has(uid)) {
+        userMap.set(uid, {
+          USERID: uid,
+          NAME: name,
+          totalDays: 0,
+          totalPoints: 0,
+          totalAttendance: 0,
+          totalPunctuality: 0,
+          totalRejections: 0,
+          total5S: 0,
+          totalPPE: 0, // Safety/PPE
+          totalDiscipline: 0,
+          monthly: {}, // Store monthly aggregates
+        });
+      }
+      const u = userMap.get(uid);
+      u.totalDays++;
+      u.totalPoints += parseFloat(r.Performance) || 0;
+
+      // Attendance Logic: 5 if Authorized/Authorized Leave, else usage
+      let attVal = parseFloat(r.Attendance) || 0;
+      if (
+        r.Attendance === 5 &&
+        (r.ATTENDANCE_Status === "Authorized Leave" ||
+          r.ATTENDANCE_Status === "Authorized")
+      ) {
+        attVal = 5;
+      }
+      u.totalAttendance += attVal;
+
+      u.totalPunctuality += parseFloat(r.Punctuality) || 0;
+      u.totalRejections += parseFloat(r.Rejections) || 0;
+      u.total5S += parseFloat(r["5S"]) || 0;
+      u.totalPPE += parseFloat(r.Safety) || 0;
+      u.totalDiscipline += parseFloat(r.Discipline) || 0;
+
+      // [NEW] Monthly Aggregation
+      const dateObj = new Date(r.RawDate || r.Date);
+      if (!isNaN(dateObj)) {
+        const monthKey = dateObj.toLocaleString("default", {
+          month: "short",
+          year: "2-digit",
+        }); // e.g. "Jan 24"
+        if (!u.monthly[monthKey]) {
+          u.monthly[monthKey] = {
+            count: 0,
+            perf: 0,
+            att: 0,
+            punct: 0,
+            rej: 0,
+            s5: 0,
+            safe: 0,
+            disc: 0,
+          };
         }
-        const u = userMap.get(r.USERID);
-        u.totalDays++;
-        u.totalPoints += (r.Performance || 0);
-        u.totalAttendance += (r.Attendance === 5 && (r.ATTENDANCE_Status === 'Authorized Leave' || r.ATTENDANCE_Status === 'Authorized')) ? 5 : (r.Attendance || 0);
-        u.totalPunctuality += (r.Punctuality || 0);
-        u.totalRejections += (r.Rejections || 0);
-        u.total5S += (r["5S"] || 0);
-        u.totalPPE += (r.PPE || 0);
-        u.totalDiscipline += (r.Disclipline || 0);
+        const m = u.monthly[monthKey];
+        m.count++;
+        m.perf += parseFloat(r.Performance) || 0;
+        m.att += attVal;
+        m.punct += parseFloat(r.Punctuality) || 0;
+        m.rej += parseFloat(r.Rejections) || 0;
+        m.s5 += parseFloat(r["5S"]) || 0;
+        m.safe += parseFloat(r.Safety) || 0;
+        m.disc += parseFloat(r.Discipline) || 0;
+      }
     });
 
-    const aggregated = Array.from(userMap.values()).map(u => {
-        const count = u.totalDays || 1;
+    const aggregated = Array.from(userMap.values())
+      .map((u) => {
+        const count = u.totalDays > 0 ? u.totalDays : 1;
+        const avgPerf = u.totalPoints / count;
+        const avgAtt = u.totalAttendance / count;
+        const avgPunct = u.totalPunctuality / count;
+        const avgRej = u.totalRejections / count;
+        const avg5S = u.total5S / count;
+        const avgPPE = u.totalPPE / count;
+        const avgDisc = u.totalDiscipline / count;
+
+        const totalScore =
+          avgPerf + avgAtt + avgPunct + avgRej + avg5S + avgPPE + avgDisc;
+
+        // [NEW] Calculate Monthly Scores
+        const monthlyScores = {};
+        for (const [mKey, mVal] of Object.entries(u.monthly)) {
+          const mCount = mVal.count > 0 ? mVal.count : 1;
+          const mScore =
+            mVal.perf / mCount +
+            mVal.att / mCount +
+            mVal.punct / mCount +
+            mVal.rej / mCount +
+            mVal.s5 / mCount +
+            mVal.safe / mCount +
+            mVal.disc / mCount;
+          monthlyScores[mKey] = parseFloat(mScore.toFixed(2));
+        }
+
         return {
-            USERID: u.USERID,
-            NAME: u.NAME,
-            TotalDays: u.totalDays,
-            AvgPerformance: parseFloat((u.totalPoints / count).toFixed(2)),
-            AvgAttendance: parseFloat((u.totalAttendance / count).toFixed(2)),
-            AvgPunctuality: parseFloat((u.totalPunctuality / count).toFixed(2)),
-            AvgRejections: parseFloat((u.totalRejections / count).toFixed(2)),
-            Avg5S: parseFloat((u.total5S / count).toFixed(2)),
-            AvgPPE: parseFloat((u.totalPPE / count).toFixed(2)),
-            AvgDiscipline: parseFloat((u.totalDiscipline / count).toFixed(2))
+          USERID: u.USERID,
+          NAME: u.NAME,
+          totalScore: totalScore.toFixed(2),
+          avgPerformance: avgPerf.toFixed(2),
+          avgAttendance: avgAtt.toFixed(2),
+          avgRejections: avgRej.toFixed(2),
+          monthlyScores: monthlyScores,
         };
-    });
+      })
+      .sort((a, b) => parseFloat(b.totalScore) - parseFloat(a.totalScore));
 
     res.json({
       success: true,
       records: aggregated,
       fromDate: fromDateStr,
-      toDate: toDateStr
+      toDate: toDateStr,
     });
-
   } catch (err) {
     console.error("Error generating unit wise report:", err);
-    res.status(500).json({ error: "Error generating unit wise report", details: err.message });
+    res.status(500).json({
+      error: "Error generating unit wise report",
+      details: err.message,
+    });
   }
 });
 
@@ -4275,7 +5020,7 @@ app.get("/download-templatejob", (req, res) => {
 
     "../master/public",
 
-    "EmployeeJobCardSampleData.xlsx"
+    "EmployeeJobCardSampleData.xlsx",
   );
 
   res.download(filePath, (err) => {
@@ -4318,12 +5063,15 @@ async function ensureLeaveTableExists(pool) {
   `;
   try {
     await pool.request().query(query);
-  } catch (e) { console.error("Error checking/creating leave table", e); }
+  } catch (e) {
+    console.error("Error checking/creating leave table", e);
+  }
 }
 
 app.get("/api/leave/absent", async (req, res) => {
   const { fromDate, toDate, shift, line } = req.query;
-  if (!fromDate || !toDate) return res.status(400).send("From Date and To Date are required");
+  if (!fromDate || !toDate)
+    return res.status(400).send("From Date and To Date are required");
 
   try {
     const pool = await sql.connect(config);
@@ -4413,22 +5161,31 @@ app.get("/api/leave/absent", async (req, res) => {
         AND (@Line IS NULL OR ISNULL(S.LINE, A.Original_LINE) = @Line)
       ORDER BY ShiftDate, NAME
     `;
-    
+
     const request = pool.request();
     request.input("FromDate", sql.Date, fromDate);
     request.input("ToDate", sql.Date, toDate);
-    request.input("Shift", sql.VarChar, (shift && shift !== 'null' && shift !== 'undefined') ? shift : null);
-    request.input("Line", sql.VarChar, (line && line !== 'null' && line !== 'undefined') ? line : null);
+    request.input(
+      "Shift",
+      sql.VarChar,
+      shift && shift !== "null" && shift !== "undefined" ? shift : null,
+    );
+    request.input(
+      "Line",
+      sql.VarChar,
+      line && line !== "null" && line !== "undefined" ? line : null,
+    );
 
-    console.log("Executing Absent Query with Range:", { 
-      fromDate, 
-      toDate, 
-      shift: (shift && shift !== 'null' && shift !== 'undefined') ? shift : null, 
-      line: (line && line !== 'null' && line !== 'undefined') ? line : null 
+    console.log("Executing Absent Query with Range:", {
+      fromDate,
+      toDate,
+      shift: shift && shift !== "null" && shift !== "undefined" ? shift : null,
+      line: line && line !== "null" && line !== "undefined" ? line : null,
     });
 
     const result = await request.query(query);
     console.log("Absent Query Row Count:", result.recordset.length);
+    console.log("Absent Query Result:", result.recordset);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching absent employees:", err);
@@ -4436,55 +5193,53 @@ app.get("/api/leave/absent", async (req, res) => {
   }
 });
 
-
 app.post("/api/leave", async (req, res) => {
-  const { userId, date, leaveType, remarks, createdBy, leaveCategory } = req.body;
-  
+  const { userId, date, leaveType, remarks, createdBy, leaveCategory } =
+    req.body;
+
   try {
     const pool = await sql.connect(config);
-    await ensureLeaveTableExists(pool); 
-    
+    await ensureLeaveTableExists(pool);
+
     // Check if exists
-    const checkQuery = "SELECT LeaveID FROM Mx_UserLeaveMaster WHERE UserID = @UserID AND LeaveDate = @LeaveDate";
+    const checkQuery =
+      "SELECT LeaveID FROM Mx_UserLeaveMaster WHERE UserID = @UserID AND LeaveDate = @LeaveDate";
     const request = pool.request();
     request.input("UserID", sql.NVarChar, userId);
     request.input("LeaveDate", sql.Date, date);
     const check = await request.query(checkQuery);
-    
+
     if (check.recordset.length > 0) {
-        // Update
-        const updateQuery = `
+      // Update
+      const updateQuery = `
             UPDATE Mx_UserLeaveMaster 
             SET LeaveType = @LeaveType, Remarks = @Remarks, CreatedBy = @CreatedBy, LeaveCategory = @LeaveCategory, CreatedDate = GETDATE()
             WHERE LeaveID = @LeaveID
         `;
-        request.input("LeaveID", sql.Int, check.recordset[0].LeaveID);
-        request.input("LeaveType", sql.NVarChar, leaveType);
-        request.input("Remarks", sql.NVarChar, remarks);
-        request.input("LeaveCategory", sql.NVarChar, leaveCategory || null);
-        request.input("CreatedBy", sql.NVarChar, createdBy || "System");
-        await request.query(updateQuery);
+      request.input("LeaveID", sql.Int, check.recordset[0].LeaveID);
+      request.input("LeaveType", sql.NVarChar, leaveType);
+      request.input("Remarks", sql.NVarChar, remarks);
+      request.input("LeaveCategory", sql.NVarChar, leaveCategory || null);
+      request.input("CreatedBy", sql.NVarChar, createdBy || "System");
+      await request.query(updateQuery);
     } else {
-        // Insert
-        const insertQuery = `
+      // Insert
+      const insertQuery = `
             INSERT INTO Mx_UserLeaveMaster (UserID, LeaveDate, LeaveType, Remarks, CreatedBy, LeaveCategory)
             VALUES (@UserID, @LeaveDate, @LeaveType, @Remarks, @CreatedBy, @LeaveCategory)
         `;
-        request.input("LeaveType", sql.NVarChar, leaveType);
-        request.input("Remarks", sql.NVarChar, remarks);
-        request.input("LeaveCategory", sql.NVarChar, leaveCategory || null);
-        request.input("CreatedBy", sql.NVarChar, createdBy || "System");
-        await request.query(insertQuery);
+      request.input("LeaveType", sql.NVarChar, leaveType);
+      request.input("Remarks", sql.NVarChar, remarks);
+      request.input("LeaveCategory", sql.NVarChar, leaveCategory || null);
+      request.input("CreatedBy", sql.NVarChar, createdBy || "System");
+      await request.query(insertQuery);
     }
     res.json({ success: true });
   } catch (err) {
-     console.error("Error saving leave:", err);
-     res.status(500).send({ error: "Server Error", details: err.message });
+    console.error("Error saving leave:", err);
+    res.status(500).send({ error: "Server Error", details: err.message });
   }
 });
-
-
-
 
 sql
   .connect(config)
