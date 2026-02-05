@@ -111,6 +111,11 @@ const LeaveManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
 
+  /* User Access Control */
+  const AdminFlag = parseInt(sessionStorage.getItem("AdminFlag")) || 0;
+  const userLine = sessionStorage.getItem("Line") || "";
+  const isAdmin = AdminFlag === 1;
+
   // Debounce Logic
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -129,13 +134,27 @@ const LeaveManagement = () => {
           axios.get("https://192.168.2.54/api/lines"),
         ]);
         setShifts(shiftRes.data || []);
-        setLines(lineRes.data || []);
+        
+        // Filter lines based on user access
+        if (!isAdmin && userLine) {
+          const userLines = userLine.split(',').map(l => l.trim());
+          const filteredLines = lineRes.data.filter(line => 
+            userLines.includes(line.LINE)
+          );
+          setLines(filteredLines);
+          // Auto-select user's line if they have only one
+          if (userLines.length === 1) {
+            setSelectedLine(userLines[0]);
+          }
+        } else {
+          setLines(lineRes.data || []);
+        }
       } catch (err) {
         console.error("Error fetching filters", err);
       }
     };
     fetchFilters();
-  }, []);
+  }, [isAdmin, userLine]);
 
   const fetchAbsent = async () => {
     setLoading(true);
@@ -143,13 +162,21 @@ const LeaveManagement = () => {
     setError("");
     setCurrentPage(1); // Reset pagination on fetch
     try {
+      // Prepare request parameters
+      const params = {
+        fromDate,
+        toDate,
+        shift: selectedShift,
+        line: selectedLine,
+      };
+
+      // If not admin, enforce LINE restriction
+      if (!isAdmin && userLine) {
+        params.userLine = userLine;
+      }
+
       const res = await axios.get("https://192.168.2.54/api/leave/absent", {
-        params: {
-          fromDate,
-          toDate,
-          shift: selectedShift,
-          line: selectedLine,
-        },
+        params,
       });
       setEmployees(res.data || []);
       if (res.data && res.data.length === 0) {

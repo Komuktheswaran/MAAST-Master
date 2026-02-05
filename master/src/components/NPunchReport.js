@@ -38,12 +38,16 @@ const NPunchReport = () => {
   const [employeeIdInput, setEmployeeIdInput] = useState("");
   const [selectedPunches, setSelectedPunches] = useState(null); // null = modal closed
   const [modalDate, setModalDate] = useState(""); // show which day we're viewing
+  const [isInactive, setIsInactive] = useState(false);
 
   // Load employees once
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://192.168.2.54/api/employees");
+        const url = isInactive
+          ? "https://192.168.2.54/api/employees-inactive"
+          : "https://192.168.2.54/api/employees";
+        const res = await axios.get(url);
 
         if (Array.isArray(res.data)) {
           const formatted = res.data.map((emp) => ({
@@ -60,7 +64,7 @@ const NPunchReport = () => {
     };
 
     fetchEmployees();
-  }, []);
+  }, [isInactive]);
   useEffect(() => {
     if (employeeIdInput.length > 0) {
       const filtered = allEmployees.filter((emp) => {
@@ -374,13 +378,22 @@ const NPunchReport = () => {
       )}
 
       <div className="glass-card p-4 mb-4">
+        <div className="d-flex justify-content-end mb-2">
+          <Form.Check
+            type="switch"
+            id="inactive-switch"
+            label="Show Inactive Employees"
+            checked={isInactive}
+            onChange={(e) => setIsInactive(e.target.checked)}
+          />
+        </div>
         <Row className="mb-3">
           <Col md={3}>
             <label className="form-label">Select Employee</label>
             <Select
               options={employeeOptions}
               value={
-                employeeOptions.find((opt) => opt.value === userid) || null
+                allEmployees.find((opt) => opt.value === userid) || null
               }
               onChange={(selected) => {
                 setUserid(selected ? selected.value : "");

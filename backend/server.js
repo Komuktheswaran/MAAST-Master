@@ -1002,7 +1002,7 @@ app.get("/api/user-skills", async (req, res) => {
   try {
     let pool = await sql.connect(config);
     let result = await pool.request().query(`
-          SELECT P2.NAME, P3.STAGE_NAME, P4.Skill_Description, P1.USERID
+          SELECT P2.NAME, P3.STAGE_NAME, P4.Skill_Description, P4.Skill_Rating, P1.USERID
           FROM Mx_UserSkills AS P1
           LEFT OUTER JOIN Mx_UserMst AS P2 ON P1.USERID = P2.USERID
           LEFT OUTER JOIN MX_STAGEMASTER AS P3 ON P1.STAGE_ID = P3.stage_id
@@ -1011,6 +1011,36 @@ app.get("/api/user-skills", async (req, res) => {
     res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching user skills:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+// Fetch user details (DOJ, Education, Designation, Unit, Department)
+app.get("/api/user-details", async (req, res) => {
+  try {
+    let pool = await sql.connect(config);
+    let result = await pool.request().query(`
+      
+        
+        SELECT
+    u.UserID,
+    u.NAME AS Name,
+    COALESCE(NULLIF(u.FullName, ''), CONCAT_WS(' ', u.FirstName, u.MiddleName, u.LastName)) AS [Name],
+    u.JoinDT AS [DOJ],
+    u.Qualification AS [Education],
+    des.Name AS [Designation],
+    org.Name AS [Unit],
+    dpt.Name AS [Department]
+FROM dbo.Mx_UserMst AS u
+LEFT JOIN dbo.Mx_DesignationMst AS des ON u.DSGID = des.DSGID
+LEFT JOIN dbo.Mx_DepartmentMst AS dpt ON u.DPTID = dpt.DPTID
+LEFT JOIN dbo.Mx_OrganizationMst AS org ON u.ORGID = org.ORGID
+WHERE u.UserID IS NOT NULL
+ORDER BY u.NAME ;
+    `);
+    res.json(result.recordset);
+  } catch (error) {
+    console.error("Error fetching user details:", error);
     res.status(500).send("Server error");
   }
 });
@@ -3049,7 +3079,7 @@ app.put("/api/carousel-images/bulk-order", async (req, res) => {
   }
 });
 
-app.post("/api/employee-history", async (req, res) => {
+const employeeHistoryHandler = async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
   console.log(req.body);
 
@@ -3268,7 +3298,9 @@ ORDER BY SL_NO;
   } finally {
     await sql.close();
   }
-});
+};
+app.post("/api/employee-history", employeeHistoryHandler);
+app.post("/api/employee-history-inactive", employeeHistoryHandler);
 
 app.get("/api/employees", async (req, res) => {
   try {
@@ -3304,7 +3336,24 @@ app.get("/api/employees-showall", async (req, res) => {
   }
 });
 
-app.get("/api/punch_report", async (req, res) => {
+app.get("/api/employees-inactive", async (req, res) => {
+  try {
+    await sql.connect(config);
+    const result = await sql.query(`
+      SELECT userid, name, UserIDEnbl
+      FROM dbo.MX_USERMST
+      where ISNULL(UserIDEnbl, 0) = 0
+      ORDER BY userid
+    `);
+    console.log("Inactive Employees Query Result:", result.recordset);
+    res.json(result.recordset); 
+  } catch (err) {
+    console.error("Error fetching inactive employees:", err);
+    res.status(500).json({ error: "Failed to fetch inactive employees" });
+  }
+});
+
+const punchReportHandler = async (req, res) => {
   try {
     console.log(req.query);
     // 1. Read & validate query-string parameters
@@ -3626,7 +3675,7 @@ LEFT   JOIN WorkingHoursCalculation WHC
        AND WHC.SFTID = PD.SFTID
 WHERE  PD.WorkDate IS NOT NULL
 ORDER  BY PD.WorkDate
-OPTION (MAXRECURSION 366);
+OPTION (MAXRECURSION 0);
 
 
 `;
@@ -3650,9 +3699,11 @@ OPTION (MAXRECURSION 366);
       .status(500)
       .json({ error: "Server Error", details: String(err) });
   }
-});
+};
+app.get("/api/punch_report", punchReportHandler);
+app.get("/api/punch_report_inactive", punchReportHandler);
 
-app.post("/api/employee-punctuality", async (req, res) => {
+const employeePunctualityHandler = async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
   console.log(req.body);
   if (!employeeId) {
@@ -3867,7 +3918,9 @@ ORDER BY EmployeePunctuality.[DATE] ASC;
   } finally {
     await sql.close();
   }
-});
+};
+app.post("/api/employee-punctuality", employeePunctualityHandler);
+app.post("/api/employee-punctuality-inactive", employeePunctualityHandler);
 
 app.post("/api/jobcard-upload", async (req, res) => {
   const records = req.body; // Expecting an array like [{ Edatetime, UserID, Job_Target, ... }, ...]
@@ -4089,11 +4142,19 @@ async function getEmployeeJobReport(pool, employeeId, fromDate, toDate, line) {
   request.input("Line", sql.VarChar, line || null);
 
   /* 
-     Dynamic Weightage Logic & New Calculation Rules:
-     - Optimization: Fetch Weightages ONCE into variables instead of subquery per row
+     OPTIMIZED QUERY FOR MILLIONS OF RECORDS
+     Key Optimizations:
+     1. Temp tables with indexes for filtered data
+     2. Pre-calculated shift windows
+     3. Single-pass punch time lookup
+     4. Eliminated redundant OUTER APPLY
+     5. Early filtering on all tables
   */
 
   const query = `
+    SET NOCOUNT ON;
+    
+    -- Fetch weightages once
     DECLARE @W_Performance DECIMAL(10,2), @W_Attendance DECIMAL(10,2), @W_Punctuality DECIMAL(10,2),
             @W_Rejections DECIMAL(10,2), @W_5S DECIMAL(10,2), @W_PPE DECIMAL(10,2), 
             @W_Safety DECIMAL(10,2), @W_Discipline DECIMAL(10,2);
@@ -4107,131 +4168,170 @@ async function getEmployeeJobReport(pool, employeeId, fromDate, toDate, line) {
         @W_PPE = MAX(CASE WHEN CategoryName = 'PPE' THEN Weightage ELSE 0 END),
         @W_Safety = MAX(CASE WHEN CategoryName = 'Safety' THEN Weightage ELSE 0 END),
         @W_Discipline = MAX(CASE WHEN CategoryName = 'Discipline' THEN Weightage ELSE 0 END)
-    FROM Mx_JobCardWeightage;
+    FROM Mx_JobCardWeightage WITH (NOLOCK);
 
-    WITH EffectiveShifts AS (
-        -- 1. Swaps (Highest Priority)
-        SELECT 
-            Swap_userid AS USERID,
-            Shift_date AS [DATE],
-            Shift_id AS SHIFTNAME,
-            stage_id,
-            LINE
-        FROM Mx_Userswap WITH (NOLOCK)
-        WHERE Shift_date BETWEEN @FromDate AND @ToDate
-        
-        UNION ALL
-        
-        -- 2. Regular Shifts (If no swap)
-        SELECT 
-            USERID,
-            Shift_date_from AS [DATE],
-            SHIFT_ID AS SHIFTNAME,
-            stage_id,
-            LINE
-        FROM Mx_UserShifts S WITH (NOLOCK)
-        WHERE Shift_date_from BETWEEN @FromDate AND @ToDate
-        AND NOT EXISTS (
-            SELECT 1 FROM Mx_Userswap SW WITH (NOLOCK)
-            WHERE SW.Swap_userid = S.USERID 
-            AND SW.Shift_date = S.Shift_date_from
-        )
-    ),
-    EmployeeJobreport AS (
-        -- Part 1: Shifts with Job Cards
+    -- Create indexed temp table for filtered shifts (swaps + regular)
+    CREATE TABLE #EffectiveShifts (
+        USERID VARCHAR(50) NOT NULL,
+        ShiftDate DATE NOT NULL,
+        SHIFTNAME VARCHAR(50),
+        stage_id INT,
+        LINE VARCHAR(50),
+        IsSwap BIT,
+        INDEX IX_User_Date NONCLUSTERED (USERID, ShiftDate),
+        INDEX IX_Date NONCLUSTERED (ShiftDate)
+    );
+
+    -- Insert swaps first (highest priority)
+    INSERT INTO #EffectiveShifts (USERID, ShiftDate, SHIFTNAME, stage_id, LINE, IsSwap)
+    SELECT 
+        Swap_userid,
+        Shift_date,
+        Shift_id,
+        stage_id,
+        LINE,
+        1
+    FROM Mx_Userswap WITH (NOLOCK)
+    WHERE Shift_date BETWEEN @FromDate AND @ToDate
+      AND (@EmployeeId IS NULL OR Swap_userid = @EmployeeId)
+      AND (@Line IS NULL OR LINE = @Line);
+
+    -- Insert regular shifts (only if not swapped)
+    INSERT INTO #EffectiveShifts (USERID, ShiftDate, SHIFTNAME, stage_id, LINE, IsSwap)
+    SELECT 
+        S.USERID,
+        S.Shift_date_from,
+        S.SHIFT_ID,
+        S.stage_id,
+        S.LINE,
+        0
+    FROM Mx_UserShifts S WITH (NOLOCK)
+    WHERE S.Shift_date_from BETWEEN @FromDate AND @ToDate
+      AND (@EmployeeId IS NULL OR S.USERID = @EmployeeId)
+      AND (@Line IS NULL OR S.LINE = @Line)
+      AND NOT EXISTS (
+          SELECT 1 FROM #EffectiveShifts ES 
+          WHERE ES.USERID = S.USERID AND ES.ShiftDate = S.Shift_date_from
+      );
+
+    -- Create temp table for shift windows (pre-calculated datetimes)
+    CREATE TABLE #ShiftWindows (
+        USERID VARCHAR(50) NOT NULL,
+        ShiftDate DATE NOT NULL,
+        SHIFTNAME VARCHAR(50),
+        stage_id INT,
+        LINE VARCHAR(50),
+        ShiftDisplay VARCHAR(20),
+        ScheduledStartTime VARCHAR(10),
+        ShiftStartDateTime DATETIME,
+        ShiftEndDateTime DATETIME,
+        PunchWindowStart DATETIME,
+        INDEX IX_User_Date NONCLUSTERED (USERID, ShiftDate)
+    );
+
+    -- Calculate shift windows once
+    INSERT INTO #ShiftWindows
+    SELECT 
+        ES.USERID,
+        ES.ShiftDate,
+        ES.SHIFTNAME,
+        ES.stage_id,
+        ES.LINE,
+        CONCAT(FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm'), '-', FORMAT(CAST(MS.SFTEDTime AS DATETIME), 'HH:mm')) AS ShiftDisplay,
+        FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm') AS ScheduledStartTime,
+        -- Shift start datetime
+        CAST(CONVERT(VARCHAR(10), ES.ShiftDate, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME) AS ShiftStartDateTime,
+        -- Shift end datetime (handle overnight shifts)
+        CASE 
+            WHEN MS.SFTEDTime < MS.SFTSTTime
+            THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), ES.ShiftDate, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
+            ELSE CAST(CONVERT(VARCHAR(10), ES.ShiftDate, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
+        END AS ShiftEndDateTime,
+        -- Punch window start (45 min before shift)
+        DATEADD(MINUTE, -45, CAST(CONVERT(VARCHAR(10), ES.ShiftDate, 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME)) AS PunchWindowStart
+    FROM #EffectiveShifts ES
+    LEFT JOIN Mx_ShiftMst MS WITH (NOLOCK) ON ES.SHIFTNAME = MS.SFTID;
+
+    -- Create temp table for first punch times (indexed for fast lookup)
+    CREATE TABLE #PunchTimes (
+        USERID VARCHAR(50) NOT NULL,
+        ShiftDate DATE NOT NULL,
+        FirstPunchTime DATETIME,
+        INDEX IX_User_Date NONCLUSTERED (USERID, ShiftDate)
+    );
+
+    -- Get first punch for each user/shift using indexed query
+    INSERT INTO #PunchTimes
+    SELECT 
+        SW.USERID,
+        SW.ShiftDate,
+        MIN(A.Edatetime) AS FirstPunchTime
+    FROM #ShiftWindows SW
+    INNER JOIN Mx_ATDEventTrn A WITH (NOLOCK) 
+        ON A.USERID = SW.USERID
+        AND A.Edatetime >= SW.PunchWindowStart
+        AND A.Edatetime <= SW.ShiftEndDateTime
+    GROUP BY SW.USERID, SW.ShiftDate;
+
+    -- Main query: Join all temp tables
+    WITH EmployeeJobReport AS (
         SELECT 
             U.USERID,
             U.NAME,
-            SW.[DATE],
-            CONCAT(FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm'), '-', FORMAT(CAST(MS.SFTEDTime AS DATETIME), 'HH:mm')) AS SHIFT,
-            FORMAT(CAST(MS.SFTSTTime AS DATETIME), 'HH:mm') AS ScheduledStart,
-            SW.LINE,        
+            SW.ShiftDate AS [DATE],
+            SW.ShiftDisplay AS SHIFT,
+            SW.ScheduledStartTime AS ScheduledStart,
+            SW.LINE,
             ST.stage_name AS STAGE,
             SW.SHIFTNAME,
-            FORMAT(ATD.PunchIn, 'HH:mm') AS ActualPunch,
+            FORMAT(PT.FirstPunchTime, 'HH:mm') AS ActualPunch,
             
-            -- Attendance Status Logic
+            -- Attendance status
             CASE 
-                WHEN ATD.PunchIn IS NOT NULL THEN 'Present' 
+                WHEN PT.FirstPunchTime IS NOT NULL THEN 'Present' 
                 WHEN LM.LeaveType = 'Authorized' THEN 'Authorized Leave' 
                 ELSE 'Absent' 
             END AS ATTENDANCE_Status,
 
-            ISNULL(J.Job_Target,0) AS Job_Target,
-            ISNULL(J.Job_Actual,0) AS Job_Actual,
-            ISNULL(J.Job_Rejns,0) AS Job_Rejns,
-            ISNULL(J.job_5S,0) AS Job_5S,
-            ISNULL(J.PPE,0) AS PPE, -- Assuming this mapped to Safety/PPE usage? Wait, usually PPE is Separate.
-            ISNULL(J.Job_Disclipline,0) AS Job_Disclipline,
+            ISNULL(J.Job_Target, 0) AS Job_Target,
+            ISNULL(J.Job_Actual, 0) AS Job_Actual,
+            ISNULL(J.Job_Rejns, 0) AS Job_Rejns,
+            ISNULL(J.job_5S, 0) AS Job_5S,
+            ISNULL(J.PPE, 0) AS PPE,
+            ISNULL(J.Job_Disclipline, 0) AS Job_Disclipline,
             
-            ShiftStartCalc -- Pass for outer calc
-        FROM EffectiveShifts SW
+            -- Pre-calculated values for punctuality
+            SW.ShiftStartDateTime,
+            PT.FirstPunchTime
+            
+        FROM #ShiftWindows SW
         INNER JOIN MX_USERMST U WITH (NOLOCK) ON SW.USERID = U.USERID
-        LEFT JOIN Mx_UserJobCard J WITH (NOLOCK) ON SW.USERID = J.USERID AND J.Edatetime = SW.[DATE]
-        LEFT JOIN Mx_ShiftMst MS WITH (NOLOCK) ON SW.SHIFTNAME = MS.SFTID
+        LEFT JOIN #PunchTimes PT ON SW.USERID = PT.USERID AND SW.ShiftDate = PT.ShiftDate
+        LEFT JOIN Mx_UserJobCard J WITH (NOLOCK) ON SW.USERID = J.USERID AND J.Edatetime = SW.ShiftDate
         LEFT JOIN Mx_STAGEMASTER ST WITH (NOLOCK) ON SW.stage_id = ST.stage_id
-        LEFT JOIN Mx_UserLeaveMaster LM WITH (NOLOCK) ON SW.USERID = LM.UserID AND SW.[DATE] = LM.LeaveDate
-        OUTER APPLY (
-            SELECT 
-                ShiftStartCalc = CAST(CONVERT(VARCHAR(10), SW.[DATE], 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTSTTime, 108) AS DATETIME),
-                ShiftEndCalc = CASE 
-                    WHEN MS.SFTEDTime < MS.SFTSTTime
-                    THEN DATEADD(DAY, 1, CAST(CONVERT(VARCHAR(10), SW.[DATE], 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME))
-                    ELSE CAST(CONVERT(VARCHAR(10), SW.[DATE], 120) + ' ' + CONVERT(VARCHAR(8), MS.SFTEDTime, 108) AS DATETIME)
-                END
-        ) AS ShiftCalc
-        OUTER APPLY (
-            SELECT MIN(A.Edatetime) AS PunchIn
-            FROM Mx_ATDEventTrn A WITH (NOLOCK)
-            WHERE A.USERID = SW.USERID
-            AND A.Edatetime >= DATEADD(MINUTE, -45, ShiftCalc.ShiftStartCalc)
-            AND A.Edatetime <= ShiftCalc.ShiftEndCalc
-        ) ATD
-        WHERE SW.[DATE] BETWEEN @FromDate AND @ToDate
-        AND (@EmployeeId IS NULL OR SW.USERID = @EmployeeId)
-        AND (@Line IS NULL OR SW.LINE = @Line)
-
-    UNION ALL
-
-    -- Part 2: Attendance Only (No Shifts assigned but present? Or just fill gaps?)
-    -- Simplified: Logic usually requires shifts. Keeping this part to match exist implementation but filtering by Line/Emp.
-    SELECT 
-        U.USERID,
-        U.NAME,
-        CAST(A.Edatetime AS DATE) AS [DATE],
-        NULL AS SHIFT,
-        NULL AS ScheduledStart,
-        NULL AS LINE,
-        NULL AS STAGE,
-        NULL AS SHIFTNAME,
-        FORMAT(MIN(A.Edatetime), 'HH:mm') AS ActualPunch,
-        'Present' AS ATTENDANCE_Status,
-        0 AS Job_Target, 0 AS Job_Actual, 0 AS Job_Rejns, 0 AS Job_5S, 0 AS PPE, 0 AS Job_Disclipline,
-        NULL AS ShiftStartCalc
-    FROM Mx_ATDEventTrn A WITH (NOLOCK)
-    INNER JOIN MX_USERMST U WITH (NOLOCK) ON A.USERID = U.USERID
-    WHERE CAST(A.Edatetime AS DATE) BETWEEN @FromDate AND @ToDate
-      AND (@EmployeeId IS NULL OR A.USERID = @EmployeeId)
-      -- AND (@Line IS NULL OR ... ) -- Cannot filter by Line if no shift.
-      AND NOT EXISTS (SELECT 1 FROM Mx_UserShifts S WHERE S.USERID = A.USERID AND S.Shift_date_from = CAST(A.Edatetime AS DATE))
-      AND NOT EXISTS (SELECT 1 FROM Mx_Userswap SW WHERE SW.Swap_userid = A.USERID AND SW.Shift_date = CAST(A.Edatetime AS DATE))
-    GROUP BY U.UserID, U.NAME, CAST(A.Edatetime AS DATE)
+        LEFT JOIN Mx_UserLeaveMaster LM WITH (NOLOCK) ON SW.USERID = LM.UserID AND SW.ShiftDate = LM.LeaveDate
     )
     SELECT 
-        UserID, NAME,
+        USERID, 
+        NAME,
         CONVERT(VARCHAR(10), [DATE], 103) AS Date,
-        [DATE] as RawDate,
-        SHIFTNAME, STAGE, LINE, ActualPunch, ScheduledStart,
+        [DATE] AS RawDate,
+        SHIFTNAME, 
+        STAGE, 
+        LINE, 
+        ActualPunch, 
+        ScheduledStart,
         Job_Target AS Target,
         Job_Actual AS Actual,
         
-        -- Calculations
+        -- Performance calculation
         CAST(CASE 
             WHEN Job_Target > 0 
             THEN (CAST(Job_Actual AS FLOAT) / Job_Target) * @W_Performance 
             ELSE 0 
         END AS DECIMAL(10,2)) AS Performance,
 
+        -- Attendance calculation
         CAST(CASE 
             WHEN ATTENDANCE_Status IN ('Present', 'Authorized Leave') 
             THEN @W_Attendance 
@@ -4240,52 +4340,44 @@ async function getEmployeeJobReport(pool, employeeId, fromDate, toDate, line) {
 
         ATTENDANCE_Status,
 
-        -- Punctuality: "before 5 minutes from shift start time"
-        -- Implies: ShiftStart - PunchIn >= 5 minutes ... OR PunchIn <= ShiftStart - 5 mins
+        -- Punctuality (5 minutes before shift start)
         CAST(CASE 
-            WHEN ActualPunch IS NOT NULL AND ShiftStartCalc IS NOT NULL 
-                 AND DATEADD(MINUTE, -5, ShiftStartCalc) >= CAST([DATE] AS DATETIME) + CAST(ActualPunch AS DATETIME) -- Approximation logic
-                 -- Better: Compare PunchIn vs ShiftStartCalc - 5 mins
-                 -- Since we don't have exact datetime in this outer select easily without re-join or complex CASE:
-                 -- We know 'ActualPunch' is HH:mm. 'ShiftStartCalc' was full datetime.
-                 -- Let's rely on 'JobReport' logic or Simplified check:
-                -- Re-implementing simplified logic inside CASE:
-                 AND (CAST(ActualPunch as TIME) <= CAST(DATEADD(MINUTE, -5, ScheduledStart) as TIME)) -- Risk of date crossover.
-            THEN @W_Punctuality
-            -- Fallback for simple check:
-            WHEN ActualPunch IS NOT NULL AND ScheduledStart IS NOT NULL
-                 AND DATEDIFF(MINUTE, CAST(ActualPunch as TIME), CAST(ScheduledStart as TIME)) >= 5
+            WHEN FirstPunchTime IS NOT NULL 
+                 AND FirstPunchTime <= DATEADD(MINUTE, -5, ShiftStartDateTime)
             THEN @W_Punctuality
             ELSE 0 
         END AS DECIMAL(10,2)) AS Punctuality,
 
         Job_5S AS [5S],
         Job_Rejns AS Rejections,
-        PPE AS Safety, -- Mapping PPE col to "Safety and PPE"
+        PPE AS Safety,
         Job_Disclipline AS Discipline,
 
-        -- TOTAL
+        -- Total calculation
         CAST(
             (CASE WHEN Job_Target > 0 THEN (CAST(Job_Actual AS FLOAT) / Job_Target) * @W_Performance ELSE 0 END)
             + (CASE WHEN ATTENDANCE_Status IN ('Present', 'Authorized Leave') THEN @W_Attendance ELSE 0 END)
-            + (CASE 
-                WHEN ActualPunch IS NOT NULL AND ScheduledStart IS NOT NULL
-                 AND DATEDIFF(MINUTE, CAST(ActualPunch as TIME), CAST(ScheduledStart as TIME)) >= 5
-                THEN @W_Punctuality ELSE 0 END)
-            + ISNULL(Job_Rejns,0) 
-            + ISNULL(Job_5S,0) 
-            + ISNULL(PPE,0) 
-            + ISNULL(Job_Disclipline,0)
+            + (CASE WHEN FirstPunchTime IS NOT NULL AND FirstPunchTime <= DATEADD(MINUTE, -5, ShiftStartDateTime)
+                    THEN @W_Punctuality ELSE 0 END)
+            + ISNULL(Job_Rejns, 0) 
+            + ISNULL(Job_5S, 0) 
+            + ISNULL(PPE, 0) 
+            + ISNULL(Job_Disclipline, 0)
         AS DECIMAL(10,2)) AS Total
-    FROM EmployeeJobreport
+    FROM EmployeeJobReport
     ORDER BY RawDate ASC
-    OPTION (RECOMPILE, MAXDOP 4);
+    OPTION (MAXDOP 4);
+
+    -- Cleanup temp tables
+    DROP TABLE #EffectiveShifts;
+    DROP TABLE #ShiftWindows;
+    DROP TABLE #PunchTimes;
   `;
 
   return request.query(query);
 }
 
-app.post("/api/employee-Jobreport", async (req, res) => {
+const employeeJobReportHandler = async (req, res) => {
   const { employeeId, fromDate, toDate } = req.body;
 
   try {
@@ -4305,9 +4397,11 @@ app.post("/api/employee-Jobreport", async (req, res) => {
     console.error("Error fetching Jobreport:", err);
     res.status(500).send("Error fetching Jobreport details");
   }
-});
+};
+app.post("/api/employee-Jobreport", employeeJobReportHandler);
+app.post("/api/employee-Jobreport-inactive", employeeJobReportHandler);
 
-app.post("/api/monthly-job-card-report", async (req, res) => {
+const monthlyJobCardReportHandler = async (req, res) => {
   console.log("Monthly Job Card Report Request:", req.body);
   const { fromMonth, toMonth, employeeId, line } = req.body;
 
@@ -4435,7 +4529,9 @@ app.post("/api/monthly-job-card-report", async (req, res) => {
       .status(500)
       .json({ error: "Error generating monthly report", details: err.message });
   }
-});
+};
+app.post("/api/monthly-job-card-report", monthlyJobCardReportHandler);
+app.post("/api/monthly-job-card-report-inactive", monthlyJobCardReportHandler);
 
 const ExcelJS = require("exceljs");
 
@@ -4504,7 +4600,7 @@ function calculateWeightedScoreBackend(userData) {
   };
 }
 
-app.post("/api/monthly-job-card-excel", async (req, res) => {
+const monthlyJobCardExcelHandler = async (req, res) => {
   const { fromMonth, toMonth, employeeId, line } = req.body;
   console.log("Monthly Job Card Excel Request:", req.body);
 
@@ -4831,9 +4927,14 @@ app.post("/api/monthly-job-card-excel", async (req, res) => {
       res.end();
     }
   }
-});
+};
+app.post("/api/monthly-job-card-excel", monthlyJobCardExcelHandler);
+app.post("/api/monthly-job-card-excel-inactive", monthlyJobCardExcelHandler);
 
-app.post("/api/unit-wise-report", async (req, res) => {
+// New Endpoint for User Details (Skills Page Enhancement)
+
+
+const unitWiseReportHandler = async (req, res) => {
   const { fromMonth, toMonth, shift, line } = req.body; // Added line
 
   if (!fromMonth || !toMonth) {
@@ -5012,7 +5113,9 @@ app.post("/api/unit-wise-report", async (req, res) => {
       details: err.message,
     });
   }
-});
+};
+app.post("/api/unit-wise-report", unitWiseReportHandler);
+app.post("/api/unit-wise-report-inactive", unitWiseReportHandler);
 
 app.get("/download-templatejob", (req, res) => {
   const filePath = path.join(
@@ -5069,13 +5172,25 @@ async function ensureLeaveTableExists(pool) {
 }
 
 app.get("/api/leave/absent", async (req, res) => {
-  const { fromDate, toDate, shift, line } = req.query;
+  const { fromDate, toDate, shift, line, userLine } = req.query;
   if (!fromDate || !toDate)
     return res.status(400).send("From Date and To Date are required");
 
   try {
     const pool = await sql.connect(config);
     await ensureLeaveTableExists(pool);
+
+    // Build dynamic LINE filter
+    let lineFilter = "";
+    if (userLine) {
+      // If userLine is provided (non-admin user), restrict to their LINE(s)
+      const userLines = userLine.split(',').map(l => l.trim());
+      const lineList = userLines.map(l => `'${l}'`).join(',');
+      lineFilter = `AND ISNULL(S.LINE, A.Original_LINE) IN (${lineList})`;
+    } else if (line && line !== "null" && line !== "undefined") {
+      // If specific line filter is selected
+      lineFilter = `AND ISNULL(S.LINE, A.Original_LINE) = @Line`;
+    }
 
     const query = `
       WITH Assignments AS (
@@ -5158,7 +5273,7 @@ app.get("/api/leave/absent", async (req, res) => {
       LEFT JOIN Mx_UserLeaveMaster L ON L.UserID = SP.USERID AND L.LeaveDate = A.Shift_date_from
       WHERE SP.PUNCHIN IS NULL
         AND (@Shift IS NULL OR A.SHIFT_ID = @Shift)
-        AND (@Line IS NULL OR ISNULL(S.LINE, A.Original_LINE) = @Line)
+        ${lineFilter}
       ORDER BY ShiftDate, NAME
     `;
 
@@ -5170,22 +5285,26 @@ app.get("/api/leave/absent", async (req, res) => {
       sql.VarChar,
       shift && shift !== "null" && shift !== "undefined" ? shift : null,
     );
-    request.input(
-      "Line",
-      sql.VarChar,
-      line && line !== "null" && line !== "undefined" ? line : null,
-    );
+    
+    // Only add @Line parameter if not using userLine-based filtering
+    if (!userLine) {
+      request.input(
+        "Line",
+        sql.VarChar,
+        line && line !== "null" && line !== "undefined" ? line : null,
+      );
+    }
 
     console.log("Executing Absent Query with Range:", {
       fromDate,
       toDate,
       shift: shift && shift !== "null" && shift !== "undefined" ? shift : null,
       line: line && line !== "null" && line !== "undefined" ? line : null,
+      userLine: userLine || "N/A (Admin)",
     });
 
     const result = await request.query(query);
     console.log("Absent Query Row Count:", result.recordset.length);
-    console.log("Absent Query Result:", result.recordset);
     res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching absent employees:", err);

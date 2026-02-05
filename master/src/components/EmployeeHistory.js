@@ -28,6 +28,7 @@ const EmployeeHistory = () => {
   const [employeeOptions, setEmployeeOptions] = useState([]); // Filtered options for react-select
   const [employeeIdInput, setEmployeeIdInput] = useState(""); // Input for react-select search
   const [Pagination, setPagination] = useState([]);
+  const [isInactive, setIsInactive] = useState(false); // Toggle state
   const formatDate = (date) => {
     if (!date) return ""; // avoid invalid value
     const d = new Date(date);
@@ -64,6 +65,9 @@ const EmployeeHistory = () => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
+        const url = isInactive
+          ? "https://192.168.2.54/api/employees-inactive"
+          : "https://192.168.2.54/api/employees";
         const res = await axios.get("https://192.168.2.54/api/employees");
 
         if (Array.isArray(res.data)) {
@@ -74,6 +78,8 @@ const EmployeeHistory = () => {
           }));
           setAllEmployees(formatted);
           setEmployeeOptions([]); // Start empty
+          setEmployeeId(null);
+          setEmployeeName("");
         }
       } catch (err) {
         console.error("Error fetching employee list:", err);
@@ -81,7 +87,7 @@ const EmployeeHistory = () => {
     };
 
     fetchEmployees();
-  }, []);
+  }, [isInactive]);
 
   // Filter options based on input
   useEffect(() => {
@@ -259,6 +265,16 @@ const EmployeeHistory = () => {
       )}
 
       <div className="glass-card p-4 mb-4">
+        <div className="d-flex justify-content-end mb-2">
+          <Form.Check
+            type="switch"
+            id="inactive-switch"
+            label="Show Inactive Employees"
+            checked={isInactive}
+            onChange={(e) => setIsInactive(e.target.checked)}
+            style={{ fontWeight: "bold", color: "white" }} 
+          />
+        </div>
         <Row className="mb-3">
           <Col md={4}>
             <label className="form-label">Select Employee</label>

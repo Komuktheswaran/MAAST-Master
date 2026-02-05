@@ -24,6 +24,7 @@ const EmployeePunctuality = () => {
   const [error, setError] = useState("");
   const [employeeId, setEmployeeid] = useState();
   const [employeeIdInput, setEmployeeIdInput] = useState(""); // Tracks input for employee search
+  const [isInactive, setIsInactive] = useState(false); // Toggle state
 
   const [fromDate, setFromDate] = useState(new Date());
   const [toDate, setToDate] = useState(new Date());
@@ -52,7 +53,10 @@ const EmployeePunctuality = () => {
     // Fetch employee list for dropdown
     const fetchEmployees = async () => {
       try {
-        const res = await axios.get("https://192.168.2.54/api/employees");
+        const url = isInactive
+          ? "https://192.168.2.54/api/employees-inactive"
+          : "https://192.168.2.54/api/employees";
+        const res = await axios.get(url);
         if (Array.isArray(res.data)) {
           const formatted = res.data.map((emp) => ({
             value: emp.userid, // Use userid as value
@@ -67,7 +71,7 @@ const EmployeePunctuality = () => {
       }
     };
     fetchEmployees();
-  }, []);
+  }, [isInactive]);
 
   useEffect(() => {
     if (employeeIdInput.length > 0) {
@@ -94,8 +98,11 @@ const EmployeePunctuality = () => {
     setLoading(true);
 
     try {
+      const endpoint = isInactive
+        ? "https://192.168.2.54/api/employee-punctuality-inactive"
+        : "https://192.168.2.54/api/employee-punctuality";
       const response = await axios.post(
-        "https://192.168.2.54/api/employee-punctuality",
+        endpoint,
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),
@@ -229,12 +236,22 @@ const EmployeePunctuality = () => {
       )}
 
       <div className="glass-card p-4 mb-4">
+        <div className="d-flex justify-content-end mb-2">
+          <Form.Check
+            type="switch"
+            id="inactive-switch"
+            label="Show Inactive Employees"
+            checked={isInactive}
+            onChange={(e) => setIsInactive(e.target.checked)}
+            style={{ fontWeight: "bold", color: "white" }} 
+          />
+        </div>
         <Row className="mb-3">
           <Col md={4}>
             <label className="form-label">Employee</label>
             <Select
               options={employeeOptions}
-              value={employeeOptions.find(
+              value={allEmployees.find(
                 (option) => option.value === employeeId,
               )} // Set selected value
               onChange={(selected) => {

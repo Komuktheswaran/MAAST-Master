@@ -25,7 +25,8 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
-import emvLogo from "../pictures/emvlogo.png"; // Ensure this path is correct
+import emvLogo from "../pictures/emvlogo.png";
+import "../styles/EmployeeJobCardDownload.css";
 
 const EmployeeJobCardDownload = () => {
   const [reportType, setReportType] = useState("date-range"); // date-range, month-wise, unit-wise
@@ -38,6 +39,7 @@ const EmployeeJobCardDownload = () => {
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [employeeIdInput, setEmployeeIdInput] = useState("");
   const [allEmployees, setAllEmployees] = useState([]);
+  const [isInactive, setIsInactive] = useState(false); // Toggle state
 
   const [JobDataData, setJobDataData] = useState([]);
   const [monthlySummary, setMonthlySummary] = useState([]);
@@ -80,7 +82,7 @@ const EmployeeJobCardDownload = () => {
         );
         if (response.data && Array.isArray(response.data)) {
           const activeUsers = response.data.filter(
-            (user) => user.UserIDEnbl === 1,
+            (user) => isInactive ? user.UserIDEnbl === 0 : user.UserIDEnbl === 1,
           );
           setAllEmployees(activeUsers);
           const options = activeUsers.map((user) => ({
@@ -99,7 +101,7 @@ const EmployeeJobCardDownload = () => {
       }
     };
     fetchEmployees();
-  }, []);
+  }, [isInactive]);
 
   const handleSearchInputChange = (newValue) => {
     setEmployeeIdInput(newValue);
@@ -178,8 +180,11 @@ const EmployeeJobCardDownload = () => {
     setJobDataData([]);
 
     try {
+      const endpoint = isInactive
+        ? "https://192.168.2.54/api/employee-Jobreport-inactive"
+        : "https://192.168.2.54/api/employee-Jobreport";
       const response = await axios.post(
-        "https://192.168.2.54/api/employee-Jobreport",
+        endpoint,
         {
           employeeId: selectedEmployee.value,
           fromDate,
@@ -213,8 +218,11 @@ const EmployeeJobCardDownload = () => {
     setMonthlyRawData([]);
 
     try {
+      const endpoint = isInactive
+        ? "https://192.168.2.54/api/monthly-job-card-report-inactive"
+        : "https://192.168.2.54/api/monthly-job-card-report";
       const response = await axios.post(
-        "https://192.168.2.54/api/monthly-job-card-report",
+        endpoint,
         {
           fromMonth,
           toMonth,
@@ -339,8 +347,11 @@ const EmployeeJobCardDownload = () => {
 
     setLoading(true);
     try {
+      const endpoint = isInactive
+        ? "https://192.168.2.54/api/monthly-job-card-excel-inactive"
+        : "https://192.168.2.54/api/monthly-job-card-excel";
       const response = await axios.post(
-        "https://192.168.2.54/api/monthly-job-card-excel",
+        endpoint,
         {
           fromMonth,
           toMonth,
@@ -393,8 +404,11 @@ const EmployeeJobCardDownload = () => {
     setChartData([]);
 
     try {
+      const endpoint = isInactive
+        ? "https://192.168.2.54/api/unit-wise-report-inactive"
+        : "https://192.168.2.54/api/unit-wise-report";
       const response = await axios.post(
-        "https://192.168.2.54/api/unit-wise-report",
+        endpoint,
         {
           fromMonth,
           toMonth,
@@ -493,98 +507,105 @@ const EmployeeJobCardDownload = () => {
     setChartData([]);
   };
 
+  const downloadExcel = () => {
+    try {
+      const data = JobDataData.map((item) => ({
+        Date: item.Date || item.Edatetime,
+        Shift: item.SHIFTNAME,
+        Line: item.LINE,
+        Target: item.Target,
+        Actual: item.Actual,
+        Performance: item.Performance,
+        Attendance: item.Attendance,
+        Punctuality: item.Punctuality,
+        Rejections: item.Rejections,
+        "5S": item["5S"],
+        Safety: item.Safety,
+        Discipline: item.Discipline,
+        Total: item.Total,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Job Card Data");
+      XLSX.writeFile(wb, `JobCard_${selectedEmployee?.value}_${fromDate}_${toDate}.xlsx`);
+    } catch (e) {
+      console.error(e);
+      setError("Download failed");
+    }
+  };
+
   return (
-    <Container
-      fluid
-      className="container-fluid"
-      style={{
-        backgroundImage: `url(${emvLogo})`,
-        backgroundSize: "auto",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "center",
-        minHeight: "100vh",
-        opacity: "0.95",
-        paddingTop: "20px",
-        backgroundColor: "#f4f6f9",
-      }}
-    >
-      <h2 className="mb-4 text-center text-dark fw-bold">
-        Employee Job Card Data
-      </h2>
+    <div className="job-card-container">
+      <Container fluid className="px-3 px-md-4 px-lg-5">
+        <h2 className="job-card-title text-center">
+          Employee Job Card Data
+        </h2>
 
-      {error && (
-        <Alert variant="danger" dismissible onClose={() => setError("")}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert 
+            variant="danger" 
+            dismissible 
+            onClose={() => setError("")}
+            className="glass-alert glass-alert-danger mb-4"
+          >
+            {error}
+          </Alert>
+        )}
 
-      {loadingEmployees ? (
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3">Loading employees...</p>
-        </div>
-      ) : (
-        <>
-          <div className="glass-card p-4 mb-4 shadow rounded bg-white">
-            {/* Toggle Report Type */}
-            <div className="d-flex justify-content-center mb-4">
-              <div className="btn-group" role="group">
-                <input
-                  type="radio"
-                  className="btn-check"
-                  name="reportType"
-                  id="typeDateRange"
-                  checked={reportType === "date-range"}
-                  onChange={() => setReportType("date-range")}
-                />
-                <label
-                  className="btn btn-outline-primary"
-                  htmlFor="typeDateRange"
-                >
-                  Date Range (Individual)
-                </label>
-
-                <input
-                  type="radio"
-                  className="btn-check"
-                  name="reportType"
-                  id="typeMonthWise"
-                  checked={reportType === "month-wise"}
-                  onChange={() => setReportType("month-wise")}
-                />
-                <label
-                  className="btn btn-outline-primary"
-                  htmlFor="typeMonthWise"
-                >
-                  Month Wise (Summary)
-                </label>
-
-                <input
-                  type="radio"
-                  className="btn-check"
-                  name="reportType"
-                  id="typeUnitWise"
-                  checked={reportType === "unit-wise"}
-                  onChange={() => setReportType("unit-wise")}
-                />
-                <label
-                  className="btn btn-outline-primary"
-                  htmlFor="typeUnitWise"
-                >
-                  Unit Wise (Graph)
-                </label>
+        {loadingEmployees ? (
+          <div className="loading-container">
+            <div className="glass-spinner"></div>
+            <p className="loading-text">Loading employees...</p>
+          </div>
+        ) : (
+          <>
+            <div className="glass-card glass-card-primary p-4 mb-4">
+              <div className="d-flex justify-content-end mb-3">
+                <div className="glass-switch">
+                  <input
+                    type="checkbox"
+                    id="inactive-switch"
+                    checked={isInactive}
+                    onChange={(e) => setIsInactive(e.target.checked)}
+                  />
+                  <label htmlFor="inactive-switch">Show Inactive</label>
+                </div>
               </div>
-            </div>
+              {/* Toggle Report Type */}
+              <div className="d-flex justify-content-center mb-4">
+                <div className="report-type-toggle">
+                  <button
+                    className={`report-type-btn ${reportType === "date-range" ? "active" : ""}`}
+                    onClick={() => setReportType("date-range")}
+                  >
+                    Date Range (Individual)
+                  </button>
+                  <button
+                    className={`report-type-btn ${reportType === "month-wise" ? "active" : ""}`}
+                    onClick={() => setReportType("month-wise")}
+                  >
+                    Month Wise (Summary)
+                  </button>
+                  <button
+                    className={`report-type-btn ${reportType === "unit-wise" ? "active" : ""}`}
+                    onClick={() => setReportType("unit-wise")}
+                  >
+                    Unit Wise (Graph)
+                  </button>
+                </div>
+              </div>
 
             <Row className="mb-3 g-3">
               {/* Filters */}
               {(reportType === "date-range" || reportType === "month-wise") && (
                 <Col md={3}>
-                  <Form.Label>
+                  <Form.Label className="glass-label">
                     Select Employee{" "}
                     {reportType === "month-wise" && "(Optional)"}
                   </Form.Label>
                   <Select
+                    className="react-select-container"
+                    classNamePrefix="react-select"
                     options={employeeOptions}
                     value={selectedEmployee}
                     onChange={handleEmployeeChange}
@@ -609,8 +630,9 @@ const EmployeeJobCardDownload = () => {
               {reportType === "date-range" ? (
                 <>
                   <Col md={3}>
-                    <Form.Label>From Date</Form.Label>
+                    <Form.Label className="glass-label">From Date</Form.Label>
                     <Form.Control
+                      className="glass-input"
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
@@ -618,8 +640,9 @@ const EmployeeJobCardDownload = () => {
                     />
                   </Col>
                   <Col md={3}>
-                    <Form.Label>To Date</Form.Label>
+                    <Form.Label className="glass-label">To Date</Form.Label>
                     <Form.Control
+                      className="glass-input"
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
@@ -630,24 +653,27 @@ const EmployeeJobCardDownload = () => {
               ) : (
                 <>
                   <Col md={2}>
-                    <Form.Label>From Month</Form.Label>
+                    <Form.Label className="glass-label">From Month</Form.Label>
                     <Form.Control
+                      className="glass-input"
                       type="month"
                       value={fromMonth}
                       onChange={(e) => setFromMonth(e.target.value)}
                     />
                   </Col>
                   <Col md={2}>
-                    <Form.Label>To Month</Form.Label>
+                    <Form.Label className="glass-label">To Month</Form.Label>
                     <Form.Control
+                      className="glass-input"
                       type="month"
                       value={toMonth}
                       onChange={(e) => setToMonth(e.target.value)}
                     />
                   </Col>
                   <Col md={2}>
-                    <Form.Label>Line (Optional)</Form.Label>
+                    <Form.Label className="glass-label">Line (Optional)</Form.Label>
                     <Form.Select
+                      className="glass-select"
                       value={selectedLine}
                       onChange={(e) => setSelectedLine(e.target.value)}
                     >
@@ -664,8 +690,9 @@ const EmployeeJobCardDownload = () => {
 
               {reportType === "unit-wise" && (
                 <Col md={3}>
-                  <Form.Label>Shift (Optional)</Form.Label>
+                  <Form.Label className="glass-label">Shift (Optional)</Form.Label>
                   <Form.Select
+                    className="glass-select"
                     value={selectedShift}
                     onChange={(e) => setSelectedShift(e.target.value)}
                   >
@@ -680,59 +707,54 @@ const EmployeeJobCardDownload = () => {
               )}
             </Row>
 
-            <div className="d-flex justify-content-between">
-              <div>
+              <div className="d-flex flex-wrap gap-2">
                 {reportType === "date-range" && (
-                  <Button
-                    variant="primary"
+                  <button
+                    className="glass-btn glass-btn-primary"
                     onClick={fetchJobData}
                     disabled={loading}
-                    className="me-2"
                   >
-                    Show JobData
-                  </Button>
+                    {loading ? "Loading..." : "Show Job Data"}
+                  </button>
                 )}
                 {reportType === "month-wise" && (
-                  <Button
-                    variant="success"
+                  <button
+                    className="glass-btn glass-btn-success"
                     onClick={fetchMonthlyData}
                     disabled={loading}
-                    className="me-2"
                   >
-                    Show Monthly Data
-                  </Button>
+                    {loading ? "Loading..." : "Show Monthly Data"}
+                  </button>
                 )}
                 {reportType === "unit-wise" && (
-                  <div className="d-flex gap-2">
-                    <Button
-                      variant="warning"
+                  <>
+                    <button
+                      className="glass-btn glass-btn-warning"
                       onClick={fetchUnitData}
                       disabled={loading}
                     >
-                      Analyze Performance
-                    </Button>
+                      {loading ? "Loading..." : "Analyze Performance"}
+                    </button>
                     {Object.keys(unitBuckets).length > 0 && (
-                      <Button variant="success" onClick={generateUnitExcel}>
+                      <button className="glass-btn glass-btn-success" onClick={generateUnitExcel}>
                         <FaFileExcel className="me-2" /> Download Report
-                      </Button>
+                      </button>
                     )}
-                  </div>
+                  </>
                 )}
-                <Button
-                  variant="outline-secondary"
+                <button
+                  className="glass-btn glass-btn-outline"
                   onClick={resetFilters}
-                  className="ms-2"
                 >
                   Reset
-                </Button>
+                </button>
               </div>
-            </div>
           </div>
 
           {loading && (
-            <div className="text-center py-4">
-              <Spinner animation="border" variant="primary" />
-              <p>Loading Data...</p>
+            <div className="loading-container">
+              <div className="glass-spinner"></div>
+              <p className="loading-text">Loading data...</p>
             </div>
           )}
 
@@ -740,13 +762,15 @@ const EmployeeJobCardDownload = () => {
           {reportType === "date-range" &&
             JobDataData.length > 0 &&
             !loading && (
-              <div className="glass-card p-4 bg-white shadow rounded">
-                <div className="d-flex justify-content-end mb-2">
-                  <Button variant="success" size="sm" onClick={downloadExcel}>
-                    <FaFileExcel className="me-1" /> Download Excel
-                  </Button>
+              <div className="glass-card glass-card-success p-4 mt-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h4 className="m-0">Job Card Data</h4>
+                  <button className="glass-btn glass-btn-success btn-sm" onClick={downloadExcel}>
+                    <FaFileExcel className="me-2" /> Download Excel
+                  </button>
                 </div>
-                <Table responsive striped bordered hover size="sm">
+                <div className="table-scroll-container">
+                  <Table className="glass-table" responsive striped bordered hover>
                   <thead>
                     <tr>
                       <th>Date</th>
@@ -879,6 +903,7 @@ const EmployeeJobCardDownload = () => {
                     </tr>
                   </tfoot>
                 </Table>
+                </div>
               </div>
             )}
 
@@ -886,19 +911,16 @@ const EmployeeJobCardDownload = () => {
           {reportType === "month-wise" &&
             monthlySummary.length > 0 &&
             !loading && (
-              <div className="glass-card p-4 bg-white shadow rounded mt-3">
+              <div className="glass-card glass-card-success p-4 mt-4">
                 <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h4>Monthly Summary</h4>
-                  <Button variant="success" onClick={generateMonthlyExcel}>
-                    <FaFileExcel /> Excel
-                  </Button>
+                  <h4 className="m-0">Monthly Summary</h4>
+                  <button className="glass-btn glass-btn-success" onClick={generateMonthlyExcel}>
+                    <FaFileExcel className="me-2" /> Download Excel
+                  </button>
                 </div>
-                <div
-                  className="table-responsive"
-                  style={{ maxHeight: "500px" }}
-                >
-                  <Table striped bordered hover className="text-center">
-                    <thead className="table-dark">
+                <div className="table-scroll-container">
+                  <Table className="glass-table text-center" striped bordered hover>
+                    <thead>
                       <tr>
                         {monthlySummary[0].map((header, i) => (
                           <th key={i}>{header}</th>
@@ -921,8 +943,9 @@ const EmployeeJobCardDownload = () => {
 
           {/* RESULTS: UNIT WISE (GRAPH) */}
           {reportType === "unit-wise" && chartData.length > 0 && !loading && (
-            <div className="glass-card p-4 bg-white shadow rounded mt-3">
-              <h4 className="text-center mb-4">Performance Distribution</h4>
+            <div className="glass-card glass-card-primary p-4 mt-4">
+              <h4 className="chart-title">Performance Distribution</h4>
+              <div className="chart-container">
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart
                   data={chartData}
@@ -945,10 +968,11 @@ const EmployeeJobCardDownload = () => {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              </div>
 
               {selectedBucket && unitBuckets[selectedBucket] && (
                 <div className="mt-4">
-                  <h5></h5>
+                  <h5 className="mb-3">Employees in {selectedBucket}</h5>
                   {(() => {
                     const bucketData = unitBuckets[selectedBucket] || [];
                     const monthKeys =
@@ -957,7 +981,8 @@ const EmployeeJobCardDownload = () => {
                         : [];
 
                     return (
-                      <Table striped bordered hover size="sm">
+                      <div className="table-scroll-container">
+                        <Table className="glass-table" striped bordered hover size="sm">
                         <thead>
                           <tr>
                             <th>ID</th>
@@ -992,7 +1017,8 @@ const EmployeeJobCardDownload = () => {
                             </tr>
                           ))}
                         </tbody>
-                      </Table>
+                        </Table>
+                      </div>
                     );
                   })()}
                 </div>
@@ -1001,7 +1027,8 @@ const EmployeeJobCardDownload = () => {
           )}
         </>
       )}
-    </Container>
+      </Container>
+    </div>
   );
 };
 

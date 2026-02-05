@@ -9,7 +9,7 @@ import {
   Table,
   Spinner,
 } from "react-bootstrap";
-import { BsTrash, BsDownload } from "react-icons/bs";
+import { BsTrash, BsDownload, BsInfoCircle } from "react-icons/bs";
 import { FaSort } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import "../styles/UserSkills.css";
@@ -30,6 +30,7 @@ const UserSkills = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [userSkills, setUserSkills] = useState([]);
+  const [userDetails, setUserDetails] = useState([]); // New State
   const [searchTerm, setSearchTerm] = useState("");
   const [searchUserskill, setsearchUserskill] = useState("");
   const [notification, setNotification] = useState("");
@@ -60,7 +61,17 @@ const UserSkills = () => {
     fetchStages();
     fetchSkills();
     fetchUserSkills();
+    fetchUserDetails(); // Fetch detailed info
   }, []);
+
+  const fetchUserDetails = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/user-details`);
+      setUserDetails(response.data);
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+    }
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -234,62 +245,72 @@ const UserSkills = () => {
     const grouped = {};
 
     filteredUserSkills.forEach((skill) => {
-      if (!grouped[skill.USERID]) {
-        grouped[skill.USERID] = {
-          userId: skill.USERID,
+      const uid = skill.USERID;
+      if (!grouped[uid]) {
+        // Find detailed info
+        const details = userDetails.find(u => u.UserID === uid) || {};
+        
+        grouped[uid] = {
+          userId: uid,
           name: skill.NAME,
+          doj: details.DOJ, // New Field
+          education: details.Education, // New Field
+          designation: details.Designation, // New Field
+          unit: details.Unit, // New Field
+          department: details.Department, // New Field
           skills: [],
         };
       }
 
-      grouped[skill.USERID].skills.push({
+      grouped[uid].skills.push({
         stageName: skill.STAGE_NAME,
         description: skill.Skill_Description,
-        rating: skill.RATING || skill.Skill_Description || "",
+        rating: skill.Skill_Rating || "",
       });
     });
 
     return Object.values(grouped);
-  }, [filteredUserSkills]);
+  }, [filteredUserSkills, userDetails]);
 
   // Memoize Max Skills Count
   const maxSkillsCount = React.useMemo(() => {
     return Math.max(...groupedUserSkills.map((user) => user.skills.length), 1);
   }, [groupedUserSkills]);
 
-  // Get color for different stages (matching your image colors)
-  const getStageColor = (stageName) => {
-    const stageColors = {
-      "EVA cutting & laying machine": "#ffeb3b", // Yellow
-      Stinger: "#4caf50", // Green
-      "Auto soldering business machine": "#2196f3", // Blue
-      "Under training": "#ff9800", // Orange
-      Competent: "#9c27b0", // Purple
-      "Outstanding & can work individually": "#f44336", // Red
-      "Expert & Can train others": "#00bcd4", // Cyan
-      // Add more stage colors as needed
-    };
 
-    return stageColors[stageName] || "#f8f9fa"; // Default light gray
-  };
 
   const handleDownload = () => {
-    const maxSkills = getMaxSkillsCount();
-
+    const maxSkills = maxSkillsCount; // Use state variable directly
+    
     // Dynamic headers
-    const headers = ["User ID", "Name"];
+    const headers = [
+      "User ID", 
+      "Name", 
+      "DOJ", 
+      "Education", 
+      "Designation", 
+      "Unit", 
+      "Department"
+    ];
     for (let i = 1; i <= maxSkills; i++) {
-      headers.push(`Stage ${i}`, `Description ${i}`, `Rating ${i}`);
+      headers.push(`Stage ${i}`, `Rating ${i}`); // Updated Headers
     }
 
     // Dynamic data mapping
-    const data = getGroupedUserSkills().map((userGroup) => {
-      const row = [userGroup.userId, userGroup.name];
+    const data = groupedUserSkills.map((userGroup) => { // Use state variable directly
+      const row = [
+        userGroup.userId, 
+        userGroup.name,
+        userGroup.doj ? new Date(userGroup.doj).toLocaleDateString("en-GB") : "",
+        userGroup.education,
+        userGroup.designation,
+        userGroup.unit,
+        userGroup.department
+      ];
 
       for (let i = 0; i < maxSkills; i++) {
         row.push(
           userGroup.skills[i]?.stageName || "",
-          userGroup.skills[i]?.description || "",
           userGroup.skills[i]?.rating || "",
         );
       }
@@ -371,6 +392,11 @@ const UserSkills = () => {
       );
     }
     return <FaSort />;
+  };
+
+  const handleInfoClick = (event, description) => {
+    setAnchorEl(event.currentTarget);
+    setPopoverContent(description || "No description available");
   };
 
   const handlePopoverClose = () => {
@@ -563,7 +589,13 @@ const UserSkills = () => {
       <Row className="mt-4">
         <Col md={12}>
           <div className="user-skills-header">
-            <h2>User Skills Details</h2>
+            <h2>
+              User Skills Details{" "}
+              <BsInfoCircle 
+                style={{ marginLeft: '10px', cursor: 'pointer', color: '#17a2b8', fontSize: '0.8em' }} 
+                onClick={(e) => handleInfoClick(e, 'Rating Scale:\n1 - Basic/Beginner\n2 - Intermediate\n3 - Advanced\n4 - Expert/Master')}
+              />
+            </h2>
             <div className="user-skills-actions">
               <Form.Group>
                 <Form.Control
@@ -597,11 +629,15 @@ const UserSkills = () => {
                     Name&nbsp;&nbsp;
                     <SortIcon columnKey="NAME" />
                   </th>
+                  <th>DOJ</th>
+                  <th>Education</th>
+                  <th>Designation</th>
+                  <th>Unit</th>
+                  <th>Department</th>
                   {/* Dynamically generate column headers */}
                   {Array.from({ length: maxSkillsCount }, (_, index) => (
                     <React.Fragment key={`header-${index}`}>
                       <th>Stage {index + 1}</th>
-                      <th>Description {index + 1}</th>
                       <th>Rating {index + 1}</th>
                     </React.Fragment>
                   ))}
@@ -613,22 +649,31 @@ const UserSkills = () => {
                   <tr key={userGroup.userId}>
                     <td>{userGroup.userId}</td>
                     <td>{userGroup.name}</td>
+                    <td>{userGroup.doj ? new Date(userGroup.doj).toLocaleDateString("en-GB") : "-"}</td>
+                    <td>{userGroup.education}</td>
+                    <td>{userGroup.designation}</td>
+                    <td>{userGroup.unit}</td>
+                    <td>{userGroup.department}</td>
 
                     {/* Dynamically generate skill columns */}
                     {Array.from({ length: maxSkillsCount }, (_, index) => (
                       <React.Fragment key={`skill-${index}`}>
                         <td
                           style={{
-                            backgroundColor: userGroup.skills[index]
-                              ? getStageColor(userGroup.skills[index].stageName)
-                              : "#f8f9fa",
                             fontWeight: "bold",
                           }}
                         >
                           {userGroup.skills[index]?.stageName || ""}
                         </td>
-                        <td>{userGroup.skills[index]?.description || ""}</td>
-                        <td>{userGroup.skills[index]?.rating || ""}</td>
+                        <td>
+                          {userGroup.skills[index]?.rating || ""}
+                          {userGroup.skills[index]?.rating && (
+                            <BsInfoCircle 
+                              style={{ marginLeft: '5px', cursor: 'pointer', color: '#17a2b8' }} 
+                              onClick={(e) => handleInfoClick(e, userGroup.skills[index]?.description)}
+                            />
+                          )}
+                        </td>
                       </React.Fragment>
                     ))}
 

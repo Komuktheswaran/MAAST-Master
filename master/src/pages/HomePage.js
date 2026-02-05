@@ -501,37 +501,31 @@ const HomePage = () => {
                           Attendance Report
                         </MenuItem>
                         {isAdmin && (
-                          <>
-                            <MenuItem
-                              onClick={() => {
-                                handleCloseAttMenu();
-                              }}
-                              component={Link}
-                              to="/summary"
-                            >
-                              Summary Report
-                            </MenuItem>
-                            <MenuItem
-                              onClick={() => {
-                                handleCloseAttMenu();
-                              }}
-                              component={Link}
-                              to="/leave-management"
-                            >
-                              Leave Management
-                            </MenuItem>
-                          </>
+                          <MenuItem
+                            onClick={() => {
+                              handleCloseAttMenu();
+                            }}
+                            component={Link}
+                            to="/summary"
+                          >
+                            Summary Report
+                          </MenuItem>
                         )}
+                        <MenuItem
+                          onClick={() => {
+                            handleCloseAttMenu();
+                          }}
+                          component={Link}
+                          to="/leave-management"
+                        >
+                          Leave Management
+                        </MenuItem>
                       </Menu>
 
                       <StyledMenuButton
                         onClick={handleLogout}
                         startIcon={<PowerSettingsNewIcon />}
-                        sx={{
-                          mx: 1,
-                          backgroundColor: "#e53935",
-                          "&:hover": { backgroundColor: "#d32f2f" },
-                        }}
+                        className="logout-button"
                       >
                         Logout
                       </StyledMenuButton>
@@ -737,12 +731,13 @@ const HomePage = () => {
                       <ListItemText primary="Attendance" />
                     </ListItem>
                     {isAdmin && (
-                      <>
-                        <ListItem button component={Link} to="/summary">
-                          <ListItemText primary="Summary" />
-                        </ListItem>
-                      </>
+                      <ListItem button component={Link} to="/summary">
+                        <ListItemText primary="Summary" />
+                      </ListItem>
                     )}
+                    <ListItem button component={Link} to="/leave-management">
+                      <ListItemText primary="Leave Management" />
+                    </ListItem>
                   </List>
                 </Collapse>
 

@@ -1,0 +1,27 @@
+
+// New Endpoint for User Details (Skills Page Enhancement)
+app.get("/api/user-details", async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool.request().query(`
+      SELECT
+          u.UserID,
+          COALESCE(NULLIF(u.FullName, ''), CONCAT_WS(' ', u.FirstName, u.MiddleName, u.LastName)) AS [Name],
+          u.JoinDT AS [DOJ],
+          u.Qualification AS [Education],
+          des.Name AS [Designation],
+          org.Name AS [Unit],
+          dpt.Name AS [Department]
+      FROM dbo.Mx_UserMst AS u
+      LEFT JOIN dbo.Mx_DesignationMst AS des ON u.DSGID = des.DSGID
+      LEFT JOIN dbo.Mx_DepartmentMst AS dpt ON u.DPTID = dpt.DPTID
+      LEFT JOIN dbo.Mx_OrganizationMst AS org ON u.ORGID = org.ORGID
+      WHERE u.UserID IS NOT NULL
+      ORDER BY u.JoinDT DESC;
+    `);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Error fetching user details:", err);
+    res.status(500).json({ error: "Failed to fetch user details" });
+  }
+});

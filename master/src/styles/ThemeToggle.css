@@ -1,0 +1,57 @@
+/* Theme Toggle Button Styling */
+.theme-toggle-button {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all 0.3s ease !important;
+  margin-left: 8px !important;
+}
+
+.theme-toggle-button:hover {
+  background: var(--surface-hover) !important;
+  box-shadow: var(--shadow-md) !important;
+  transform: scale(1.05);
+}
+
+.theme-icon {
+  color: var(--secondary-color) !important;
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease !important;
+  font-size: 1.5rem !important;
+}
+
+.theme-toggle-button:hover .theme-icon {
+  transform: rotate(180deg);
+  color: var(--primary-color) !important;
+}
+
+/* Animation for theme icon */
+@keyframes rotate-sun {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-moon {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+[data-theme="light"] .theme-icon {
+  animation: rotate-sun 20s linear infinite;
+}
+
+[data-theme="dark"] .theme-icon {
+  animation: fade-moon 3s ease-in-out infinite;
+}

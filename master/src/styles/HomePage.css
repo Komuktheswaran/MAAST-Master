@@ -1,18 +1,64 @@
-/* AppBar Styles */
+/* AppBar Styles - Emmvee Brand with Theme Support */
 .app-bar {
-  background-color: rgb(59, 179, 105); /* Metallic silver */
-  /* background-image: linear-gradient(315deg, #bdc3c7 0%, #2c3e50 74%); Dark gray transition */
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--primary-light) 70%,
+    var(--secondary-color) 100%
+  ) !important;
+  backdrop-filter: blur(15px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(15px) saturate(180%) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-bottom: 1px solid var(--glass-border);
+  position: relative;
+}
+
+.app-bar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--secondary-color),
+    var(--primary-color),
+    var(--secondary-color)
+  );
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .logo {
   max-height: 50px;
   width: auto;
+  /* Add padding and background for visibility in all themes */
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.logo:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.02);
 }
 
 @media (max-width: 600px) {
   .logo {
     max-height: 40px;
+    padding: 3px 10px;
   }
 }
 
@@ -79,7 +125,7 @@
 
   /* CHANGED: Set image height to 100% to fill the 100vh parent (.carouselslide) */
   .carousel-image {
-    height: 100%; 
+    height: 100%;
   }
 }
 
@@ -89,18 +135,17 @@
   align-items: center;
   background-color: #d4edda;
   /* CHANGED: Use 100vh (viewport height) instead of fixed height (was 400px) */
-  height: 100vh; 
+  height: 100vh;
   transition: all 1s ease-in-out; /* Slide transition effect */
 }
 
 @media (max-width: 600px) {
   .carousel .slide {
     /* CHANGED: Use 100vh (viewport height) instead of fixed height (was 250px) */
-    height: 100vh; 
+    height: 100vh;
   }
 }
 /* -------------------------------------------------------- */
-
 
 /* Responsive AppBar and Drawer Menu */
 .drawer-menu-button {
@@ -122,6 +167,32 @@
   }
 }
 
+/* Glass Drawer for Mobile - Emmvee Theme */
+.MuiDrawer-paper {
+  background: var(--surface-glass) !important;
+  backdrop-filter: blur(15px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(15px) saturate(180%) !important;
+  box-shadow: var(--shadow-xl) !important;
+  border-left: 1px solid var(--border-color) !important;
+}
+
+.MuiListItem-button {
+  border-radius: 8px !important;
+  margin: 4px 12px !important;
+  transition: all 0.2s ease !important;
+  color: var(--text-primary) !important;
+}
+
+.MuiListItem-button:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 114, 177, 0.1),
+    rgba(250, 158, 50, 0.1)
+  ) !important;
+  transform: translateX(-4px);
+  border-left: 3px solid var(--secondary-color);
+}
+
 /* Custom Arrow Styles for Carousel */
 .custom-prev-arrow,
 .custom-next-arrow {
@@ -136,7 +207,9 @@
   transform: translateY(-50%);
   padding: 10px;
   border-radius: 50%; /* Rounded arrows for a smoother look */
-  transition: background-color 0.3s ease, transform 0.3s ease; /* Smooth transition for background and scaling */
+  transition:
+    background-color 0.3s ease,
+    transform 0.3s ease; /* Smooth transition for background and scaling */
 }
 
 /* Arrow Hover Effect with Scaling Animation */
@@ -162,7 +235,7 @@
     font-size: 24px; /* Smaller arrow size on mobile */
     padding: 8px; /* Reduce padding */
   }
-  
+
   /* Hide arrows on very small screens, if desired */
   @media (max-width: 400px) {
     .custom-prev-arrow,
@@ -172,19 +245,91 @@
   }
 }
 
-/* Button Styles */
+/* Button Styles - Glass Effect with Emmvee Theme */
 .MuiButton-root {
   font-size: 1rem;
   text-transform: none;
   padding: 10px 20px;
   font-weight: bold;
-  color: white;
+  color: var(--text-inverse) !important;
   background-color: transparent;
+  transition: all 0.3s ease !important;
+  position: relative;
+  border-radius: 8px !important;
+}
+
+.MuiButton-root::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .MuiButton-root:hover {
-  background-color: #adb8be;
-  color: white;
+  background: rgba(250, 158, 50, 0.15) !important;
+  color: var(--text-inverse) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--secondary-color);
+}
+
+.MuiButton-root:hover::before {
+  opacity: 1;
+}
+
+/* Glass Menu Dropdown - Emmvee Theme */
+.MuiMenu-paper {
+  background: var(--surface-glass) !important;
+  backdrop-filter: blur(15px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(15px) saturate(180%) !important;
+  box-shadow: var(--shadow-xl) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  margin-top: 8px !important;
+}
+
+.MuiMenuItem-root {
+  transition: all 0.2s ease !important;
+  border-radius: 8px !important;
+  margin: 4px 8px !important;
+  color: var(--text-primary) !important;
+}
+
+.MuiMenuItem-root:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 114, 177, 0.1),
+    rgba(250, 158, 50, 0.1)
+  ) !important;
+  transform: translateX(4px);
+  border-left: 3px solid var(--secondary-color);
+}
+
+/* Logout Button Glass Effect */
+.logout-button {
+  background: linear-gradient(
+    135deg,
+    rgba(229, 57, 53, 0.9),
+    rgba(211, 47, 47, 0.9)
+  ) !important;
+  backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 15px rgba(229, 57, 53, 0.3) !important;
+  transition: all 0.3s ease !important;
+}
+
+.logout-button:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(229, 57, 53, 1),
+    rgba(211, 47, 47, 1)
+  ) !important;
+  box-shadow: 0 6px 20px rgba(229, 57, 53, 0.4) !important;
+  transform: translateY(-2px);
 }
 
 .carousel-section {
@@ -207,20 +352,23 @@
 /* Custom styling for h2 in carousel slide */
 .carouselslide h2 {
   font-weight: bold;
-  color: #00BFFF; /* Icy blue */
-  font-family: 'Poppins', sans-serif;
+  color: #00bfff; /* Icy blue */
+  font-family: "Poppins", sans-serif;
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3); /* Subtle shadow */
   letter-spacing: 2px;
   text-transform: uppercase;
   font-size: 3rem;
   animation: fadeInSlide 1.5s ease-in-out both;
 
-  background: linear-gradient(90deg, #00BFFF, #0047AB); /* Icy blue to rich cobalt blue gradient */
+  background: linear-gradient(
+    90deg,
+    #00bfff,
+    #0047ab
+  ); /* Icy blue to rich cobalt blue gradient */
   background-clip: text; /* Standard background-clip for modern browsers */
   -webkit-background-clip: text; /* Webkit for Safari and Chrome */
   -webkit-text-fill-color: transparent; /* Required for text color to show gradient */
 }
-
 
 @keyframes fadeIn {
   0% {
@@ -243,19 +391,33 @@
   font-size: 1.2rem;
   font-weight: bold;
   text-transform: uppercase;
-  background: linear-gradient(90deg, #007FFF, #4682B4); /* Bright azure to soft steel blue */
+  background: linear-gradient(
+    90deg,
+    #007fff,
+    #4682b4
+  ); /* Bright azure to soft steel blue */
   box-shadow: 0px 4px 15px rgba(0, 127, 255, 0.5); /* Subtle azure glow */
-  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  transition:
+    transform 0.3s ease-in-out,
+    box-shadow 0.3s ease-in-out;
 }
 
 .styled-button:hover {
-  background: linear-gradient(90deg, #1E90FF, #5F9EA0); /* Lighter azure with rich steel blue */
+  background: linear-gradient(
+    90deg,
+    #1e90ff,
+    #5f9ea0
+  ); /* Lighter azure with rich steel blue */
   transform: translateY(-3px);
   box-shadow: 0px 6px 20px rgba(30, 144, 255, 0.8); /* Enhanced azure glow */
 }
 
 .styled-button:active {
-  background: linear-gradient(90deg, #4169E1, #4682B4); /* Royal blue to soft steel blue */
+  background: linear-gradient(
+    90deg,
+    #4169e1,
+    #4682b4
+  ); /* Royal blue to soft steel blue */
   box-shadow: 0px 2px 10px rgba(65, 105, 225, 0.3); /* Royal blue shadow */
   transform: translateY(0);
 }

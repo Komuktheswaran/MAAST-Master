@@ -144,7 +144,7 @@ const LoginPage = () => {
     console.log(userId, oldPassword, newPassword);
     try {
       const response = await axios.post(
-        "http192.168.2.54/api/change-password",
+        "https://192.168.2.54/api/change-password",
         {
           userId,
           oldPassword,
