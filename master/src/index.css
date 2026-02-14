@@ -25,7 +25,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--primary-gradient);
+  background: white; /* Changed from var(--primary-gradient) */
   min-height: 100vh;
   color: #333;
 }
@@ -48,6 +48,7 @@ code {
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
+  overflow: visible !important; /* Allow dropdowns to overflow */
 }
 
 .glass-card:hover {

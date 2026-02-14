@@ -90,8 +90,8 @@ const MultiSelectDropdown = ({
         <div
           className="position-absolute w-100 bg-white border border-secondary rounded mt-1 shadow"
           style={{
-            zIndex: 1050,
-            maxHeight: "200px",
+            zIndex: 9999, // Increased to ensure it's on top
+            maxHeight: "400px", // Increased from 200px
             overflowY: "auto",
           }}
         >
@@ -176,10 +176,11 @@ const Summary = () => {
         console.log("Line options response:", lineRes.data);
 
         const shifts = Array.isArray(shiftRes.data) ? shiftRes.data : [];
-        const lines = Array.isArray(lineRes.data) ? lineRes.data : [];
+        const rawLines = Array.isArray(lineRes.data) ? lineRes.data : [];
+        const validLines = rawLines.filter(l => l && l.LINE && l.LINE.trim() !== "" && l.LINE !== "N/A" && l.LINE !== "null");
 
         setShiftOptions(shifts);
-        setLineOptions(lines);
+        setLineOptions(validLines);
       } catch (err) {
         console.error("Error fetching dropdown options:", err);
         setError(
@@ -338,7 +339,7 @@ const Summary = () => {
         </Alert>
       )}
 
-      <div className="glass-card p-4 mb-4">
+      <div className="glass-card p-4 mb-4" style={{ position: "relative", zIndex: 20 }}>
         {/* ✅ Updated Form with From Date and To Date */}
         <Row className="mb-3">
           <Col md={3}>

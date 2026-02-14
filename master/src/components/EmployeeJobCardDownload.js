@@ -84,8 +84,12 @@ const EmployeeJobCardDownload = () => {
           const activeUsers = response.data.filter(
             (user) => isInactive ? user.UserIDEnbl === 0 : user.UserIDEnbl === 1,
           );
-          setAllEmployees(activeUsers);
-          const options = activeUsers.map((user) => ({
+          
+          // FIX: Deduplicate employees using Map
+          const uniqueEmployees = Array.from(new Map(activeUsers.map(emp => [emp.userid, emp])).values());
+
+          setAllEmployees(uniqueEmployees);
+          const options = uniqueEmployees.map((user) => ({
             value: user.userid,
             label: `${user.name} (${user.userid})`,
             id: user.userid,

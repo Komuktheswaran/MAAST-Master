@@ -81,7 +81,11 @@ const Attendance = () => {
         const lineResponse = await axios.get("https://192.168.2.54/api/lines");
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
-        setLineOptions(lineResponse.data || []);
+        
+        // Filter out null or empty lines
+        const rawLines = lineResponse.data || [];
+        const validLines = rawLines.filter(l => l && l.LINE && l.LINE.trim() !== "" && l.LINE !== "N/A" && l.LINE !== "null");
+        setLineOptions(validLines);
 
         console.log("isAdmin set to:", isAdmin);
 
@@ -142,6 +146,11 @@ const Attendance = () => {
 
       showAllData.forEach((record) => {
         const stage = record.Stage_name || "N/A";
+        // Extract Stage_id, prioritizing snake_case as seen in logs, fallback to camelCase or direct access
+        // Log shows "Stage_id": 6 and "Effective_Stage_ID": 6
+        const rawStageId = record.Stage_id || record.STAGE_ID || record.stage_id || record.Effective_Stage_ID || 9999;
+        const stageId = parseInt(rawStageId, 10) || 9999; 
+        
         const shift = record.SHIFT_ID || "N/A";
         const line = record.LINE || "N/A";
         // Create a unique key for grouping
@@ -150,6 +159,7 @@ const Attendance = () => {
         if (!aggregationMap.has(key)) {
           aggregationMap.set(key, {
             Stage_name: stage,
+            Stage_id: stageId, // Store for sorting
             SHIFT_ID: shift,
             LINE: line,
             SFTSTTime: record.SFTSTTime || "N/A", // Assume consistent within group
@@ -167,16 +177,19 @@ const Attendance = () => {
         const status = String(record.STATUS || record.status || "")
           .toLowerCase()
           .trim();
-        if (status === "present" || status === "p") {
-          group.PRESENT += 1;
-        } else if (status === "absent" || status === "a") {
-          group.ABSENT += 1;
+        // Logic change: If Shift ID is 'WO', do NOT count as Absent or Present
+        if (String(shift).trim() === "WO") {
+           // Do nothing for WO shift regarding Present/Absent counts
+        } else {
+            if (status === "present" || status === "p") {
+              group.PRESENT += 1;
+            } else if (status === "absent" || status === "a") {
+              group.ABSENT += 1;
+            }
         }
 
         // Calculate earliest punch in for the group (for Excel export)
         if (record.PUNCHIN) {
-          // Simple string comparison for ISO dates or HH:mm:ss works if format is consistent,
-          // but let's be safe(r). If it's just time, string compare is usually okay for same day.
           if (!group.FirstPunchIn || record.PUNCHIN < group.FirstPunchIn) {
             group.FirstPunchIn = record.PUNCHIN;
           }
@@ -189,6 +202,11 @@ const Attendance = () => {
           FirstPunchIn: group.FirstPunchIn || "No Punch",
         }),
       );
+
+      // Sort by Stage_id
+      aggregatedDetails.sort((a, b) => {
+        return (a.Stage_id || 0) - (b.Stage_id || 0);
+      });
 
       setAttendanceDetails(aggregatedDetails);
 
@@ -265,13 +283,27 @@ const Attendance = () => {
           // Normalize the status field - handle various cases
           const rawStatus = record.STATUS || record.status || "";
           const status = String(rawStatus).toLowerCase().trim();
+          const shiftId = String(record.SHIFT_ID || "").trim();
+
+          // STATUS LOGIC: If Shift ID is 'WO', treat status as 'WO'
+          const effectiveStatus = (shiftId === "WO") ? "wo" : status;
 
           if (type === "present") {
             // Match: "present", "Present", "PRESENT", "P", "p"
-            return status === "present" || status === "p";
+            return effectiveStatus === "present" || effectiveStatus === "p";
           } else if (type === "absent") {
             // Match: "absent", "Absent", "ABSENT", "A", "a"
-            return status === "absent" || status === "a";
+            // For WO, we DO NOT want to show them in Absent list (user said "show him WO instead of absent")
+            // So we exclude WO from absent list unless we create a specific "WO" list.
+            // Assumption: User wants WO displayed distinctively, maybe not in Absent list?
+            // "show him WO instead of absent for WO only" -> This implies in the list, if they are absent, show WO.
+            // But if we filter for "Absent", should they appear?
+            // If they are technically absent but it's a Week Off, they shouldn't be counted as Absent for attendance purposes usually.
+            // However, to "show him WO instead of absent", we might need to modify the record's status for display.
+            // If the user selects "Absent" button, they expect to see people who are absent.
+            // If a person is WO, they are not "Absent" in the negative sense.
+            // Let's assume for now we EXCLUDE WO from "Absent" button filter if the goal is "WO instead of Absent".
+            return (effectiveStatus === "absent" || effectiveStatus === "a") && shiftId !== "WO";
           }
           return false;
         });
@@ -329,30 +361,27 @@ const Attendance = () => {
           // Enhanced status matching - handle various cases
           const rawStatus = record.STATUS || record.status || "";
           const recordStatus = String(rawStatus).toLowerCase().trim();
+          const recordShiftId = String(record.SHIFT_ID || "").trim();
+          // Logic: If Shift is WO, Status is effectively WO
+          const effectiveStatus = (recordShiftId === "WO") ? "wo" : recordStatus;
+
           let matchesType = false;
 
           if (type === "present") {
-            matchesType = recordStatus === "present" || recordStatus === "p";
+            matchesType = effectiveStatus === "present" || effectiveStatus === "p";
           } else if (type === "absent") {
-            matchesType = recordStatus === "absent" || recordStatus === "a";
+             // Exclude WO from absent list if we strictly want to "show WO instead of absent"
+             // But if the user clicks the "Absent" count regarding a specific line/shift,
+             // and that shift IS 'WO' (which is weird, selecting a WO shift and asking for absent?),
+             // If the shift is WO, everyone is WO.
+             // If the shift is Normal, and someone has WO assigned (e.g. rotating), they shouldn't be in Absent list.
+            matchesType = (effectiveStatus === "absent" || effectiveStatus === "a") && recordShiftId !== "WO";
           } else if (type === "allot") {
             matchesType = true; // For allot, show all records regardless of status
           }
 
           const result =
             matchesShift && matchesStage && matchesLine && matchesType;
-
-          // Debug logging
-          console.log("Filtering record:", {
-            USERID: record.USERID,
-            rawStatus: rawStatus,
-            normalizedStatus: recordStatus,
-            matchesShift,
-            matchesStage,
-            matchesLine,
-            matchesType,
-            finalResult: result,
-          });
 
           return result;
         });
@@ -361,7 +390,16 @@ const Attendance = () => {
           `Stage-wise filtered records for ${type}:`,
           filtered.length,
         );
-        setDetailedRecords(filtered);
+        
+        // Post-process to update STATUS display for WO
+        const processedFiltered = filtered.map(r => {
+             if (String(r.SHIFT_ID).trim() === 'WO') {
+                 return { ...r, STATUS: 'WO' };
+             }
+             return r;
+        });
+
+        setDetailedRecords(processedFiltered);
         setShowAllDetails(false);
       }
     } catch (error) {
@@ -463,15 +501,31 @@ const Attendance = () => {
         const status = String(record.STATUS || record.status || "")
           .toLowerCase()
           .trim();
-        return (
-          status === "present" ||
-          status === "p" ||
-          status === "absent" ||
-          status === "a"
-        );
+        const shiftId = String(record.SHIFT_ID || "").trim();  
+        
+        // Include WO records in "Show All" or just P/A?
+        // Usually Show All implies everyone relevance. 
+        // If "WO" is considered a status replacing Absent, we should include it?
+        // The original code filtered for "present" or "absent".
+        // If we want WO to show "instead of absent", we should probably include them if they were originally absent but are now WO.
+        // Or if they are just WO.
+        
+        const isPresent = status === "present" || status === "p";
+        const isAbsent = status === "absent" || status === "a";
+        const isWO = shiftId === "WO";
+
+        return isPresent || isAbsent || isWO;
       });
 
-      setDetailedRecords(filteredRecords);
+      // Update display status for WO
+      const processedRecords = filteredRecords.map(r => {
+           if (String(r.SHIFT_ID).trim() === 'WO') {
+               return { ...r, STATUS: 'WO' };
+           }
+           return r;
+      });
+
+      setDetailedRecords(processedRecords);
       console.log("showall (filtered to Present/Absent only)", filteredRecords);
     } catch (error) {
       console.error("Error fetching all records:", error);
@@ -849,7 +903,7 @@ const Attendance = () => {
               </div>
               <div
                 style={{
-                  maxHeight: "200px",
+                  maxHeight: "400px", // Increased from 200px
                   overflowY: "auto",
                   border: "1px solid #ced4da",
                   padding: "10px",
@@ -903,7 +957,7 @@ const Attendance = () => {
               </div>
               <div
                 style={{
-                  maxHeight: "200px",
+                  maxHeight: "400px", // Increased from 200px
                   overflowY: "auto",
                   border: "1px solid #ced4da",
                   padding: "10px",

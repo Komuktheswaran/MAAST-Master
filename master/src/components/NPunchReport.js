@@ -50,7 +50,10 @@ const NPunchReport = () => {
         const res = await axios.get(url);
 
         if (Array.isArray(res.data)) {
-          const formatted = res.data.map((emp) => ({
+          // FIX: Deduplicate employees using Map
+          const uniqueEmployees = Array.from(new Map(res.data.map(emp => [emp.userid, emp])).values());
+          
+          const formatted = uniqueEmployees.map((emp) => ({
             value: emp.userid,
             label: `${emp.userid} - ${emp.name}`,
             name: emp.name,
@@ -377,7 +380,7 @@ const NPunchReport = () => {
         </Alert>
       )}
 
-      <div className="glass-card p-4 mb-4">
+      <div className="glass-card p-4 mb-4" style={{ position: "relative", zIndex: 20 }}>
         <div className="d-flex justify-content-end mb-2">
           <Form.Check
             type="switch"
@@ -385,6 +388,7 @@ const NPunchReport = () => {
             label="Show Inactive Employees"
             checked={isInactive}
             onChange={(e) => setIsInactive(e.target.checked)}
+            style={{ fontWeight: "bold", color: "#333" }} // Changed to dark color for visibility
           />
         </div>
         <Row className="mb-3">

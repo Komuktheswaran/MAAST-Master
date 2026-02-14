@@ -58,7 +58,10 @@ const EmployeePunctuality = () => {
           : "https://192.168.2.54/api/employees";
         const res = await axios.get(url);
         if (Array.isArray(res.data)) {
-          const formatted = res.data.map((emp) => ({
+           // FIX: Deduplicate employees using Map
+          const uniqueEmployees = Array.from(new Map(res.data.map(emp => [emp.userid, emp])).values());
+
+          const formatted = uniqueEmployees.map((emp) => ({
             value: emp.userid, // Use userid as value
             label: `${emp.userid} - ${emp.name}`, // Display userid and name
             name: emp.name, // Store name for later use
@@ -235,7 +238,7 @@ const EmployeePunctuality = () => {
         </Alert>
       )}
 
-      <div className="glass-card p-4 mb-4">
+      <div className="glass-card p-4 mb-4" style={{ position: "relative", zIndex: 20 }}>
         <div className="d-flex justify-content-end mb-2">
           <Form.Check
             type="switch"
@@ -243,7 +246,7 @@ const EmployeePunctuality = () => {
             label="Show Inactive Employees"
             checked={isInactive}
             onChange={(e) => setIsInactive(e.target.checked)}
-            style={{ fontWeight: "bold", color: "white" }} 
+            style={{ fontWeight: "bold", color: "#333" }} // Changed from white to #333 
           />
         </div>
         <Row className="mb-3">

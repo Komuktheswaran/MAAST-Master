@@ -559,7 +559,7 @@
 }
 
 .glass-switch label {
-  color: rgba(255, 255, 255, 0.9);
+  color: #333; /* Changed from white for visibility on white bg */
   font-weight: 600;
   cursor: pointer;
 }
