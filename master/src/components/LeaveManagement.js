@@ -134,11 +134,11 @@ const LeaveManagement = () => {
           axios.get("https://192.168.2.54/api/lines"),
         ]);
         setShifts(shiftRes.data || []);
-        
+
         // Filter lines based on user access
         if (!isAdmin && userLine) {
           const userLines = userLine.split(',').map(l => l.trim());
-          const filteredLines = lineRes.data.filter(line => 
+          const filteredLines = lineRes.data.filter(line =>
             userLines.includes(line.LINE)
           );
           setLines(filteredLines);

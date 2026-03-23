@@ -55,43 +55,11 @@ async function runDebug() {
         console.log("Rows in Mx_Userswap for range:", countSwaps.recordset[0].Cnt);
 
 
-        // 2. Run the Main Query (Reduced to CTE part)
-        const query = `
-        WITH EffectiveShifts AS (
-            -- 1. Swaps (Highest Priority)
-            SELECT 
-                Swap_userid AS USERID,
-                Shift_date AS [DATE],
-                Shift_id AS SHIFTNAME,
-                stage_id,
-                Line_name AS LINE,
-                1 AS Priority
-            FROM Mx_Userswap SW WITH (NOLOCK)
-            WHERE Shift_date BETWEEN @FromDate AND @ToDate
-            
-            UNION ALL
-        
-            -- 2. Regular Shifts (If no swap)
-            SELECT 
-                USERID,
-                Shift_date_from AS [DATE],
-                SHIFT_ID AS SHIFTNAME,
-                stage_id,
-                LINE,
-                2 AS Priority
-            FROM Mx_UserShifts S WITH (NOLOCK)
-            WHERE Shift_date_from BETWEEN @FromDate AND @ToDate
-              AND NOT EXISTS (
-                  SELECT 1 FROM Mx_Userswap SW WITH (NOLOCK)
-                  WHERE SW.Swap_userid = S.USERID 
-                    AND SW.Shift_date = S.Shift_date_from
-              )
-        )
-        SELECT * FROM EffectiveShifts ORDER BY [DATE]
-        `;
-
+        // 2. Run the Main Query to find columns
+        const query = `SELECT Stage_name, Stage_Serial FROM Mx_StageMaster ORDER BY Stage_name`;
         const result = await request.query(query);
-        console.log(`EffectiveShifts returned ${result.recordset.length} rows.`);
+        console.log("Results:");
+        result.recordset.forEach(r => console.log(`${r.Stage_name.substring(0,25)}: ${r.Stage_Serial}`));
 
         // Analyze unique users
         const uniqueUsers = new Set(result.recordset.map(r => r.USERID));

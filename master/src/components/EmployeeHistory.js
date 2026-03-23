@@ -69,12 +69,12 @@ const EmployeeHistory = () => {
           ? "https://192.168.2.54/api/employees-inactive"
           : "https://192.168.2.54/api/employees";
         // FIX: Use the 'url' variable instead of hardcoded string
-        const res = await axios.get(url); 
+        const res = await axios.get(url);
 
         if (Array.isArray(res.data)) {
           // FIX: Deduplicate employees using Map
           const uniqueEmployees = Array.from(new Map(res.data.map(emp => [emp.userid, emp])).values());
-          
+
           const formatted = uniqueEmployees.map((emp) => ({
             value: emp.userid,
             label: `${emp.userid} - ${emp.name}`,
@@ -103,11 +103,13 @@ const EmployeeHistory = () => {
         return id.startsWith(search) || name.startsWith(search);
       });
       setEmployeeOptions(filtered);
+    } else if (isInactive) {
+      // When inactive toggle is on, show all inactive employees immediately
+      setEmployeeOptions(allEmployees);
     } else {
-      // Option to clear or show limited, user requested "wait for 5 digits"
       setEmployeeOptions([]);
     }
-  }, [employeeIdInput, allEmployees]);
+  }, [employeeIdInput, allEmployees, isInactive]);
 
   const fetchHistory = async () => {
     if (!fromDate || !toDate) {
@@ -135,9 +137,25 @@ const EmployeeHistory = () => {
       console.log("fromdate", fromDate);
 
       if (response.data && Array.isArray(response.data.records)) {
-        setHistoryData(response.data.records);
-        console.log(EmployeeHistory);
-        if (response.data.records.length === 0) {
+        // Deduplicate by DATE: prefer 'Present' rows and rows with a STAGE
+        const seen = new Map();
+        response.data.records.forEach((item) => {
+          const key = item.DATE;
+          if (!seen.has(key)) {
+            seen.set(key, item);
+          } else {
+            const existing = seen.get(key);
+            const existingScore =
+              (existing.ATTENDANCE === "Present" ? 2 : 0) +
+              (existing.STAGE ? 1 : 0);
+            const newScore =
+              (item.ATTENDANCE === "Present" ? 2 : 0) + (item.STAGE ? 1 : 0);
+            if (newScore > existingScore) seen.set(key, item);
+          }
+        });
+        const deduped = Array.from(seen.values());
+        setHistoryData(deduped);
+        if (deduped.length === 0) {
           setError("No history found for the selected filters.");
         }
       } else {
@@ -296,6 +314,8 @@ const EmployeeHistory = () => {
               isClearable
               noOptionsMessage={() => "No matching employees"}
               classNamePrefix="react-select"
+              menuPortalTarget={document.body}
+              menuPosition="fixed"
               styles={{
                 control: (base) => ({
                   ...base,
@@ -308,7 +328,9 @@ const EmployeeHistory = () => {
                   ...base,
                   backgroundColor: "rgba(255, 255, 255, 0.9)",
                   backdropFilter: "blur(10px)",
+                  zIndex: 9999,
                 }),
+                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
               }}
             />
           </Col>

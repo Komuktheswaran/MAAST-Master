@@ -81,7 +81,7 @@ const Attendance = () => {
         const lineResponse = await axios.get("https://192.168.2.54/api/lines");
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
-        
+
         // Filter out null or empty lines
         const rawLines = lineResponse.data || [];
         const validLines = rawLines.filter(l => l && l.LINE && l.LINE.trim() !== "" && l.LINE !== "N/A" && l.LINE !== "null");
@@ -146,11 +146,10 @@ const Attendance = () => {
 
       showAllData.forEach((record) => {
         const stage = record.Stage_name || "N/A";
-        // Extract Stage_id, prioritizing snake_case as seen in logs, fallback to camelCase or direct access
-        // Log shows "Stage_id": 6 and "Effective_Stage_ID": 6
-        const rawStageId = record.Stage_id || record.STAGE_ID || record.stage_id || record.Effective_Stage_ID || 9999;
-        const stageId = parseInt(rawStageId, 10) || 9999; 
-        
+        // Extract Stage_Serial for sorting
+        const rawStageSerial = record.Stage_Serial || 9999;
+        const stageSerial = parseInt(rawStageSerial, 10) || 9999;
+
         const shift = record.SHIFT_ID || "N/A";
         const line = record.LINE || "N/A";
         // Create a unique key for grouping
@@ -159,7 +158,7 @@ const Attendance = () => {
         if (!aggregationMap.has(key)) {
           aggregationMap.set(key, {
             Stage_name: stage,
-            Stage_id: stageId, // Store for sorting
+            Stage_Serial: stageSerial, // Store for sorting
             SHIFT_ID: shift,
             LINE: line,
             SFTSTTime: record.SFTSTTime || "N/A", // Assume consistent within group
@@ -179,13 +178,13 @@ const Attendance = () => {
           .trim();
         // Logic change: If Shift ID is 'WO', do NOT count as Absent or Present
         if (String(shift).trim() === "WO") {
-           // Do nothing for WO shift regarding Present/Absent counts
+          // Do nothing for WO shift regarding Present/Absent counts
         } else {
-            if (status === "present" || status === "p") {
-              group.PRESENT += 1;
-            } else if (status === "absent" || status === "a") {
-              group.ABSENT += 1;
-            }
+          if (status === "present" || status === "p") {
+            group.PRESENT += 1;
+          } else if (status === "absent" || status === "a") {
+            group.ABSENT += 1;
+          }
         }
 
         // Calculate earliest punch in for the group (for Excel export)
@@ -203,9 +202,9 @@ const Attendance = () => {
         }),
       );
 
-      // Sort by Stage_id
+      // Sort by Stage_Serial
       aggregatedDetails.sort((a, b) => {
-        return (a.Stage_id || 0) - (b.Stage_id || 0);
+        return (a.Stage_Serial || 0) - (b.Stage_Serial || 0);
       });
 
       setAttendanceDetails(aggregatedDetails);
@@ -370,11 +369,11 @@ const Attendance = () => {
           if (type === "present") {
             matchesType = effectiveStatus === "present" || effectiveStatus === "p";
           } else if (type === "absent") {
-             // Exclude WO from absent list if we strictly want to "show WO instead of absent"
-             // But if the user clicks the "Absent" count regarding a specific line/shift,
-             // and that shift IS 'WO' (which is weird, selecting a WO shift and asking for absent?),
-             // If the shift is WO, everyone is WO.
-             // If the shift is Normal, and someone has WO assigned (e.g. rotating), they shouldn't be in Absent list.
+            // Exclude WO from absent list if we strictly want to "show WO instead of absent"
+            // But if the user clicks the "Absent" count regarding a specific line/shift,
+            // and that shift IS 'WO' (which is weird, selecting a WO shift and asking for absent?),
+            // If the shift is WO, everyone is WO.
+            // If the shift is Normal, and someone has WO assigned (e.g. rotating), they shouldn't be in Absent list.
             matchesType = (effectiveStatus === "absent" || effectiveStatus === "a") && recordShiftId !== "WO";
           } else if (type === "allot") {
             matchesType = true; // For allot, show all records regardless of status
@@ -390,13 +389,13 @@ const Attendance = () => {
           `Stage-wise filtered records for ${type}:`,
           filtered.length,
         );
-        
+
         // Post-process to update STATUS display for WO
         const processedFiltered = filtered.map(r => {
-             if (String(r.SHIFT_ID).trim() === 'WO') {
-                 return { ...r, STATUS: 'WO' };
-             }
-             return r;
+          if (String(r.SHIFT_ID).trim() === 'WO') {
+            return { ...r, STATUS: 'WO' };
+          }
+          return r;
         });
 
         setDetailedRecords(processedFiltered);
@@ -501,15 +500,15 @@ const Attendance = () => {
         const status = String(record.STATUS || record.status || "")
           .toLowerCase()
           .trim();
-        const shiftId = String(record.SHIFT_ID || "").trim();  
-        
+        const shiftId = String(record.SHIFT_ID || "").trim();
+
         // Include WO records in "Show All" or just P/A?
         // Usually Show All implies everyone relevance. 
         // If "WO" is considered a status replacing Absent, we should include it?
         // The original code filtered for "present" or "absent".
         // If we want WO to show "instead of absent", we should probably include them if they were originally absent but are now WO.
         // Or if they are just WO.
-        
+
         const isPresent = status === "present" || status === "p";
         const isAbsent = status === "absent" || status === "a";
         const isWO = shiftId === "WO";
@@ -519,10 +518,10 @@ const Attendance = () => {
 
       // Update display status for WO
       const processedRecords = filteredRecords.map(r => {
-           if (String(r.SHIFT_ID).trim() === 'WO') {
-               return { ...r, STATUS: 'WO' };
-           }
-           return r;
+        if (String(r.SHIFT_ID).trim() === 'WO') {
+          return { ...r, STATUS: 'WO' };
+        }
+        return r;
       });
 
       setDetailedRecords(processedRecords);
@@ -758,18 +757,18 @@ const Attendance = () => {
 
   const filteredEmployees = Array.isArray(swapEmployees)
     ? swapEmployees.filter((swapdetail) => {
-        if (!swapdetail) return false;
-        const query = debouncedSearchQuery.toLowerCase();
-        return (
-          (swapdetail.USERID &&
-            swapdetail.USERID.toLowerCase().includes(query)) ||
-          (swapdetail.NAME && swapdetail.NAME.toLowerCase().includes(query)) ||
-          (swapdetail.Stage_name &&
-            swapdetail.Stage_name.toLowerCase().includes(query)) ||
-          (swapdetail.SKILL_DESCRIPTION &&
-            swapdetail.SKILL_DESCRIPTION.toLowerCase().includes(query))
-        );
-      })
+      if (!swapdetail) return false;
+      const query = debouncedSearchQuery.toLowerCase();
+      return (
+        (swapdetail.USERID &&
+          swapdetail.USERID.toLowerCase().includes(query)) ||
+        (swapdetail.NAME && swapdetail.NAME.toLowerCase().includes(query)) ||
+        (swapdetail.Stage_name &&
+          swapdetail.Stage_name.toLowerCase().includes(query)) ||
+        (swapdetail.SKILL_DESCRIPTION &&
+          swapdetail.SKILL_DESCRIPTION.toLowerCase().includes(query))
+      );
+    })
     : [];
 
   const handleClosePopup = () => {
@@ -793,8 +792,8 @@ const Attendance = () => {
 
       const updatedRecords = detailedRecords.map((record) =>
         record &&
-        record.USERID === selectedRecord.USERID &&
-        record.SHIFT_ID === selectedRecord.SHIFT_ID
+          record.USERID === selectedRecord.USERID &&
+          record.SHIFT_ID === selectedRecord.SHIFT_ID
           ? updatedRecord
           : record,
       );
@@ -1113,7 +1112,7 @@ const Attendance = () => {
                                       }
                                     >
                                       {loadingRecords &&
-                                      detailType === "allot" ? (
+                                        detailType === "allot" ? (
                                         <Spinner animation="border" size="sm" />
                                       ) : (
                                         detail.ALLOT || 0
@@ -1137,7 +1136,7 @@ const Attendance = () => {
                                       }
                                     >
                                       {loadingRecords &&
-                                      detailType === "present" ? (
+                                        detailType === "present" ? (
                                         <Spinner animation="border" size="sm" />
                                       ) : (
                                         detail.PRESENT || 0
@@ -1161,7 +1160,7 @@ const Attendance = () => {
                                       }
                                     >
                                       {loadingRecords &&
-                                      detailType === "absent" ? (
+                                        detailType === "absent" ? (
                                         <Spinner animation="border" size="sm" />
                                       ) : (
                                         detail.ABSENT || 0
@@ -1242,10 +1241,9 @@ const Attendance = () => {
                         : detailType === "showAll"
                           ? "Show All Details"
                           : detailType
-                            ? `${
-                                detailType.charAt(0).toUpperCase() +
-                                detailType.slice(1)
-                              } Details`
+                            ? `${detailType.charAt(0).toUpperCase() +
+                            detailType.slice(1)
+                            } Details`
                             : "Details"}
                     </h2>
                     <Button variant="success" onClick={downloadAll}>
@@ -1267,7 +1265,7 @@ const Attendance = () => {
                     ) : detailType === "unassigned" ? (
                       // Unassigned Manpower Table
                       !Array.isArray(unassignedEmployees) ||
-                      unassignedEmployees.length === 0 ? (
+                        unassignedEmployees.length === 0 ? (
                         <div className="text-center p-3">
                           <p>No unassigned or wrong shift employees found.</p>
                         </div>
@@ -1338,142 +1336,142 @@ const Attendance = () => {
                         </Table>
                       )
                     ) : // Regular Details Table (Present, Absent, Show All, Allot)
-                    !Array.isArray(detailedRecords) ||
-                      detailedRecords.length === 0 ? (
-                      <div className="text-center p-3">
-                        <p>
-                          No {detailType} records found for the selected
-                          criteria.
-                        </p>
-                      </div>
-                    ) : (
-                      <Table
-                        striped
-                        bordered
-                        hover
-                        responsive
-                        className="glass-table"
-                      >
-                        <thead style={{ fontSize: "15px" }}>
-                          <tr>
-                            <th>S.No</th>
-                            <th>User ID</th>
-                            <th>Name</th>
-                            <th>Stage Name</th>
-                            <th>Shift ID</th>
-                            {detailType === "present" && <th>Punch Time</th>}
-                            {detailType === "present" && <th>Punch Out</th>}
-                            {detailType === "present" && <th>Shift Start</th>}
-                            {detailType === "present" && <th>Status</th>}
-                            {detailType === "showAll" && <th>Line</th>}
-                            {detailType === "showAll" && <th>Status</th>}
-                            {detailType === "showAll" && <th>Punch Time</th>}
-                            {detailType === "showAll" && <th>Punch Out</th>}
-                            {(detailType === "absent" ||
-                              detailType === "present") && <th>Line</th>}
-                            {(detailType === "absent" ||
-                              detailType === "present") && <th>Swap Action</th>}
-                            {(detailType === "absent" ||
-                              detailType === "present") && (
-                              <th>Selected Swap</th>
-                            )}
-                            {(detailType === "absent" ||
-                              detailType === "present") && (
-                              <th>Swapped Employee</th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody style={{ fontSize: "15px" }}>
-                          {detailedRecords.map(
-                            (record, index) =>
-                              record && (
-                                <tr key={index}>
-                                  <td>{index + 1}</td>
-                                  <td>{record.USERID || "N/A"}</td>
-                                  <td>{record.NAME || "N/A"}</td>
-                                  <td>{record.Stage_name || "N/A"}</td>
-                                  <td>{record.SHIFT_ID || "N/A"}</td>
+                      !Array.isArray(detailedRecords) ||
+                        detailedRecords.length === 0 ? (
+                        <div className="text-center p-3">
+                          <p>
+                            No {detailType} records found for the selected
+                            criteria.
+                          </p>
+                        </div>
+                      ) : (
+                        <Table
+                          striped
+                          bordered
+                          hover
+                          responsive
+                          className="glass-table"
+                        >
+                          <thead style={{ fontSize: "15px" }}>
+                            <tr>
+                              <th>S.No</th>
+                              <th>User ID</th>
+                              <th>Name</th>
+                              <th>Stage Name</th>
+                              <th>Shift ID</th>
+                              {detailType === "present" && <th>Punch Time</th>}
+                              {detailType === "present" && <th>Punch Out</th>}
+                              {detailType === "present" && <th>Shift Start</th>}
+                              {detailType === "present" && <th>Status</th>}
+                              {detailType === "showAll" && <th>Line</th>}
+                              {detailType === "showAll" && <th>Status</th>}
+                              {detailType === "showAll" && <th>Punch Time</th>}
+                              {detailType === "showAll" && <th>Punch Out</th>}
+                              {(detailType === "absent" ||
+                                detailType === "present") && <th>Line</th>}
+                              {(detailType === "absent" ||
+                                detailType === "present") && <th>Swap Action</th>}
+                              {(detailType === "absent" ||
+                                detailType === "present") && (
+                                  <th>Selected Swap</th>
+                                )}
+                              {(detailType === "absent" ||
+                                detailType === "present") && (
+                                  <th>Swapped Employee</th>
+                                )}
+                            </tr>
+                          </thead>
+                          <tbody style={{ fontSize: "15px" }}>
+                            {detailedRecords.map(
+                              (record, index) =>
+                                record && (
+                                  <tr key={index}>
+                                    <td>{index + 1}</td>
+                                    <td>{record.USERID || "N/A"}</td>
+                                    <td>{record.NAME || "N/A"}</td>
+                                    <td>{record.Stage_name || "N/A"}</td>
+                                    <td>{record.SHIFT_ID || "N/A"}</td>
 
-                                  {detailType === "present" && (
-                                    <>
-                                      <td>{record.PUNCHIN}</td>
-                                      <td>
-                                        {record.PUNCHOUT || "No Punch Out"}
-                                      </td>
-                                      <td>{record.StartTime || "N/A"}</td>
-                                      <td
-                                        style={{
-                                          color: getPunctualityColor(
-                                            record.PunctualityStatus,
-                                          ),
-                                          fontWeight: "bold",
-                                        }}
-                                      >
-                                        {record.PunctualityStatus || "Unknown"}
-                                      </td>
-                                    </>
-                                  )}
-
-                                  {detailType === "showAll" && (
-                                    <>
-                                      <td>{record.LINE || "N/A"}</td>
-                                      <td
-                                        style={{
-                                          color:
-                                            record.STATUS &&
-                                            record.STATUS.toLowerCase() ===
-                                              "absent"
-                                              ? "red"
-                                              : "green",
-                                          fontWeight: "bold",
-                                        }}
-                                      >
-                                        {record.STATUS || "N/A"}
-                                      </td>
-                                      <td>{record.PUNCHIN}</td>
-                                      <td>
-                                        {record.PUNCHOUT || "No Punch Out"}
-                                      </td>
-                                    </>
-                                  )}
-
-                                  {(detailType === "absent" ||
-                                    detailType === "present") && (
-                                    <>
-                                      <td>{record.LINE || "N/A"}</td>
-                                      <td>
-                                        <Button
-                                          onClick={() =>
-                                            handleShowEmployees(
-                                              record.USERID,
-                                              record.NAME,
-                                              record.SHIFT_ID,
-                                              record.Stage_name,
-                                              record.LINE,
-                                            )
-                                          }
-                                          disabled={record.SWAPUSERNAME}
-                                          variant="primary"
-                                          size="sm"
+                                    {detailType === "present" && (
+                                      <>
+                                        <td>{record.PUNCHIN}</td>
+                                        <td>
+                                          {record.PUNCHOUT || "No Punch Out"}
+                                        </td>
+                                        <td>{record.StartTime || "N/A"}</td>
+                                        <td
+                                          style={{
+                                            color: getPunctualityColor(
+                                              record.PunctualityStatus,
+                                            ),
+                                            fontWeight: "bold",
+                                          }}
                                         >
-                                          Swap
-                                        </Button>
-                                      </td>
-                                      <td>
-                                        {record.swapEmployee ||
-                                          "No Swap Selected"}
-                                      </td>
-                                      <td>
-                                        {record.SWAPUSERNAME || "No Swap"}
-                                      </td>
-                                    </>
-                                  )}
-                                </tr>
-                              ),
-                          )}
-                        </tbody>
-                      </Table>
-                    )}
+                                          {record.PunctualityStatus || "Unknown"}
+                                        </td>
+                                      </>
+                                    )}
+
+                                    {detailType === "showAll" && (
+                                      <>
+                                        <td>{record.LINE || "N/A"}</td>
+                                        <td
+                                          style={{
+                                            color:
+                                              record.STATUS &&
+                                                record.STATUS.toLowerCase() ===
+                                                "absent"
+                                                ? "red"
+                                                : "green",
+                                            fontWeight: "bold",
+                                          }}
+                                        >
+                                          {record.STATUS || "N/A"}
+                                        </td>
+                                        <td>{record.PUNCHIN}</td>
+                                        <td>
+                                          {record.PUNCHOUT || "No Punch Out"}
+                                        </td>
+                                      </>
+                                    )}
+
+                                    {(detailType === "absent" ||
+                                      detailType === "present") && (
+                                        <>
+                                          <td>{record.LINE || "N/A"}</td>
+                                          <td>
+                                            <Button
+                                              onClick={() =>
+                                                handleShowEmployees(
+                                                  record.USERID,
+                                                  record.NAME,
+                                                  record.SHIFT_ID,
+                                                  record.Stage_name,
+                                                  record.LINE,
+                                                )
+                                              }
+                                              disabled={record.SWAPUSERNAME}
+                                              variant="primary"
+                                              size="sm"
+                                            >
+                                              Swap
+                                            </Button>
+                                          </td>
+                                          <td>
+                                            {record.swapEmployee ||
+                                              "No Swap Selected"}
+                                          </td>
+                                          <td>
+                                            {record.SWAPUSERNAME || "No Swap"}
+                                          </td>
+                                        </>
+                                      )}
+                                  </tr>
+                                ),
+                            )}
+                          </tbody>
+                        </Table>
+                      )}
                   </div>
                 </Col>
               )}

@@ -52,7 +52,7 @@ const NPunchReport = () => {
         if (Array.isArray(res.data)) {
           // FIX: Deduplicate employees using Map
           const uniqueEmployees = Array.from(new Map(res.data.map(emp => [emp.userid, emp])).values());
-          
+
           const formatted = uniqueEmployees.map((emp) => ({
             value: emp.userid,
             label: `${emp.userid} - ${emp.name}`,
@@ -77,10 +77,13 @@ const NPunchReport = () => {
         return id.startsWith(search) || name.startsWith(search);
       });
       setEmployeeOptions(filtered);
+    } else if (isInactive) {
+      // When inactive toggle is on, show all inactive employees immediately
+      setEmployeeOptions(allEmployees);
     } else {
       setEmployeeOptions([]);
     }
-  }, [employeeIdInput, allEmployees]);
+  }, [employeeIdInput, allEmployees, isInactive]);
 
   const prettyDate = (d) => {
     if (!d) return "-";
@@ -155,9 +158,19 @@ const NPunchReport = () => {
 
   // Improved hours formatting
   const fmtHours = (num) => {
-    if (num == null || num === undefined || Number.isNaN(Number(num)))
-      return "-";
+    if (num == null || num === undefined) return "-";
+
+    // Handle "HH:MM" or "H:MM" string format from backend
+    if (typeof num === "string" && num.includes(":")) {
+      const parts = num.split(":").map((p) => parseInt(p, 10));
+      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        const hours = parts[0] + parts[1] / 60;
+        return hours.toFixed(2);
+      }
+    }
+
     const hours = Number(num);
+    if (Number.isNaN(hours)) return "-";
     return hours.toFixed(2);
   };
 
@@ -253,7 +266,7 @@ const NPunchReport = () => {
       console.error("Fetch error:", error);
       setErr(
         "Failed to fetch report: " +
-          (error.response?.data?.message || error.message),
+        (error.response?.data?.message || error.message),
       );
       setReports([]);
     } finally {
@@ -323,6 +336,7 @@ const NPunchReport = () => {
         "Hours Worked": fmtHours(
           row.HoursWorkedInclusive ?? row.HoursWithinShift,
         ),
+        "Actual Hours Worked": fmtHours(row.ActualHoursWorked),
         "Night Shift": row.IsNightShift ? "Yes" : "No",
       };
     });
@@ -409,6 +423,9 @@ const NPunchReport = () => {
               placeholder="Search Employee..."
               isClearable
               noOptionsMessage={() => "No matching employees"}
+              menuPortalTarget={document.body}
+              menuPosition="fixed"
+              styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
             />
           </Col>
           <Col md={3}>
@@ -586,7 +603,7 @@ const NPunchReport = () => {
                         row.HoursWorkedInclusive ?? row.HoursWithinShift,
                       )}
                     </td>
-                    <td>{row.ActualHoursWorked}</td>
+                    <td>{fmtHours(row.ActualHoursWorked)}</td>
                     <td>
                       <span
                         className={`badge ${row.IsNightShift ? "bg-primary" : "bg-secondary"}`}
@@ -610,9 +627,16 @@ const NPunchReport = () => {
                 <strong>Total Hours Worked:</strong>{" "}
                 {reports
                   .reduce((sum, row) => {
-                    const hours = parseFloat(
-                      row.HoursWorkedInclusive ?? row.HoursWithinShift ?? 0,
-                    );
+                    const val = row.HoursWorkedInclusive ?? row.HoursWithinShift ?? 0;
+                    let hours = 0;
+                    if (typeof val === "string" && val.includes(":")) {
+                      const parts = val.split(":").map(p => parseInt(p, 10));
+                      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                        hours = parts[0] + (parts[1] / 60);
+                      }
+                    } else {
+                      hours = parseFloat(val);
+                    }
                     return sum + (isNaN(hours) ? 0 : hours);
                   }, 0)
                   .toFixed(2)}{" "}

@@ -58,7 +58,7 @@ const EmployeePunctuality = () => {
           : "https://192.168.2.54/api/employees";
         const res = await axios.get(url);
         if (Array.isArray(res.data)) {
-           // FIX: Deduplicate employees using Map
+          // FIX: Deduplicate employees using Map
           const uniqueEmployees = Array.from(new Map(res.data.map(emp => [emp.userid, emp])).values());
 
           const formatted = uniqueEmployees.map((emp) => ({
@@ -86,10 +86,13 @@ const EmployeePunctuality = () => {
         );
       });
       setEmployeeOptions(filtered);
+    } else if (isInactive) {
+      // When inactive toggle is on, show all inactive employees immediately
+      setEmployeeOptions(allEmployees);
     } else {
       setEmployeeOptions([]); // Clear options if input is empty
     }
-  }, [employeeIdInput, allEmployees]);
+  }, [employeeIdInput, allEmployees, isInactive]);
 
   const fetchPunctuality = async () => {
     if (!employeeId) {
@@ -115,8 +118,12 @@ const EmployeePunctuality = () => {
       );
 
       if (response.data && Array.isArray(response.data.records)) {
-        setPunctualityData(response.data.records);
-        if (response.data.records.length === 0) {
+        // --- Deduplicate Records ---
+        const unique = Array.from(
+          new Map(response.data.records.map((r) => [JSON.stringify(r), r])).values()
+        );
+        setPunctualityData(unique);
+        if (unique.length === 0) {
           setError("No Punctuality found for the selected filters.");
         }
       } else {
@@ -266,6 +273,8 @@ const EmployeePunctuality = () => {
               isClearable
               noOptionsMessage={() => "No matching employees"}
               classNamePrefix="react-select"
+              menuPortalTarget={document.body}
+              menuPosition="fixed"
               styles={{
                 control: (base) => ({
                   ...base,
@@ -279,6 +288,7 @@ const EmployeePunctuality = () => {
                   backgroundColor: "rgba(255, 255, 255, 0.9)",
                   backdropFilter: "blur(10px)",
                 }),
+                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
               }}
             />
           </Col>

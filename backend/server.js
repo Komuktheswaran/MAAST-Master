@@ -1170,6 +1170,19 @@ app.post("/api/saveUserShifts", async (req, res) => {
       );
     });
 
+    // Fetch user active/inactive status from MX_USERMST
+    const userIds = [...new Set(shiftsData.map((s) => s.userid).filter(Boolean))];
+    const userStatusMap = new Map();
+    if (userIds.length > 0) {
+      const idList = userIds.map((id) => `'${id}'`).join(",");
+      const userStatusResult = await request.query(
+        `SELECT USERID, UserIDEnbl FROM MX_USERMST WHERE USERID IN (${idList})`
+      );
+      userStatusResult.recordset.forEach((u) => {
+        userStatusMap.set(String(u.USERID), u.UserIDEnbl);
+      });
+    }
+
     const batchSize = 50;
 
     function normalizeDate(dateStr) {
@@ -1210,6 +1223,16 @@ app.post("/api/saveUserShifts", async (req, res) => {
 
       Shift_date_from = normalizeDate(Shift_date_from);
       Shift_date_to = normalizeDate(Shift_date_to);
+
+      // ✅ Check if user is inactive (UserIDEnbl = 0)
+      const userStatus = userStatusMap.get(String(userid));
+      if (userStatus === 0) {
+        invalidStages.push({
+          ...shift,
+          reason: "Inactive User (UserIDEnbl=0)",
+        });
+        continue;
+      }
 
       // Validate stage name
       if (!STAGE_NAME || typeof STAGE_NAME !== "string") {
@@ -1450,7 +1473,7 @@ app.get("/api/stages_list", async (req, res) => {
     const result = await pool
       .request()
       .query(
-        "SELECT Stage_id, Stage_name FROM Mx_StageMaster ORDER BY Stage_name",
+        "SELECT Stage_id, Stage_name, Stage_Serial FROM Mx_StageMaster ORDER BY Stage_Serial",
       );
     console.log("Stages Query Result:", result.recordset);
     res.json(result.recordset);
@@ -1481,7 +1504,7 @@ app.get("/api/getUserShifts", async (req, res) => {
   try {
     let pool = await sql.connect(config);
     let query = `
-          SELECT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
+          SELECT DISTINCT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
           FROM Mx_UserShifts u
           LEFT JOIN MX_USERMST m ON u.userid = m.USERID
           LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
@@ -1534,7 +1557,7 @@ app.get("/api/getUserShifts", async (req, res) => {
 
     if (conditions.length > 0) {
       query = `
-          SELECT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
+          SELECT DISTINCT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
           FROM Mx_UserShifts u
           LEFT JOIN MX_USERMST m ON u.userid = m.USERID
           LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
@@ -2004,6 +2027,7 @@ SELECT DISTINCT
     ISNULL(S.LINE, A.Original_LINE) AS LINE,
     ST.stage_name AS Stage_name,
     ST.Stage_id,
+    ST.Stage_Serial,
     
     SP.PUNCHIN,
     FORMAT(SP.PUNCHIN, 'HH:mm:ss') AS PunchInTimeOnly,
@@ -2395,6 +2419,7 @@ app.get("/api/attendance", async (req, res) => {
         
         SELECT 
             ST.Stage_name,
+            ST.Stage_Serial,
             A.LINE,
             A.SHIFT_ID,
             A.SFTSTTime,
@@ -2403,8 +2428,8 @@ app.get("/api/attendance", async (req, res) => {
             CAST(SUM(CASE WHEN A.IsPresent = 0 THEN 1 ELSE 0 END) AS INT) AS ABSENT
         FROM AttendanceStatus A
         LEFT JOIN dbo.Mx_STAGEMASTER ST ON A.stage_id = ST.stage_id
-        GROUP BY ST.Stage_name, A.LINE, A.SHIFT_ID, A.SFTSTTime
-        ORDER BY ALLOT DESC;
+        GROUP BY ST.Stage_name, ST.Stage_Serial, A.LINE, A.SHIFT_ID, A.SFTSTTime
+        ORDER BY ST.Stage_Serial ASC;
       `);
     console.log(result.recordset);
 
@@ -3098,7 +3123,7 @@ const employeeHistoryHandler = async (req, res) => {
     const query = `
   WITH EmployeeHistory AS (
     -- Data from Mx_UserShifts
-    SELECT 
+    SELECT DISTINCT
         P2.USERID,
         P2.NAME,
         P1.Shift_date_from AS [DATE],
@@ -3172,7 +3197,7 @@ const employeeHistoryHandler = async (req, res) => {
     UNION ALL
 
     -- Data from Mx_Userswap
-    SELECT 
+    SELECT DISTINCT
         P2.USERID,
         P2.NAME,
         SW.Shift_date AS [DATE],
@@ -3243,7 +3268,7 @@ const employeeHistoryHandler = async (req, res) => {
           UNION ALL
 
     -- Users present in attendance but not in UserShifts or UserSwap
-    SELECT 
+    SELECT DISTINCT
         U.USERID,
         U.NAME,
         CAST(A.Edatetime AS DATE) AS [DATE],

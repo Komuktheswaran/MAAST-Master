@@ -249,7 +249,7 @@ const UserSkills = () => {
       if (!grouped[uid]) {
         // Find detailed info
         const details = userDetails.find(u => u.UserID === uid) || {};
-        
+
         grouped[uid] = {
           userId: uid,
           name: skill.NAME,
@@ -281,15 +281,15 @@ const UserSkills = () => {
 
   const handleDownload = () => {
     const maxSkills = maxSkillsCount; // Use state variable directly
-    
+
     // Dynamic headers
     const headers = [
-      "User ID", 
-      "Name", 
-      "DOJ", 
-      "Education", 
-      "Designation", 
-      "Unit", 
+      "User ID",
+      "Name",
+      "DOJ",
+      "Education",
+      "Designation",
+      "Unit",
       "Department"
     ];
     for (let i = 1; i <= maxSkills; i++) {
@@ -299,7 +299,7 @@ const UserSkills = () => {
     // Dynamic data mapping
     const data = groupedUserSkills.map((userGroup) => { // Use state variable directly
       const row = [
-        userGroup.userId, 
+        userGroup.userId,
         userGroup.name,
         userGroup.doj ? new Date(userGroup.doj).toLocaleDateString("en-GB") : "",
         userGroup.education,
@@ -497,8 +497,8 @@ const UserSkills = () => {
                         <td>
                           {employee.Enrolldt
                             ? new Date(employee.Enrolldt).toLocaleDateString(
-                                "en-GB",
-                              )
+                              "en-GB",
+                            )
                             : " - "}
                         </td>
                         <td>{employee.designation}</td>
@@ -591,8 +591,8 @@ const UserSkills = () => {
           <div className="user-skills-header">
             <h2>
               User Skills Details{" "}
-              <BsInfoCircle 
-                style={{ marginLeft: '10px', cursor: 'pointer', color: '#17a2b8', fontSize: '0.8em' }} 
+              <BsInfoCircle
+                style={{ marginLeft: '10px', cursor: 'pointer', color: '#17a2b8', fontSize: '0.8em' }}
                 onClick={(e) => handleInfoClick(e, 'Rating Scale:\n1 - Basic/Beginner\n2 - Intermediate\n3 - Advanced\n4 - Expert/Master')}
               />
             </h2>
@@ -668,8 +668,8 @@ const UserSkills = () => {
                         <td>
                           {userGroup.skills[index]?.rating || ""}
                           {userGroup.skills[index]?.rating && (
-                            <BsInfoCircle 
-                              style={{ marginLeft: '5px', cursor: 'pointer', color: '#17a2b8' }} 
+                            <BsInfoCircle
+                              style={{ marginLeft: '5px', cursor: 'pointer', color: '#17a2b8' }}
                               onClick={(e) => handleInfoClick(e, userGroup.skills[index]?.description)}
                             />
                           )}

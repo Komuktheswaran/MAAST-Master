@@ -1,160 +1,158 @@
 .title {
-    text-align: center;
-    margin-bottom: 20px;
-    font-weight: 700;
-    color: #333;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  text-align: center;
+  margin-bottom: 20px;
+  font-weight: 700;
+  color: #333;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.file-upload {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.input-file {
+  flex: 1;
+  font-size: 15px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.glass-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  margin-top: 10px;
+  background: transparent;
+}
+
+.glass-table thead tr {
+  background: transparent; /* Remove background from tr */
+  box-shadow: none;
+}
+
+.glass-table thead th {
+  background-color: #4a90e2;
+  background-image: linear-gradient(135deg, #4a90e2 0%, #007bff 100%);
+  color: white;
+  padding: 15px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Shadow on cells */
+}
+
+.glass-table tbody tr {
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.glass-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+  transform: scale(1.005);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.glass-table td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: #444;
+  vertical-align: middle;
+}
+
+.glass-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 12px;
+}
+
+.glass-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 12px;
+}
+
+.glass-input {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Original styles preserved/updated */
+.button {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.3s ease;
+  margin-left: 10px;
+  border-radius: 8px; /* Added radius */
+}
+
+.button:hover {
+  background-color: #45a049;
+}
+
+.icon {
+  margin-right: 5px;
+}
+
+.notification {
+  background-color: #4caf50;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1050;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.message {
+  margin-top: 10px;
+  color: #d32f2f;
+  text-align: center;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 1.5em;
   }
-  
+
   .file-upload {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap; 
-    margin-bottom: 20px;
+    flex-direction: column;
+    align-items: stretch;
   }
-  
+
   .input-file {
-    flex: 1;
-    font-size: 15px;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.6);
-    border-radius: 8px;
-    backdrop-filter: blur(5px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    margin-bottom: 10px;
   }
-  
-  .glass-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-  }
-  
-  .glass-table {
-    border-collapse: separate; 
-    border-spacing: 0;
-    width: 100%;
-    margin-top: 10px;
-    background: transparent;
-  }
-  
-  .glass-table thead tr {
-    background: transparent; /* Remove background from tr */
-    box-shadow: none;
-  }
-  
-  .glass-table thead th {
-    background-color: #4a90e2; 
-    background-image: linear-gradient(135deg, #4a90e2 0%, #007bff 100%);
-    color: white;
-    padding: 15px;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
-    border: none;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Shadow on cells */
-  }
-  
-  .glass-table tbody tr {
-    background: rgba(255, 255, 255, 0.6);
-    transition: all 0.2s ease;
-  }
-  
-  .glass-table tbody tr:hover {
-      background: rgba(255, 255, 255, 0.9);
-      transform: scale(1.005);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-  }
-  
+
+  .glass-table th,
   .glass-table td {
-    padding: 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-    color: #444;
-    vertical-align: middle;
+    padding: 8px;
+    font-size: 0.8rem;
   }
-  
-  .glass-table tbody tr:last-child td:first-child {
-      border-bottom-left-radius: 12px;
-  }
-  
-  .glass-table tbody tr:last-child td:last-child {
-      border-bottom-right-radius: 12px;
-  }
-  
-  .glass-input {
-      background: rgba(255, 255, 255, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      backdrop-filter: blur(4px);
-  }
-  
-  .glass-input:focus {
-      background: rgba(255, 255, 255, 0.8);
-      box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-  }
-  
-  /* Original styles preserved/updated */
-  .button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    transition: background-color 0.3s ease;
-    margin-left: 10px;
-    border-radius: 8px; /* Added radius */
-  }
-  
-  .button:hover {
-    background-color: #45a049;
-  }
-  
-  .icon {
-    margin-right: 5px;
-  }
-  
-  .notification {
-    background-color: #4CAF50;
-    color: white;
-    text-align: center;
-    padding: 10px;
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1050;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-  
-  .message {
-    margin-top: 10px;
-    color: #d32f2f;
-    text-align: center;
-    font-weight: 500;
-  }
-  
-  @media (max-width: 768px) {
-    .title {
-      font-size: 1.5em;
-    }
-  
-    .file-upload {
-      flex-direction: column; 
-      align-items: stretch;
-    }
-  
-    .input-file {
-      margin-bottom: 10px;
-    }
-    
-    .glass-table th, .glass-table td {
-        padding: 8px;
-        font-size: 0.8rem;
-    }
-  }
+}

@@ -35,4 +35,15 @@
   to {
     transform: rotate(360deg);
   }
+
+/* Global fix for dropdowns overlapping below elements */
+.form-select, .glass-input {
+  position: relative;
+  z-index: 50;
+}
+
+.table-responsive, .glass-table {
+  position: relative;
+  z-index: 10;
+}
 }

@@ -187,7 +187,7 @@ const LoginPage = () => {
           style={{ color: "#ECF0F5" }}
         >
           {showChangePassword ? "CHANGE PASSWORD" : "LOGIN"}
-          {}
+          { }
         </Typography>
         <div class="col-lg-12 login-form">
           {!showChangePassword ? (

@@ -5,8 +5,6 @@ import axios from "axios";
 import { DateTime } from "luxon";
 import { FaFileDownload, FaEye, FaEyeSlash, FaSave } from "react-icons/fa";
 import { Container, Button, CircularProgress, Snackbar } from "@mui/material"; // Import Material-UI components
-import "../styles/UserShiftUpload.css"; // Import the CSS file
-import emvLogo from "../pictures/emvlogo.png";
 // import { maxWidth } from '@mui/system';
 
 const EmployeeJobCardUpload = () => {
@@ -175,12 +173,8 @@ const EmployeeJobCardUpload = () => {
       fluid
       className="container-fluid"
       style={{
-        backgroundImage: `url(${emvLogo})`,
-        backgroundSize: "auto",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "center",
+        backgroundColor: "white",
         minHeight: "100vh",
-        opacity: "0.9",
         paddingTop: "20px",
         maxWidth: "100%",
       }}

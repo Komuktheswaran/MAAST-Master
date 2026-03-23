@@ -76,11 +76,12 @@ const UserShiftReport = () => {
         axios.get(`${baseURL}/stages_list`),
         axios.get(`${baseURL}/lines`),
       ]);
+      const sortedStages = stagesRes.data.sort((a, b) => (a.Stage_Serial || a.Stage_id) - (b.Stage_Serial || b.Stage_id));
       console.log(shiftsRes.data);
-      console.log(stagesRes.data);
+      console.log(sortedStages);
       console.log(linesRes.data);
       setShiftOptions(shiftsRes.data);
-      setStageOptions(stagesRes.data);
+      setStageOptions(sortedStages);
       setLineOptions(linesRes.data);
     } catch (error) {
       console.error("Error fetching filter options:", error);
@@ -249,16 +250,29 @@ const UserShiftReport = () => {
       fluid
       className="container-fluid"
       style={{
-        backgroundImage: `url(${emvLogo})`,
-        backgroundSize: "auto",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "center",
         minHeight: "100vh",
-        opacity: "0.9",
         paddingTop: "20px",
         maxWidth: "100%",
+        position: "relative",
+        zIndex: 1
       }}
     >
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundImage: `url(${emvLogo})`,
+          backgroundSize: "auto",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+          opacity: 0.1,
+          zIndex: -1,
+          pointerEvents: "none"
+        }}
+      />
       <Row className="mt-4">
         <Col md={12}>
           <div className="d-flex justify-content-between align-items-center mb-4">

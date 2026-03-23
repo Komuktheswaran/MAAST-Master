@@ -23,23 +23,32 @@ const MultiSelectDropdown = ({
   placeholder,
   labelKey,
   valueKey,
+  onOpenChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const toggleOpen = (val) => {
+    setIsOpen(val);
+    if (onOpenChange) onOpenChange(val);
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
+        if (onOpenChange) onOpenChange(false);
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [isOpen]);
 
   const handleItemChange = (value) => {
     if (value === "ALL") {
@@ -75,10 +84,10 @@ const MultiSelectDropdown = ({
   };
 
   return (
-    <div className="position-relative" ref={dropdownRef}>
+    <div className="position-relative" ref={dropdownRef} style={{ zIndex: isOpen ? 99999 : 1 }}>
       <div
         className="form-select d-flex justify-content-between align-items-center"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => toggleOpen(!isOpen)}
         style={{ cursor: "pointer" }}
       >
         <span className={selectedValues.length === 0 ? "text-muted" : ""}>
@@ -90,9 +99,10 @@ const MultiSelectDropdown = ({
         <div
           className="position-absolute w-100 bg-white border border-secondary rounded mt-1 shadow"
           style={{
-            zIndex: 9999, // Increased to ensure it's on top
+            zIndex: 100000, // Increased to ensure it's on top of everything Else
             maxHeight: "400px", // Increased from 200px
             overflowY: "auto",
+            backgroundColor: "white", // Ensure background is solid
           }}
         >
           <div className="p-2">
@@ -160,6 +170,8 @@ const Summary = () => {
   const [summaryData, setSummaryData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [anyDropdownOpen, setAnyDropdownOpen] = useState(false);
 
   // ✅ Fetch dropdown options on component mount
   useEffect(() => {
@@ -339,7 +351,7 @@ const Summary = () => {
         </Alert>
       )}
 
-      <div className="glass-card p-4 mb-4" style={{ position: "relative", zIndex: 20 }}>
+      <div className="glass-card p-4 mb-4" style={{ position: "relative", zIndex: anyDropdownOpen ? 3000 : 20 }}>
         {/* ✅ Updated Form with From Date and To Date */}
         <Row className="mb-3">
           <Col md={3}>
@@ -371,6 +383,7 @@ const Summary = () => {
               options={shiftOptions}
               selectedValues={selectedShifts}
               onSelectionChange={setSelectedShifts}
+              onOpenChange={setAnyDropdownOpen}
               placeholder="Select Shift"
               labelKey="SHIFT_ID"
               valueKey="SHIFT_ID"
@@ -391,6 +404,7 @@ const Summary = () => {
               options={lineOptions}
               selectedValues={selectedLines}
               onSelectionChange={setSelectedLines}
+              onOpenChange={setAnyDropdownOpen}
               placeholder="Select Line"
               labelKey="LINE"
               valueKey="LINE"
@@ -487,8 +501,8 @@ const Summary = () => {
                     <td>
                       {item.DATE
                         ? DateTime.fromJSDate(new Date(item.DATE)).toFormat(
-                            "yyyy-MM-dd",
-                          )
+                          "yyyy-MM-dd",
+                        )
                         : "N/A"}
                     </td>
                     <td>{item.SHIFT || "N/A"}</td>

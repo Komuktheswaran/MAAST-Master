@@ -260,9 +260,9 @@ const UserShiftUpload = () => {
   const conflictColHeaders = columns.length
     ? columns
     : [
-        { Header: "Row", accessor: "row" },
-        { Header: "User_ID", accessor: "col0" },
-      ];
+      { Header: "Row", accessor: "row" },
+      { Header: "User_ID", accessor: "col0" },
+    ];
 
   return (
     <Container

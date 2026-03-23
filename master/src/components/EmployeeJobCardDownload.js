@@ -84,7 +84,7 @@ const EmployeeJobCardDownload = () => {
           const activeUsers = response.data.filter(
             (user) => isInactive ? user.UserIDEnbl === 0 : user.UserIDEnbl === 1,
           );
-          
+
           // FIX: Deduplicate employees using Map
           const uniqueEmployees = Array.from(new Map(activeUsers.map(emp => [emp.userid, emp])).values());
 
@@ -116,7 +116,8 @@ const EmployeeJobCardDownload = () => {
   };
 
   const noOptionsMessage = () => {
-    return employeeIdInput.length > 0 ? "No user found" : "Type to search...";
+    if (employeeIdInput.length > 0) return "No user found";
+    return isInactive ? "No inactive employees found" : "Type to search...";
   };
 
   // --- Calculations ---
@@ -132,8 +133,8 @@ const EmployeeJobCardDownload = () => {
       userData.reduce((sum, item) => {
         const val =
           item.Attendance === 5 &&
-          (item.ATTENDANCE_Status === "Authorized Leave" ||
-            item.ATTENDANCE_Status === "Authorized")
+            (item.ATTENDANCE_Status === "Authorized Leave" ||
+              item.ATTENDANCE_Status === "Authorized")
             ? 5
             : item.Attendance || 0;
         return sum + val;
@@ -198,7 +199,11 @@ const EmployeeJobCardDownload = () => {
       console.log("Job Data: ", response.data);
 
       if (response.data && Array.isArray(response.data.records)) {
-        setJobDataData(response.data.records);
+        // --- Deduplicate Records ---
+        const unique = Array.from(
+          new Map(response.data.records.map((r) => [JSON.stringify(r), r])).values()
+        );
+        setJobDataData(unique);
       } else {
         setError("No data found.");
       }
@@ -242,8 +247,13 @@ const EmployeeJobCardDownload = () => {
 
       if (response.data && response.data.success) {
         // Updated Logic: Backend now returns 'summary' instead of raw 'records' to avoid crash.
-        const summary = response.data.summary || [];
-        const records = response.data.records || []; // Fallback if backend not updated
+        // --- Deduplicate Summary and Records ---
+        const summary = Array.from(
+          new Map((response.data.summary || []).map((s) => [JSON.stringify(s), s])).values()
+        );
+        const records = Array.from(
+          new Map((response.data.records || []).map((r) => [JSON.stringify(r), r])).values()
+        );
 
         if (summary.length === 0 && records.length === 0) {
           setError("No data found for the selected range.");
@@ -332,7 +342,11 @@ const EmployeeJobCardDownload = () => {
         }
 
         setMonthlySummary(matrixRows);
-        setMonthlyRawData(records); // Note: this might be empty now if using summary
+        // --- Deduplicate Raw Data ---
+        const uniqueRaw = Array.from(
+          new Map(records.map((r) => [JSON.stringify(r), r])).values()
+        );
+        setMonthlyRawData(uniqueRaw); // Note: this might be empty now if using summary
       } else {
         setError("No records found.");
       }
@@ -387,7 +401,7 @@ const EmployeeJobCardDownload = () => {
           try {
             const msg = JSON.parse(reader.result);
             console.error(msg);
-          } catch (e) {}
+          } catch (e) { }
         };
         reader.readAsText(err.response.data);
       }
@@ -424,7 +438,10 @@ const EmployeeJobCardDownload = () => {
       console.log("Unit Data:", response.data);
 
       if (response.data && response.data.success) {
-        const records = response.data.records;
+        // --- Deduplicate Records ---
+        const records = Array.from(
+          new Map((response.data.records || []).map((r) => [JSON.stringify(r), r])).values()
+        );
 
         // Bucket Logic
         const buckets = {
@@ -546,9 +563,9 @@ const EmployeeJobCardDownload = () => {
         </h2>
 
         {error && (
-          <Alert 
-            variant="danger" 
-            dismissible 
+          <Alert
+            variant="danger"
+            dismissible
             onClose={() => setError("")}
             className="glass-alert glass-alert-danger mb-4"
           >
@@ -599,117 +616,118 @@ const EmployeeJobCardDownload = () => {
                 </div>
               </div>
 
-            <Row className="mb-3 g-3">
-              {/* Filters */}
-              {(reportType === "date-range" || reportType === "month-wise") && (
-                <Col md={3}>
-                  <Form.Label className="glass-label">
-                    Select Employee{" "}
-                    {reportType === "month-wise" && "(Optional)"}
-                  </Form.Label>
-                  <Select
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                    options={employeeOptions}
-                    value={selectedEmployee}
-                    onChange={handleEmployeeChange}
-                    onInputChange={handleSearchInputChange}
-                    placeholder="Search employee..."
-                    isClearable={true}
-                    filterOption={(candidate, input) => {
-                      if (!input) return true;
-                      const search = input.toLowerCase();
-                      // Check ID (value) or Name
-                      // candidate.data contains { value, label, id, name }
-                      const id =
-                        candidate.data.value?.toString().toLowerCase() || "";
-                      const name =
-                        candidate.data.name?.toString().toLowerCase() || "";
-                      return id.startsWith(search) || name.startsWith(search);
-                    }}
-                  />
-                </Col>
-              )}
+              <Row className="mb-3 g-3">
+                {/* Filters */}
+                {(reportType === "date-range" || reportType === "month-wise") && (
+                  <Col md={3}>
+                    <Form.Label className="glass-label">
+                      Select Employee{" "}
+                      {reportType === "month-wise" && "(Optional)"}
+                    </Form.Label>
+                    <Select
+                      className="react-select-container"
+                      classNamePrefix="react-select"
+                      options={employeeOptions}
+                      value={selectedEmployee}
+                      onChange={handleEmployeeChange}
+                      onInputChange={handleSearchInputChange}
+                      placeholder="Search employee..."
+                      isClearable={true}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                      filterOption={(candidate, input) => {
+                        if (!input) return true;
+                        const search = input.toLowerCase();
+                        const id =
+                          candidate.data.value?.toString().toLowerCase() || "";
+                        const name =
+                          candidate.data.name?.toString().toLowerCase() || "";
+                        return id.startsWith(search) || name.startsWith(search);
+                      }}
+                    />
+                  </Col>
+                )}
 
-              {reportType === "date-range" ? (
-                <>
+                {reportType === "date-range" ? (
+                  <>
+                    <Col md={3}>
+                      <Form.Label className="glass-label">From Date</Form.Label>
+                      <Form.Control
+                        className="glass-input"
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        max={new Date().toISOString().split("T")[0]}
+                      />
+                    </Col>
+                    <Col md={3}>
+                      <Form.Label className="glass-label">To Date</Form.Label>
+                      <Form.Control
+                        className="glass-input"
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        max={new Date().toISOString().split("T")[0]}
+                      />
+                    </Col>
+                  </>
+                ) : (
+                  <>
+                    <Col md={2}>
+                      <Form.Label className="glass-label">From Month</Form.Label>
+                      <Form.Control
+                        className="glass-input"
+                        type="month"
+                        value={fromMonth}
+                        onChange={(e) => setFromMonth(e.target.value)}
+                      />
+                    </Col>
+                    <Col md={2}>
+                      <Form.Label className="glass-label">To Month</Form.Label>
+                      <Form.Control
+                        className="glass-input"
+                        type="month"
+                        value={toMonth}
+                        onChange={(e) => setToMonth(e.target.value)}
+                      />
+                    </Col>
+                    <Col md={2}>
+                      <Form.Label className="glass-label">Line (Optional)</Form.Label>
+                      <Form.Select
+                        className="glass-select"
+                        value={selectedLine}
+                        onChange={(e) => setSelectedLine(e.target.value)}
+                      >
+                        <option value="">All Lines</option>
+                        {lines.map((l, i) => (
+                          <option key={i} value={l.LINE}>
+                            {l.LINE}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Col>
+                  </>
+                )}
+
+                {reportType === "unit-wise" && (
                   <Col md={3}>
-                    <Form.Label className="glass-label">From Date</Form.Label>
-                    <Form.Control
-                      className="glass-input"
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                  </Col>
-                  <Col md={3}>
-                    <Form.Label className="glass-label">To Date</Form.Label>
-                    <Form.Control
-                      className="glass-input"
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                  </Col>
-                </>
-              ) : (
-                <>
-                  <Col md={2}>
-                    <Form.Label className="glass-label">From Month</Form.Label>
-                    <Form.Control
-                      className="glass-input"
-                      type="month"
-                      value={fromMonth}
-                      onChange={(e) => setFromMonth(e.target.value)}
-                    />
-                  </Col>
-                  <Col md={2}>
-                    <Form.Label className="glass-label">To Month</Form.Label>
-                    <Form.Control
-                      className="glass-input"
-                      type="month"
-                      value={toMonth}
-                      onChange={(e) => setToMonth(e.target.value)}
-                    />
-                  </Col>
-                  <Col md={2}>
-                    <Form.Label className="glass-label">Line (Optional)</Form.Label>
+                    <Form.Label className="glass-label">Shift (Optional)</Form.Label>
                     <Form.Select
                       className="glass-select"
-                      value={selectedLine}
-                      onChange={(e) => setSelectedLine(e.target.value)}
+                      value={selectedShift}
+                      onChange={(e) => setSelectedShift(e.target.value)}
                     >
-                      <option value="">All Lines</option>
-                      {lines.map((l, i) => (
-                        <option key={i} value={l.LINE}>
-                          {l.LINE}
+                      <option value="">All Shifts</option>
+                      {shifts.map((s) => (
+                        <option key={s.SFTID} value={s.SFTID}>
+                          {s.SFTName}
                         </option>
                       ))}
                     </Form.Select>
                   </Col>
-                </>
-              )}
-
-              {reportType === "unit-wise" && (
-                <Col md={3}>
-                  <Form.Label className="glass-label">Shift (Optional)</Form.Label>
-                  <Form.Select
-                    className="glass-select"
-                    value={selectedShift}
-                    onChange={(e) => setSelectedShift(e.target.value)}
-                  >
-                    <option value="">All Shifts</option>
-                    {shifts.map((s) => (
-                      <option key={s.SFTID} value={s.SFTID}>
-                        {s.SFTName}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Col>
-              )}
-            </Row>
+                )}
+              </Row>
 
               <div className="d-flex flex-wrap gap-2">
                 {reportType === "date-range" && (
@@ -753,284 +771,284 @@ const EmployeeJobCardDownload = () => {
                   Reset
                 </button>
               </div>
-          </div>
-
-          {loading && (
-            <div className="loading-container">
-              <div className="glass-spinner"></div>
-              <p className="loading-text">Loading data...</p>
             </div>
-          )}
 
-          {/* RESULTS: DATE RANGE */}
-          {reportType === "date-range" &&
-            JobDataData.length > 0 &&
-            !loading && (
-              <div className="glass-card glass-card-success p-4 mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h4 className="m-0">Job Card Data</h4>
-                  <button className="glass-btn glass-btn-success btn-sm" onClick={downloadExcel}>
-                    <FaFileExcel className="me-2" /> Download Excel
-                  </button>
-                </div>
-                <div className="table-scroll-container">
-                  <Table className="glass-table" responsive striped bordered hover>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Shift</th>
-                      <th>Line</th>
-                      <th>Target</th>
-                      <th>Actual</th>
-                      <th>Perf.</th>
-                      <th>Att.</th>
-                      <th>Punct.</th>
-                      <th>Rej.</th>
-                      <th>5S</th>
-                      <th>Safety</th>
-                      <th>Disc.</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {JobDataData.map((item, idx) => (
-                      <tr key={idx}>
-                        <td>{item.Date || item.Edatetime}</td>
-                        <td>{item.SHIFTNAME}</td>
-                        <td>{item.LINE}</td>
-                        <td>{item.Target}</td>
-                        <td>{item.Actual}</td>
-                        <td>{item.Performance}</td>
-                        <td>
-                          {item.Attendance === 5 &&
-                          item.ATTENDANCE_Status?.includes("Auth")
-                            ? "5 (Auth)"
-                            : item.Attendance}
-                        </td>
-                        <td>{item.Punctuality}</td>
-                        <td>{item.Rejections}</td>
-                        <td>{item["5S"]}</td>
-                        <td>{item.Safety}</td>
-                        <td>{item.Discipline}</td>
-                        <td>
-                          <strong>{item.Total}</strong>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="table-secondary fw-bold">
-                      <td colSpan={3} className="text-end">
-                        Total / Average:
-                      </td>
-                      <td>
-                        {JobDataData.reduce(
-                          (sum, item) => sum + (parseFloat(item.Target) || 0),
-                          0,
-                        )}
-                      </td>
-                      <td>
-                        {JobDataData.reduce(
-                          (sum, item) => sum + (parseFloat(item.Actual) || 0),
-                          0,
-                        )}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) =>
-                              sum + (parseFloat(item.Performance) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) =>
-                              sum + (parseFloat(item.Attendance) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) =>
-                              sum + (parseFloat(item.Punctuality) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) =>
-                              sum + (parseFloat(item.Rejections) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) => sum + (parseFloat(item["5S"]) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) => sum + (parseFloat(item.Safety) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) =>
-                              sum + (parseFloat(item.Discipline) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                      <td>
-                        {(
-                          JobDataData.reduce(
-                            (sum, item) => sum + (parseFloat(item.Total) || 0),
-                            0,
-                          ) / (JobDataData.length || 1)
-                        ).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </Table>
-                </div>
+            {loading && (
+              <div className="loading-container">
+                <div className="glass-spinner"></div>
+                <p className="loading-text">Loading data...</p>
               </div>
             )}
 
-          {/* RESULTS: MONTH WISE */}
-          {reportType === "month-wise" &&
-            monthlySummary.length > 0 &&
-            !loading && (
-              <div className="glass-card glass-card-success p-4 mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h4 className="m-0">Monthly Summary</h4>
-                  <button className="glass-btn glass-btn-success" onClick={generateMonthlyExcel}>
-                    <FaFileExcel className="me-2" /> Download Excel
-                  </button>
-                </div>
-                <div className="table-scroll-container">
-                  <Table className="glass-table text-center" striped bordered hover>
-                    <thead>
-                      <tr>
-                        {monthlySummary[0].map((header, i) => (
-                          <th key={i}>{header}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlySummary.slice(1).map((row, r) => (
-                        <tr key={r}>
-                          {row.map((cell, c) => (
-                            <td key={c}>{cell}</td>
-                          ))}
+            {/* RESULTS: DATE RANGE */}
+            {reportType === "date-range" &&
+              JobDataData.length > 0 &&
+              !loading && (
+                <div className="glass-card glass-card-success p-4 mt-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h4 className="m-0">Job Card Data</h4>
+                    <button className="glass-btn glass-btn-success btn-sm" onClick={downloadExcel}>
+                      <FaFileExcel className="me-2" /> Download Excel
+                    </button>
+                  </div>
+                  <div className="table-scroll-container">
+                    <Table className="glass-table" responsive striped bordered hover>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Shift</th>
+                          <th>Line</th>
+                          <th>Target</th>
+                          <th>Actual</th>
+                          <th>Perf.</th>
+                          <th>Att.</th>
+                          <th>Punct.</th>
+                          <th>Rej.</th>
+                          <th>5S</th>
+                          <th>Safety</th>
+                          <th>Disc.</th>
+                          <th>Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-          {/* RESULTS: UNIT WISE (GRAPH) */}
-          {reportType === "unit-wise" && chartData.length > 0 && !loading && (
-            <div className="glass-card glass-card-primary p-4 mt-4">
-              <h4 className="chart-title">Performance Distribution</h4>
-              <div className="chart-container">
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar
-                    dataKey="count"
-                    name="Employees"
-                    onClick={(data) => setSelectedBucket(data.name)}
-                    cursor="pointer"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              </div>
-
-              {selectedBucket && unitBuckets[selectedBucket] && (
-                <div className="mt-4">
-                  <h5 className="mb-3">Employees in {selectedBucket}</h5>
-                  {(() => {
-                    const bucketData = unitBuckets[selectedBucket] || [];
-                    const monthKeys =
-                      bucketData.length > 0 && bucketData[0].monthlyScores
-                        ? Object.keys(bucketData[0].monthlyScores)
-                        : [];
-
-                    return (
-                      <div className="table-scroll-container">
-                        <Table className="glass-table" striped bordered hover size="sm">
-                        <thead>
-                          <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Total Score</th>
-                            <th>Perf.</th>
-                            <th>Att.</th>
-                            <th>Rej.</th>
-                            {monthKeys.map((m) => (
-                              <th key={m}>{m}</th>
-                            ))}
+                      </thead>
+                      <tbody>
+                        {JobDataData.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>{item.Date || item.Edatetime}</td>
+                            <td>{item.SHIFTNAME}</td>
+                            <td>{item.LINE}</td>
+                            <td>{item.Target}</td>
+                            <td>{item.Actual}</td>
+                            <td>{item.Performance}</td>
+                            <td>
+                              {item.Attendance === 5 &&
+                                item.ATTENDANCE_Status?.includes("Auth")
+                                ? "5 (Auth)"
+                                : item.Attendance}
+                            </td>
+                            <td>{item.Punctuality}</td>
+                            <td>{item.Rejections}</td>
+                            <td>{item["5S"]}</td>
+                            <td>{item.Safety}</td>
+                            <td>{item.Discipline}</td>
+                            <td>
+                              <strong>{item.Total}</strong>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {bucketData.map((u, i) => (
-                            <tr key={i}>
-                              <td>{u.USERID}</td>
-                              <td>{u.NAME}</td>
-                              <td>
-                                <strong>{u.totalScore}</strong>
-                              </td>
-                              <td>{u.avgPerformance}</td>
-                              <td>{u.avgAttendance}</td>
-                              <td>{u.avgRejections}</td>
-                              {monthKeys.map((m) => (
-                                <td key={m}>
-                                  {u.monthlyScores && u.monthlyScores[m]
-                                    ? u.monthlyScores[m]
-                                    : "-"}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                        </Table>
-                      </div>
-                    );
-                  })()}
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="table-secondary fw-bold">
+                          <td colSpan={3} className="text-end">
+                            Total / Average:
+                          </td>
+                          <td>
+                            {JobDataData.reduce(
+                              (sum, item) => sum + (parseFloat(item.Target) || 0),
+                              0,
+                            )}
+                          </td>
+                          <td>
+                            {JobDataData.reduce(
+                              (sum, item) => sum + (parseFloat(item.Actual) || 0),
+                              0,
+                            )}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.Performance) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.Attendance) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.Punctuality) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.Rejections) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) => sum + (parseFloat(item["5S"]) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) => sum + (parseFloat(item.Safety) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.Discipline) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                          <td>
+                            {(
+                              JobDataData.reduce(
+                                (sum, item) => sum + (parseFloat(item.Total) || 0),
+                                0,
+                              ) / (JobDataData.length || 1)
+                            ).toFixed(2)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </Table>
+                  </div>
                 </div>
               )}
-            </div>
-          )}
-        </>
-      )}
+
+            {/* RESULTS: MONTH WISE */}
+            {reportType === "month-wise" &&
+              monthlySummary.length > 0 &&
+              !loading && (
+                <div className="glass-card glass-card-success p-4 mt-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h4 className="m-0">Monthly Summary</h4>
+                    <button className="glass-btn glass-btn-success" onClick={generateMonthlyExcel}>
+                      <FaFileExcel className="me-2" /> Download Excel
+                    </button>
+                  </div>
+                  <div className="table-scroll-container">
+                    <Table className="glass-table text-center" striped bordered hover>
+                      <thead>
+                        <tr>
+                          {monthlySummary[0].map((header, i) => (
+                            <th key={i}>{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlySummary.slice(1).map((row, r) => (
+                          <tr key={r}>
+                            {row.map((cell, c) => (
+                              <td key={c}>{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+            {/* RESULTS: UNIT WISE (GRAPH) */}
+            {reportType === "unit-wise" && chartData.length > 0 && !loading && (
+              <div className="glass-card glass-card-primary p-4 mt-4">
+                <h4 className="chart-title">Performance Distribution</h4>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar
+                        dataKey="count"
+                        name="Employees"
+                        onClick={(data) => setSelectedBucket(data.name)}
+                        cursor="pointer"
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {selectedBucket && unitBuckets[selectedBucket] && (
+                  <div className="mt-4">
+                    <h5 className="mb-3">Employees in {selectedBucket}</h5>
+                    {(() => {
+                      const bucketData = unitBuckets[selectedBucket] || [];
+                      const monthKeys =
+                        bucketData.length > 0 && bucketData[0].monthlyScores
+                          ? Object.keys(bucketData[0].monthlyScores)
+                          : [];
+
+                      return (
+                        <div className="table-scroll-container">
+                          <Table className="glass-table" striped bordered hover size="sm">
+                            <thead>
+                              <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Total Score</th>
+                                <th>Perf.</th>
+                                <th>Att.</th>
+                                <th>Rej.</th>
+                                {monthKeys.map((m) => (
+                                  <th key={m}>{m}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {bucketData.map((u, i) => (
+                                <tr key={i}>
+                                  <td>{u.USERID}</td>
+                                  <td>{u.NAME}</td>
+                                  <td>
+                                    <strong>{u.totalScore}</strong>
+                                  </td>
+                                  <td>{u.avgPerformance}</td>
+                                  <td>{u.avgAttendance}</td>
+                                  <td>{u.avgRejections}</td>
+                                  {monthKeys.map((m) => (
+                                    <td key={m}>
+                                      {u.monthlyScores && u.monthlyScores[m]
+                                        ? u.monthlyScores[m]
+                                        : "-"}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </Container>
     </div>
   );
