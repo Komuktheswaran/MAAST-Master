@@ -530,22 +530,51 @@ const EmployeeJobCardDownload = () => {
 
   const downloadExcel = () => {
     try {
-      const data = JobDataData.map((item) => ({
-        Date: item.Date || item.Edatetime,
-        Shift: item.SHIFTNAME,
-        Line: item.LINE,
-        Target: item.Target,
-        Actual: item.Actual,
-        Performance: item.Performance,
-        Attendance: item.Attendance,
-        Punctuality: item.Punctuality,
-        Rejections: item.Rejections,
-        "5S": item["5S"],
-        Safety: item.Safety,
-        Discipline: item.Discipline,
-        Total: item.Total,
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
+      const cols = ["Date", "Shift", "Line", "Target", "Actual", "Performance", "Attendance", "Punctuality", "Rejections", "5S", "Safety", "Discipline", "Total"];
+      const count = JobDataData.length || 1;
+
+      const avg = (key) => (JobDataData.reduce((s, i) => s + (parseFloat(i[key]) || 0), 0) / count).toFixed(2);
+      const sum = (key) => JobDataData.reduce((s, i) => s + (parseFloat(i[key]) || 0), 0);
+
+      const aoa = [
+        // Header info rows (matching image layout)
+        ["NAME:", selectedEmployee?.name || "", "", "DATE:", "FROM", fromDate, "", ""],
+        ["ID NO.", selectedEmployee?.value || "", "", "", "TO", toDate, "", ""],
+        [],
+        // Column headers
+        cols,
+        // Data rows
+        ...JobDataData.map((item) => [
+          item.Date || item.Edatetime,
+          item.SHIFTNAME,
+          item.LINE,
+          item.Target,
+          item.Actual,
+          item.Performance,
+          item.Attendance,
+          item.Punctuality,
+          item.Rejections,
+          item["5S"],
+          item.Safety,
+          item.Discipline,
+          item.Total,
+        ]),
+        // Average row
+        ["", "", "Average",
+          sum("Target"),
+          sum("Actual"),
+          avg("Performance"),
+          avg("Attendance"),
+          avg("Punctuality"),
+          avg("Rejections"),
+          avg("5S"),
+          avg("Safety"),
+          avg("Discipline"),
+          avg("Total"),
+        ],
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Job Card Data");
       XLSX.writeFile(wb, `JobCard_${selectedEmployee?.value}_${fromDate}_${toDate}.xlsx`);

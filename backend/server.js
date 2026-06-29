@@ -3434,6 +3434,22 @@ WITH DateRange AS (
     WHERE  WorkDate < @ToDate
 ),
 
+RawPunches AS (
+    SELECT DISTINCT UserId, Edatetime
+    FROM dbo.Mx_ATDEventTrn
+    WHERE UserId = @UserId
+),
+DistinctPunches AS (
+    SELECT UserId, Edatetime
+    FROM (
+        SELECT UserId, Edatetime,
+               LAG(Edatetime) OVER (PARTITION BY UserId ORDER BY Edatetime) AS PrevPunch
+        FROM RawPunches
+    ) T
+    WHERE PrevPunch IS NULL
+       OR DATEDIFF(SECOND, PrevPunch, Edatetime) > 60
+),
+
 ShiftInfoByDate AS (
     SELECT DR.WorkDate,
            -- Direct shift assignment
@@ -3455,9 +3471,8 @@ ShiftInfoByDate AS (
                  SELECT 
                  MIN(Edatetime) AS FirstPunch,
                  MAX(Edatetime) AS LastPunch
-                 FROM dbo.Mx_ATDEventTrn
-                 WHERE UserId = @UserId
-                 AND Edatetime >= DATEADD(HOUR,-6, CAST(DR.WorkDate AS DATETIME2))
+                 FROM DistinctPunches
+                 WHERE Edatetime >= CAST(DR.WorkDate AS DATETIME2)
                  AND Edatetime < DATEADD(HOUR,42, CAST(DR.WorkDate AS DATETIME2))
             ) P
             WHERE P.FirstPunch IS NOT NULL 
@@ -3546,9 +3561,8 @@ PunchStats AS (
             STRING_AGG( FORMAT(P.Edatetime,'HH:mm:ss'), ', ' ) WITHIN GROUP
             (ORDER BY P.Edatetime)                                               AS PunchList
     FROM   ShiftTimesByDate ST
-    LEFT   JOIN dbo.Mx_ATDEventTrn P
-           ON  P.UserId   = @UserId
-           AND P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
+    LEFT   JOIN DistinctPunches P
+           ON  P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
                                AND     DATEADD(MINUTE, @LateGrace, ST.ShiftEnd)
     GROUP  BY ST.WorkDate, ST.SFTID
 ),
@@ -3566,12 +3580,26 @@ PunchDataByDate AS (
             ST.ShiftEnd,
             ST.BreakStart,
             ST.BreakEnd,
-            MIN(CASE WHEN P.Edatetime >= CAST(ST.WorkDate AS DATETIME2)
-                           AND P.Edatetime <  DATEADD(DAY,1,CAST(ST.WorkDate AS DATETIME2))
-                     THEN P.Edatetime END)                                       AS FirstPunchDay,
-            MAX(CASE WHEN P.Edatetime >= CAST(ST.WorkDate AS DATETIME2)
-                           AND P.Edatetime <  DATEADD(DAY,1,CAST(ST.WorkDate AS DATETIME2))
-                     THEN P.Edatetime END)                                       AS LastPunchDay,
+            MIN(CASE
+                    WHEN ST.IsOvernight = 0
+                         AND P.Edatetime >= CAST(ST.WorkDate AS DATETIME2)
+                         AND P.Edatetime <  DATEADD(DAY,1,CAST(ST.WorkDate AS DATETIME2))
+                    THEN P.Edatetime
+                    WHEN ST.IsOvernight = 1
+                         AND P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
+                                         AND     DATEADD(MINUTE, @LateGrace,  ST.ShiftEnd)
+                    THEN P.Edatetime
+                END)                                                             AS FirstPunchDay,
+            MAX(CASE
+                    WHEN ST.IsOvernight = 0
+                         AND P.Edatetime >= CAST(ST.WorkDate AS DATETIME2)
+                         AND P.Edatetime <  DATEADD(DAY,1,CAST(ST.WorkDate AS DATETIME2))
+                    THEN P.Edatetime
+                    WHEN ST.IsOvernight = 1
+                         AND P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
+                                         AND     DATEADD(MINUTE, @LateGrace,  ST.ShiftEnd)
+                    THEN P.Edatetime
+                END)                                                             AS LastPunchDay,
             MIN(CASE WHEN P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
                                      AND     DATEADD(MINUTE, @LateGrace,  ST.ShiftEnd)
                      THEN P.Edatetime END)                                       AS FirstPunchShift,
@@ -3579,15 +3607,13 @@ PunchDataByDate AS (
                                      AND     DATEADD(MINUTE, @LateGrace,  ST.ShiftEnd)
                      THEN P.Edatetime END)                                       AS LastPunchShift
     FROM   ShiftTimesByDate ST
-    LEFT   JOIN dbo.Mx_ATDEventTrn P
-           ON  P.UserId   = @UserId
-           AND P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
+    LEFT   JOIN DistinctPunches P
+           ON  P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
                                AND     DATEADD(MINUTE, @LateGrace, ST.ShiftEnd)
     GROUP  BY ST.WorkDate, ST.SFTID, ST.DisplayShiftID, ST.SFTSTTime, ST.SFTEDTime, ST.BRKSTTime, ST.BRKEDTime,
               ST.IsOvernight, ST.ShiftStart, ST.ShiftEnd, ST.BreakStart, ST.BreakEnd
 ),
 
--- Add this new CTE after PunchDataByDate and before the final SELECT
 PunchSequence AS (
     SELECT  
         ST.WorkDate,
@@ -3599,9 +3625,8 @@ PunchSequence AS (
              ELSE 'OUT' 
         END AS PunchType
     FROM   ShiftTimesByDate ST
-    INNER  JOIN dbo.Mx_ATDEventTrn P
-           ON  P.UserId   = @UserId
-           AND P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
+    INNER  JOIN DistinctPunches P
+           ON  P.Edatetime BETWEEN DATEADD(MINUTE,-@EarlyGrace, ST.ShiftStart)
                                AND DATEADD(MINUTE, @LateGrace, ST.ShiftEnd)
     WHERE  ST.SFTID IS NOT NULL
 ),

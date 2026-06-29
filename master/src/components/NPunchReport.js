@@ -174,6 +174,36 @@ const NPunchReport = () => {
     return hours.toFixed(2);
   };
 
+  // Convert decimal hours (or HH:MM string) to HH:MM format
+  const formatToHHMM = (num) => {
+    if (num == null || num === undefined) return "-";
+
+    if (typeof num === "string" && num.includes(":")) {
+      const parts = num.split(":");
+      if (parts.length >= 2) {
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (!isNaN(h) && !isNaN(m)) {
+          return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+        }
+      }
+    }
+
+    const hoursDec = Number(num);
+    if (Number.isNaN(hoursDec)) return "-";
+
+    const isNegative = hoursDec < 0;
+    const absHours = Math.abs(hoursDec);
+    const h = Math.floor(absHours);
+    const m = Math.round((absHours - h) * 60);
+    
+    const finalH = m === 60 ? h + 1 : h;
+    const finalM = m === 60 ? 0 : m;
+
+    const sign = isNegative ? "-" : "";
+    return `${sign}${String(finalH).padStart(2, "0")}:${String(finalM).padStart(2, "0")}`;
+  };
+
   // Better punch time formatting - handles both simple time strings and datetime objects
   const formatPunchTime = (timeStr, dateTimeStr) => {
     // If we have a simple time string like "05:54", use it directly
@@ -336,7 +366,7 @@ const NPunchReport = () => {
         "Hours Worked": fmtHours(
           row.HoursWorkedInclusive ?? row.HoursWithinShift,
         ),
-        "Actual Hours Worked": fmtHours(row.ActualHoursWorked),
+        "Actual Hours Worked": formatToHHMM(row.ActualHoursWorked),
         "Night Shift": row.IsNightShift ? "Yes" : "No",
       };
     });
@@ -603,7 +633,7 @@ const NPunchReport = () => {
                         row.HoursWorkedInclusive ?? row.HoursWithinShift,
                       )}
                     </td>
-                    <td>{fmtHours(row.ActualHoursWorked)}</td>
+                    <td>{formatToHHMM(row.ActualHoursWorked)}</td>
                     <td>
                       <span
                         className={`badge ${row.IsNightShift ? "bg-primary" : "bg-secondary"}`}

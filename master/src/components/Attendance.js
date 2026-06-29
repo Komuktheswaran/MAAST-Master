@@ -642,6 +642,56 @@ const Attendance = () => {
   };
 
   const downloadAll = () => {
+    // For the "Present (Non alloted manpower)" view the records live in
+    // `unassignedEmployees`, not `detailedRecords`. Export the matching data
+    // so the download isn't blank.
+    if (detailType === "unassigned") {
+      if (!Array.isArray(unassignedEmployees) || unassignedEmployees.length === 0) {
+        alert("No unassigned manpower records to download.");
+        return;
+      }
+
+      const unassignedData = unassignedEmployees
+        .filter((record) => record)
+        .map((record, index) => ({
+          "S.No": index + 1,
+          "Employee ID": record?.USERID || "N/A",
+          Name: record?.NAME || "N/A",
+          "Punch In": formatPunchTime(record?.PUNCHIN) || "No Punch In",
+          "Punch Out": formatPunchTime(record?.PUNCHOUT) || "No Punch Out",
+          "Total Punches": record?.TotalPunches || 0,
+          "Worked Hours": record?.WorkedMinutes
+            ? (record.WorkedMinutes / 60).toFixed(2)
+            : "0.00",
+          Status: record?.STATUS || "N/A",
+        }));
+
+      const unassignedWorksheet = XLSX.utils.json_to_sheet(unassignedData);
+      unassignedWorksheet["!cols"] = [
+        { wpx: 60 },
+        { wpx: 110 },
+        { wpx: 150 },
+        { wpx: 120 },
+        { wpx: 120 },
+        { wpx: 110 },
+        { wpx: 110 },
+        { wpx: 120 },
+      ];
+
+      const unassignedWorkbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(
+        unassignedWorkbook,
+        unassignedWorksheet,
+        "Unassigned Manpower",
+      );
+
+      XLSX.writeFile(
+        unassignedWorkbook,
+        `Unassigned_Manpower_${formatDate(selectedDate)}.xlsx`,
+      );
+      return;
+    }
+
     if (!Array.isArray(detailedRecords)) return;
 
     const data = detailedRecords.map((record) => ({
