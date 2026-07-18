@@ -3371,10 +3371,62 @@ app.get("/api/employees-inactive", async (req, res) => {
       ORDER BY userid
     `);
     console.log("Inactive Employees Query Result:", result.recordset);
-    res.json(result.recordset); 
+    res.json(result.recordset);
   } catch (err) {
     console.error("Error fetching inactive employees:", err);
     res.status(500).json({ error: "Failed to fetch inactive employees" });
+  }
+});
+
+// Detailed inactive employees list with pagination (for "Inactive List Download" page)
+// GET /api/inactive-employees-list?limit=50&offset=0   -> { total, rows }
+// GET /api/inactive-employees-list?all=1               -> { total, rows } (all rows, for Excel export)
+app.get("/api/inactive-employees-list", async (req, res) => {
+  try {
+    const all = req.query.all === "1" || req.query.all === "true";
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+
+    const pool = await sql.connect(config);
+
+    const baseSelect = `
+      SELECT
+        u.NAME          AS Username,
+        u.USERID        AS EmployeeID,
+        u.JoinDT        AS JoinDT,
+        u.ConfirmDT     AS ConfirmDT,
+        u.LeaveDT       AS LeaveDT,
+        u.EnrollDT      AS EnrollDT,
+        u.Qualification AS Education,
+        des.Name        AS Designation
+      FROM dbo.Mx_UserMst AS u
+      LEFT JOIN dbo.Mx_DesignationMst AS des ON u.DSGID = des.DSGID
+      WHERE ISNULL(u.UserIDEnbl, 0) = 0
+      ORDER BY u.USERID`;
+
+    const countResult = await pool.request().query(`
+      SELECT COUNT(*) AS total
+      FROM dbo.Mx_UserMst AS u
+      WHERE ISNULL(u.UserIDEnbl, 0) = 0`);
+    const total = countResult.recordset[0].total;
+
+    let rows;
+    if (all) {
+      const result = await pool.request().query(baseSelect);
+      rows = result.recordset;
+    } else {
+      const result = await pool
+        .request()
+        .input("offset", sql.Int, offset)
+        .input("limit", sql.Int, limit)
+        .query(`${baseSelect} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);
+      rows = result.recordset;
+    }
+
+    res.json({ total, rows });
+  } catch (err) {
+    console.error("Error fetching inactive employees list:", err);
+    res.status(500).json({ error: "Failed to fetch inactive employees list" });
   }
 });
 

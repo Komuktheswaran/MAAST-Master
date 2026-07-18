@@ -21,6 +21,7 @@ import EmployeeJobCardUpload from './components/EmployeeJobCardUpload';
 import EmployeeJobCardDownload from './components/EmployeeJobCardDownload';
 import LeaveManagement from './components/LeaveManagement';
 import WeightageMaster from './components/WeightageMaster';
+import InactiveEmployeesList from './components/InactiveEmployeesList';
 
 
 const darkDrawerTheme = createTheme({
@@ -71,6 +72,7 @@ const AppContent = () => {
         <Route path="/employee-Punctuality" element={<ProtectedRoute element={< EmployeePunctuality/>} />} />
         <Route path="/leave-management" element={<ProtectedRoute element={<LeaveManagement />} />} />
         <Route path="/weightage-master" element={<ProtectedRoute element={<WeightageMaster />} />} />
+        <Route path="/inactive-employees" element={<ProtectedRoute element={<InactiveEmployeesList />} />} />
       </Routes>
     </div>
   );

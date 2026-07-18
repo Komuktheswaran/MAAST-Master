@@ -396,6 +396,15 @@ const HomePage = () => {
                         >
                           Employee Job Card Report
                         </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            handleCloseEmployeeMenu();
+                          }}
+                          component={Link}
+                          to="/inactive-employees"
+                        >
+                          Inactive List Download
+                        </MenuItem>
                       </Menu>
 
                       {/* <StyledMenuButton component={Link} to="/user-skills">User Skills</StyledMenuButton> */}
@@ -663,6 +672,14 @@ const HomePage = () => {
                       sx={{ pl: 4 }}
                     >
                       <ListItemText primary="Employee Job Card Report" />
+                    </ListItem>
+                    <ListItem
+                      button
+                      component={Link}
+                      to="/inactive-employees"
+                      sx={{ pl: 4 }}
+                    >
+                      <ListItemText primary="Inactive List Download" />
                     </ListItem>
                   </List>
                 </Collapse>
