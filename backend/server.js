@@ -3378,16 +3378,44 @@ app.get("/api/employees-inactive", async (req, res) => {
   }
 });
 
-// Detailed inactive employees list with pagination (for "Inactive List Download" page)
-// GET /api/inactive-employees-list?limit=50&offset=0   -> { total, rows }
-// GET /api/inactive-employees-list?all=1               -> { total, rows } (all rows, for Excel export)
+// Detailed inactive employees list with pagination, search and leave-date filter
+// (for "Inactive List Download" page)
+// Query params:
+//   limit, offset       -> pagination (ignored when all=1)
+//   all=1               -> return every matching row (for Excel export)
+//   search              -> matches Employee ID (USERID) or User Name (NAME)
+//   fromDate, toDate    -> filter on LeaveDT (YYYY-MM-DD), inclusive
+// Returns { total, rows }
 app.get("/api/inactive-employees-list", async (req, res) => {
   try {
     const all = req.query.all === "1" || req.query.all === "true";
     const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
 
+    const search = (req.query.search || "").trim();
+    const fromDate = (req.query.fromDate || "").trim();
+    const toDate = (req.query.toDate || "").trim();
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (fromDate && !dateRe.test(fromDate))
+      return res.status(400).json({ error: "Invalid fromDate format. Use YYYY-MM-DD" });
+    if (toDate && !dateRe.test(toDate))
+      return res.status(400).json({ error: "Invalid toDate format. Use YYYY-MM-DD" });
+
     const pool = await sql.connect(config);
+
+    // Build the WHERE clause and register the matching parameters on a request.
+    const conditions = ["ISNULL(u.UserIDEnbl, 0) = 0"];
+    const bindParams = (request) => {
+      if (search) request.input("search", sql.NVarChar, `%${search}%`);
+      if (fromDate) request.input("fromDate", sql.Date, fromDate);
+      if (toDate) request.input("toDate", sql.Date, toDate);
+      return request;
+    };
+    if (search) conditions.push("(u.USERID LIKE @search OR u.NAME LIKE @search)");
+    if (fromDate) conditions.push("CAST(u.LeaveDT AS DATE) >= @fromDate");
+    if (toDate) conditions.push("CAST(u.LeaveDT AS DATE) <= @toDate");
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
     const baseSelect = `
       SELECT
@@ -3401,22 +3429,21 @@ app.get("/api/inactive-employees-list", async (req, res) => {
         des.Name        AS Designation
       FROM dbo.Mx_UserMst AS u
       LEFT JOIN dbo.Mx_DesignationMst AS des ON u.DSGID = des.DSGID
-      WHERE ISNULL(u.UserIDEnbl, 0) = 0
+      ${whereClause}
       ORDER BY u.USERID`;
 
-    const countResult = await pool.request().query(`
+    const countResult = await bindParams(pool.request()).query(`
       SELECT COUNT(*) AS total
       FROM dbo.Mx_UserMst AS u
-      WHERE ISNULL(u.UserIDEnbl, 0) = 0`);
+      ${whereClause}`);
     const total = countResult.recordset[0].total;
 
     let rows;
     if (all) {
-      const result = await pool.request().query(baseSelect);
+      const result = await bindParams(pool.request()).query(baseSelect);
       rows = result.recordset;
     } else {
-      const result = await pool
-        .request()
+      const result = await bindParams(pool.request())
         .input("offset", sql.Int, offset)
         .input("limit", sql.Int, limit)
         .query(`${baseSelect} OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);

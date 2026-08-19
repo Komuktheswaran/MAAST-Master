@@ -76,9 +76,9 @@ const Attendance = () => {
 
       try {
         const shiftResponse = await axios.get(
-          "https://192.168.2.54/api/shifts",
+          "https://103.38.50.149:5000/api/shifts",
         );
-        const lineResponse = await axios.get("https://192.168.2.54/api/lines");
+        const lineResponse = await axios.get("https://103.38.50.149:5000/api/lines");
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
 
@@ -123,14 +123,14 @@ const Attendance = () => {
       });
 
       const [response, unassignedRes] = await Promise.all([
-        axios.get("https://192.168.2.54/api/attendance/showAll", {
+        axios.get("https://103.38.50.149:5000/api/attendance/showAll", {
           params: {
             date: formattedDate,
             shifts: selectedShifts.join(","),
             lines: selectedLines.join(","),
           },
         }),
-        axios.get("https://192.168.2.54/api/attendance/unassignedManpower", {
+        axios.get("https://103.38.50.149:5000/api/attendance/unassignedManpower", {
           params: {
             date: formattedDate,
             shifts: "S1,S2,S3",
@@ -244,7 +244,7 @@ const Attendance = () => {
       ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "https://192.168.2.54/api/attendance/showAll",
+          "https://103.38.50.149:5000/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -331,7 +331,7 @@ const Attendance = () => {
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "https://192.168.2.54/api/attendance/showAll",
+          "https://103.38.50.149:5000/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -483,7 +483,7 @@ const Attendance = () => {
 
     try {
       const response = await axios.get(
-        "https://192.168.2.54/api/attendance/showAll",
+        "https://103.38.50.149:5000/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -545,7 +545,7 @@ const Attendance = () => {
     try {
       // Use the existing showAll endpoint with all shifts and lines
       const response = await axios.get(
-        "https://192.168.2.54/api/attendance/unassignedManpower",
+        "https://103.38.50.149:5000/api/attendance/unassignedManpower",
         {
           params: {
             date: formattedDate,
@@ -657,6 +657,9 @@ const Attendance = () => {
           "S.No": index + 1,
           "Employee ID": record?.USERID || "N/A",
           Name: record?.NAME || "N/A",
+          "Assigned Shift": record?.AssignedShift || "N/A",
+          "Assigned Line": record?.AssignedLine || "N/A",
+          "Actual Shift": record?.ActualShift || "N/A",
           "Punch In": formatPunchTime(record?.PUNCHIN) || "No Punch In",
           "Punch Out": formatPunchTime(record?.PUNCHOUT) || "No Punch Out",
           "Total Punches": record?.TotalPunches || 0,
@@ -671,6 +674,9 @@ const Attendance = () => {
         { wpx: 60 },
         { wpx: 110 },
         { wpx: 150 },
+        { wpx: 140 },
+        { wpx: 110 },
+        { wpx: 120 },
         { wpx: 120 },
         { wpx: 120 },
         { wpx: 110 },
@@ -755,7 +761,7 @@ const Attendance = () => {
     }));
 
     axios
-      .post("https://192.168.2.54/api/saveUserSwap", swaps)
+      .post("https://103.38.50.149:5000/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -773,7 +779,7 @@ const Attendance = () => {
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("https://192.168.2.54/api/getEmployees", {
+        .get("https://103.38.50.149:5000/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,
@@ -860,7 +866,13 @@ const Attendance = () => {
   const formatPunchTime = (punchDate) => {
     if (!punchDate) return "No Punch";
     try {
-      return DateTime.fromISO(punchDate).toFormat("dd-MM-yyyy HH:mm:ss");
+      // The backend runs with mssql useUTC:true, so punch datetimes arrive
+      // tagged as UTC (trailing "Z") even though the clock digits are already
+      // the correct local wall-clock time. Format in UTC to keep those digits
+      // intact instead of re-shifting into the browser's timezone (+5:30 IST).
+      return DateTime.fromISO(punchDate, { zone: "utc" }).toFormat(
+        "dd-MM-yyyy HH:mm:ss",
+      );
     } catch (error) {
       return "Invalid Date";
     }
@@ -1332,6 +1344,9 @@ const Attendance = () => {
                               <th>S.No</th>
                               <th>Employee ID</th>
                               <th>Name</th>
+                              <th>Assigned Shift</th>
+                              <th>Assigned Line</th>
+                              <th>Actual Shift</th>
                               <th>Punch In</th>
                               <th>Punch Out</th>
                               <th>Total Punches</th>
@@ -1347,6 +1362,9 @@ const Attendance = () => {
                                     <td>{index + 1}</td>
                                     <td>{record.USERID || "N/A"}</td>
                                     <td>{record.NAME || "N/A"}</td>
+                                    <td>{record.AssignedShift || "N/A"}</td>
+                                    <td>{record.AssignedLine || "N/A"}</td>
+                                    <td>{record.ActualShift || "N/A"}</td>
                                     <td>
                                       {formatPunchTime(record.PUNCHIN) ||
                                         "No Punch In"}

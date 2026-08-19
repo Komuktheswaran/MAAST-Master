@@ -1,6 +1,9 @@
 import React, { useState, useCallback } from "react";
 import {
   Container,
+  Row,
+  Col,
+  Form,
   Table,
   Button,
   Spinner,
@@ -12,7 +15,7 @@ import emvLogo from "../pictures/emvlogo.png";
 import "../styles/UserSkills.css"; // Reuse the glass styles used across reports
 
 const API_BASE = "https://192.168.2.54";
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 500;
 
 // Column definitions shared by the on-screen table and the Excel export.
 // `key` matches the field name returned by /api/inactive-employees-list.
@@ -54,7 +57,21 @@ const InactiveEmployeesList = () => {
   const [error, setError] = useState("");
   const [hasListed, setHasListed] = useState(false);
 
+  // Filters
+  const [search, setSearch] = useState(""); // Employee ID or User Name
+  const [fromDate, setFromDate] = useState(""); // Leave date range (YYYY-MM-DD)
+  const [toDate, setToDate] = useState("");
+
   const hasMore = rows.length < total;
+
+  // Build the filter params sent to the API (only include non-empty values).
+  const buildFilterParams = useCallback(() => {
+    const params = {};
+    if (search.trim()) params.search = search.trim();
+    if (fromDate) params.fromDate = fromDate;
+    if (toDate) params.toDate = toDate;
+    return params;
+  }, [search, fromDate, toDate]);
 
   // Fetch one page (PAGE_SIZE rows) starting at the given offset and append it.
   const fetchPage = useCallback(async (startOffset, replace) => {
@@ -65,7 +82,7 @@ const InactiveEmployeesList = () => {
 
     try {
       const res = await axios.get(`${API_BASE}/api/inactive-employees-list`, {
-        params: { limit: PAGE_SIZE, offset: startOffset },
+        params: { limit: PAGE_SIZE, offset: startOffset, ...buildFilterParams() },
         timeout: 120000,
       });
 
@@ -93,7 +110,7 @@ const InactiveEmployeesList = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [buildFilterParams]);
 
   const handleList = () => {
     setRows([]);
@@ -106,13 +123,24 @@ const InactiveEmployeesList = () => {
     if (!loadingMore && hasMore) fetchPage(offset, false);
   };
 
-  // Download ALL inactive employees as an Excel file
+  const handleResetFilters = () => {
+    setSearch("");
+    setFromDate("");
+    setToDate("");
+    setRows([]);
+    setOffset(0);
+    setTotal(0);
+    setHasListed(false);
+    setError("");
+  };
+
+  // Download ALL matching inactive employees as an Excel file
   const handleDownload = async () => {
     setDownloading(true);
     setError("");
     try {
       const res = await axios.get(`${API_BASE}/api/inactive-employees-list`, {
-        params: { all: 1 },
+        params: { all: 1, ...buildFilterParams() },
         timeout: 300000,
       });
 
@@ -179,6 +207,51 @@ const InactiveEmployeesList = () => {
         className="glass-card p-4 mb-4"
         style={{ position: "relative", zIndex: 20 }}
       >
+        <Row className="mb-3">
+          <Col md={4} className="mb-2">
+            <Form.Label>Search (Employee ID / User Name)</Form.Label>
+            <Form.Control
+              type="text"
+              className="glass-input"
+              placeholder="Enter Employee ID or Name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleList();
+              }}
+            />
+          </Col>
+          <Col md={3} className="mb-2">
+            <Form.Label>Leave Date From</Form.Label>
+            <Form.Control
+              type="date"
+              className="glass-input"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+          </Col>
+          <Col md={3} className="mb-2">
+            <Form.Label>Leave Date To</Form.Label>
+            <Form.Control
+              type="date"
+              className="glass-input"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+          </Col>
+          <Col md={2} className="mb-2 d-flex align-items-end">
+            <Button
+              variant="outline-secondary"
+              className="w-100"
+              onClick={handleResetFilters}
+            >
+              Reset Filters
+            </Button>
+          </Col>
+        </Row>
+
         <div className="d-flex flex-wrap gap-2 align-items-center">
           <Button onClick={handleList} disabled={loading} className="btn-primary">
             {loading ? (

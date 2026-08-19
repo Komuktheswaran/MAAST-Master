@@ -47,6 +47,17 @@ const EmployeeHistory = () => {
     return `${day}-${month}-${year}`; // dd-mm-yyyy
   };
 
+  // Treat WO / W0 / wo (week off) shift as a distinct attendance value
+  const isWeekOff = (shift) => {
+    const s = String(shift || "").trim().toUpperCase();
+    return s === "WO" || s === "W0";
+  };
+
+  const getAttendanceDisplay = (item) => {
+    if (isWeekOff(item.SHIFT)) return "WO";
+    return item.ATTENDANCE || "N/A";
+  };
+
   const formatDatefordisplay = (dateStr) => {
     if (!dateStr || typeof dateStr !== "string" || dateStr.trim() === "") {
       return "N/A";
@@ -66,8 +77,8 @@ const EmployeeHistory = () => {
     const fetchEmployees = async () => {
       try {
         const url = isInactive
-          ? "https://192.168.2.54/api/employees-inactive"
-          : "https://192.168.2.54/api/employees";
+          ? "https://103.38.50.149:5000/api/employees-inactive"
+          : "https://103.38.50.149:5000/api/employees";
         // FIX: Use the 'url' variable instead of hardcoded string
         const res = await axios.get(url);
 
@@ -126,7 +137,7 @@ const EmployeeHistory = () => {
 
     try {
       const response = await axios.post(
-        "https://192.168.2.54/api/employee-history",
+        "https://103.38.50.149:5000/api/employee-history",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),
@@ -214,7 +225,7 @@ const EmployeeHistory = () => {
           item.SHIFT || "",
           item.LINE || "",
           item.STAGE || "",
-          item.ATTENDANCE || "",
+          getAttendanceDisplay(item),
           item.PUNCTUALITY || "",
         ]),
       ];
@@ -422,7 +433,7 @@ const EmployeeHistory = () => {
                   <td>{item.SHIFT || "N/A"}</td>
                   <td>{item.LINE || "N/A"}</td>
                   <td>{item.STAGE || "N/A"}</td>
-                  <td>{item.ATTENDANCE || "N/A"}</td>
+                  <td>{getAttendanceDisplay(item)}</td>
                   <td>{item.PUNCTUALITY || "N/A"}</td>
                 </tr>
               ))}
