@@ -76,9 +76,9 @@ const Attendance = () => {
 
       try {
         const shiftResponse = await axios.get(
-          "https://103.38.50.149:5000/api/shifts",
+          "https://192.168.2.54/api/shifts",
         );
-        const lineResponse = await axios.get("https://103.38.50.149:5000/api/lines");
+        const lineResponse = await axios.get("https://192.168.2.54/api/lines");
         setShiftOptions(shiftResponse.data || []);
         console.log(shiftResponse.data);
 
@@ -123,14 +123,14 @@ const Attendance = () => {
       });
 
       const [response, unassignedRes] = await Promise.all([
-        axios.get("https://103.38.50.149:5000/api/attendance/showAll", {
+        axios.get("https://192.168.2.54/api/attendance/showAll", {
           params: {
             date: formattedDate,
             shifts: selectedShifts.join(","),
             lines: selectedLines.join(","),
           },
         }),
-        axios.get("https://103.38.50.149:5000/api/attendance/unassignedManpower", {
+        axios.get("https://192.168.2.54/api/attendance/unassignedManpower", {
           params: {
             date: formattedDate,
             shifts: "S1,S2,S3",
@@ -244,7 +244,7 @@ const Attendance = () => {
       ) {
         // TOTAL BUTTON click — filter client-side from showAll
         const response = await axios.get(
-          "https://103.38.50.149:5000/api/attendance/showAll",
+          "https://192.168.2.54/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -331,7 +331,7 @@ const Attendance = () => {
       } else {
         // STAGE-WISE row click — filter from showAll data
         const response = await axios.get(
-          "https://103.38.50.149:5000/api/attendance/showAll",
+          "https://192.168.2.54/api/attendance/showAll",
           {
             params: {
               date: formattedDate,
@@ -483,7 +483,7 @@ const Attendance = () => {
 
     try {
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance/showAll",
+        "https://192.168.2.54/api/attendance/showAll",
         {
           params: {
             date: formattedDate,
@@ -545,7 +545,7 @@ const Attendance = () => {
     try {
       // Use the existing showAll endpoint with all shifts and lines
       const response = await axios.get(
-        "https://103.38.50.149:5000/api/attendance/unassignedManpower",
+        "https://192.168.2.54/api/attendance/unassignedManpower",
         {
           params: {
             date: formattedDate,
@@ -761,7 +761,7 @@ const Attendance = () => {
     }));
 
     axios
-      .post("https://103.38.50.149:5000/api/saveUserSwap", swaps)
+      .post("https://192.168.2.54/api/saveUserSwap", swaps)
       .then((response) => {
         alert("Swaps saved successfully");
         fetchAttendanceDetails();
@@ -779,7 +779,7 @@ const Attendance = () => {
     const formattedDate = formatDate(selectedDate);
     if (swapPopup && selectedRecord) {
       axios
-        .get("https://103.38.50.149:5000/api/getEmployees", {
+        .get("https://192.168.2.54/api/getEmployees", {
           params: {
             date: formattedDate,
             shiftId: selectedRecord.SHIFT_ID,

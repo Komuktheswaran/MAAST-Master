@@ -77,8 +77,8 @@ const EmployeeHistory = () => {
     const fetchEmployees = async () => {
       try {
         const url = isInactive
-          ? "https://103.38.50.149:5000/api/employees-inactive"
-          : "https://103.38.50.149:5000/api/employees";
+          ? "https://192.168.2.54/api/employees-inactive"
+          : "https://192.168.2.54/api/employees";
         // FIX: Use the 'url' variable instead of hardcoded string
         const res = await axios.get(url);
 
@@ -137,7 +137,7 @@ const EmployeeHistory = () => {
 
     try {
       const response = await axios.post(
-        "https://103.38.50.149:5000/api/employee-history",
+        "https://192.168.2.54/api/employee-history",
         {
           fromDate: formatDate(fromDate),
           toDate: formatDate(toDate),

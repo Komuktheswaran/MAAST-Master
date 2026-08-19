@@ -12,10 +12,8 @@ import {
   FormControl,
   InputGroup,
   Card,
-  Accordion,
   Modal,
 } from "react-bootstrap";
-import { IconButton } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { FaSort, FaDownload, FaInfoCircle } from "react-icons/fa";
 import moment from "moment";
@@ -39,21 +37,12 @@ const UserShiftReport = () => {
   const [shiftMasterDetails, setShiftMasterDetails] = useState([]);
   const [loadingShiftDetails, setLoadingShiftDetails] = useState(false);
 
-  // Debounce Logic
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchUserShift(searchUserShift);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchUserShift]);
-  const pageSize = 100;
-
   // Filter States
   const [selectedFromDate, setSelectedFromDate] = useState(
-    moment().format("YYYY-MM-DD"),
+    moment().format("YYYY-MM-DD")
   );
   const [selectedToDate, setSelectedToDate] = useState(
-    moment().format("YYYY-MM-DD"),
+    moment().format("YYYY-MM-DD")
   );
   const [selectedShiftIds, setSelectedShiftIds] = useState([]);
   const [selectedStages, setSelectedStages] = useState([]);
@@ -64,55 +53,96 @@ const UserShiftReport = () => {
   const [stageOptions, setStageOptions] = useState([]);
   const [lineOptions, setLineOptions] = useState([]);
 
-  // Fetch filter options on mount only
+  const pageSize = 100;
+
+  // Debounce Logic
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchUserShift(searchUserShift);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchUserShift]);
+
+  // Fetch filter options on mount
   useEffect(() => {
     fetchFilterOptions();
   }, []);
 
   const fetchFilterOptions = async () => {
+    console.log("[DEBUG] Fetching filter options from API...");
     try {
       const [shiftsRes, stagesRes, linesRes] = await Promise.all([
         axios.get(`${baseURL}/shifts_list`),
         axios.get(`${baseURL}/stages_list`),
         axios.get(`${baseURL}/lines`),
       ]);
-      const sortedStages = stagesRes.data.sort((a, b) => (a.Stage_Serial || a.Stage_id) - (b.Stage_Serial || b.Stage_id));
-      console.log(shiftsRes.data);
-      console.log(sortedStages);
-      console.log(linesRes.data);
-      setShiftOptions(shiftsRes.data);
+
+      console.log("[DEBUG] Shifts API Response:", shiftsRes.data);
+      console.log("[DEBUG] Stages API Response:", stagesRes.data);
+      console.log("[DEBUG] Lines API Response:", linesRes.data);
+
+      const stagesData = Array.isArray(stagesRes.data) ? stagesRes.data : [];
+      const sortedStages = [...stagesData].sort(
+        (a, b) => (a.Stage_id || 0) - (b.Stage_id || 0)
+      );
+
+      setShiftOptions(Array.isArray(shiftsRes.data) ? shiftsRes.data : []);
       setStageOptions(sortedStages);
-      setLineOptions(linesRes.data);
+      setLineOptions(Array.isArray(linesRes.data) ? linesRes.data : []);
     } catch (error) {
-      console.error("Error fetching filter options:", error);
+      console.error("[DEBUG ERROR] Failed to fetch filter options:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      setNotification(
+        `Failed to load filter options: ${error.message}. Check SSL/CORS settings.`
+      );
     }
   };
 
   const fetchUserShifts = async () => {
     setLoading(true);
     setNotification("");
-    setUserShifts([]); // Clear previous data while loading
+    setUserShifts([]);
 
     try {
       const params = {
         fromDate: selectedFromDate,
         toDate: selectedToDate,
-        shifts: selectedShiftIds.join(","),
-        stages: selectedStages.join(","),
-        lines: selectedLines.join(","),
       };
+
+      if (selectedShiftIds.length > 0) {
+        params.shifts = selectedShiftIds.join(",");
+      }
+      if (selectedStages.length > 0) {
+        params.stages = selectedStages.join(",");
+      }
+      if (selectedLines.length > 0) {
+        params.lines = selectedLines.join(",");
+      }
+
+      console.log("[DEBUG] Fetching user shifts with params:", params);
 
       const response = await axios.get(`${baseURL}/getUserShifts`, { params });
 
-      if (response.data.length === 0) {
+      console.log("[DEBUG] getUserShifts Response Status:", response.status);
+      console.log("[DEBUG] getUserShifts Data:", response.data);
+
+      if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+        console.warn("[DEBUG] No records found or payload is not an array.");
         setNotification("No records found matching the selected filters.");
       } else {
-        // console.log("Fetched User Shifts:", response.data);
         setUserShifts(response.data);
       }
     } catch (error) {
-      console.error("Error fetching user shifts:", error);
-      setNotification("Error fetching data. Please try again.");
+      console.error("[DEBUG ERROR] Error fetching user shifts:", {
+        message: error.message,
+        code: error.code,
+        response: error.response ? error.response.data : "No response body",
+        config: error.config,
+      });
+      setNotification(`Error fetching data: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -137,28 +167,25 @@ const UserShiftReport = () => {
   };
 
   const getFilteredAndSortedData = () => {
-    let filtered = userShifts;
+    let filtered = Array.isArray(userShifts) ? userShifts : [];
 
     if (debouncedSearchUserShift) {
       const lowerSearch = debouncedSearchUserShift.toLowerCase();
       filtered = filtered.filter((shift) => {
+        const userIdStr = String(shift.userid || "").toLowerCase();
+        const userNameStr = String(shift.user_name || "").toLowerCase();
         return (
-          (shift.userid &&
-            shift.userid.toString().toLowerCase().startsWith(lowerSearch)) ||
-          (shift.user_name &&
-            shift.user_name.toString().toLowerCase().startsWith(lowerSearch))
+          userIdStr.includes(lowerSearch) || userNameStr.includes(lowerSearch)
         );
       });
     }
 
     if (sortConfig.key) {
       filtered = [...filtered].sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
+        const valA = a[sortConfig.key] ?? "";
+        const valB = b[sortConfig.key] ?? "";
+        if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
@@ -167,12 +194,39 @@ const UserShiftReport = () => {
 
   const paginatedData = getFilteredAndSortedData().slice(
     (currentPage - 1) * pageSize,
-    currentPage * pageSize,
+    currentPage * pageSize
   );
 
   const totalPages = Math.ceil(getFilteredAndSortedData().length / pageSize);
 
+  const formatDate = (date) => {
+    if (!date) return "";
+    const m = moment(date);
+    return m.isValid() ? m.format("DD-MM-YYYY") : String(date);
+  };
+
+  // Safe Text Highlighting
+  const highlightText = (text, highlight) => {
+    const stringText = String(text ?? "");
+    if (!highlight || !highlight.trim()) return stringText;
+
+    // Escape special regex characters in search input
+    const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(${escapedHighlight})`, "gi");
+
+    return stringText.split(regex).map((part, index) =>
+      part.toLowerCase() === highlight.toLowerCase() ? (
+        <span key={index} className="highlight">
+          {part}
+        </span>
+      ) : (
+        part
+      )
+    );
+  };
+
   const handleDownload = () => {
+    console.log("[DEBUG] Exporting data to Excel...");
     const dataToExport = getFilteredAndSortedData();
     const formattedData = dataToExport.map((shift) => ({
       "User ID": shift.userid || "",
@@ -198,10 +252,20 @@ const UserShiftReport = () => {
     FileSaver.saveAs(blob, `UserShifts_${moment().format("YYYY-MM-DD")}.xlsx`);
   };
 
-  const formatDate = (date) => {
-    if (!date) return "";
-    const m = moment(date);
-    return m.isValid() ? m.format("DD-MM-YYYY") : date;
+  const fetchShiftMasterDetails = async () => {
+    setLoadingShiftDetails(true);
+    console.log("[DEBUG] Fetching shift master details...");
+    try {
+      const response = await axios.get(`${baseURL}/shifts_master_details`);
+      console.log("[DEBUG] shifts_master_details Response:", response.data);
+      setShiftMasterDetails(Array.isArray(response.data) ? response.data : []);
+      setShowShiftDetails(true);
+    } catch (error) {
+      console.error("[DEBUG ERROR] Error fetching shift master details:", error);
+      setNotification("Error loading shift details. Please try again.");
+    } finally {
+      setLoadingShiftDetails(false);
+    }
   };
 
   const SortIcon = ({ columnKey }) => {
@@ -217,34 +281,6 @@ const UserShiftReport = () => {
     return <FaSort />;
   };
 
-  const fetchShiftMasterDetails = async () => {
-    setLoadingShiftDetails(true);
-    try {
-      const response = await axios.get(`${baseURL}/shifts_master_details`);
-      setShiftMasterDetails(response.data);
-      setShowShiftDetails(true);
-    } catch (error) {
-      console.error("Error fetching shift master details:", error);
-      setNotification("Error loading shift details. Please try again.");
-    } finally {
-      setLoadingShiftDetails(false);
-    }
-  };
-
-  const highlightText = (text, highlight) => {
-    if (!highlight.trim()) return text;
-    const regex = new RegExp(`(${highlight})`, "gi");
-    return text.split(regex).map((part, index) =>
-      part.toLowerCase() === highlight.toLowerCase() ? (
-        <span key={index} className="highlight">
-          {part}
-        </span>
-      ) : (
-        part
-      ),
-    );
-  };
-
   return (
     <Container
       fluid
@@ -254,7 +290,7 @@ const UserShiftReport = () => {
         paddingTop: "20px",
         maxWidth: "100%",
         position: "relative",
-        zIndex: 1
+        zIndex: 1,
       }}
     >
       <div
@@ -270,9 +306,10 @@ const UserShiftReport = () => {
           backgroundPosition: "center",
           opacity: 0.1,
           zIndex: -1,
-          pointerEvents: "none"
+          pointerEvents: "none",
         }}
       />
+
       <Row className="mt-4">
         <Col md={12}>
           <div className="d-flex justify-content-between align-items-center mb-4">
@@ -352,6 +389,7 @@ const UserShiftReport = () => {
               </div>
 
               <Row>
+                {/* Shifts Checkbox Group */}
                 <Col md={4}>
                   <h6>Shifts</h6>
                   <div
@@ -373,13 +411,15 @@ const UserShiftReport = () => {
                           setSelectedShiftIds((prev) =>
                             prev.includes(shift.SFTID)
                               ? prev.filter((id) => id !== shift.SFTID)
-                              : [...prev, shift.SFTID],
+                              : [...prev, shift.SFTID]
                           );
                         }}
                       />
                     ))}
                   </div>
                 </Col>
+
+                {/* Stages Checkbox Group */}
                 <Col md={4}>
                   <h6>Stages</h6>
                   <div
@@ -396,18 +436,20 @@ const UserShiftReport = () => {
                         key={stage.Stage_id}
                         type="checkbox"
                         label={stage.Stage_name}
-                        checked={selectedStages.includes(stage.Stage_name)}
+                        checked={selectedStages.includes(stage.Stage_id)}
                         onChange={() => {
                           setSelectedStages((prev) =>
-                            prev.includes(stage.Stage_name)
-                              ? prev.filter((n) => n !== stage.Stage_name)
-                              : [...prev, stage.Stage_name],
+                            prev.includes(stage.Stage_id)
+                              ? prev.filter((id) => id !== stage.Stage_id)
+                              : [...prev, stage.Stage_id]
                           );
                         }}
                       />
                     ))}
                   </div>
                 </Col>
+
+                {/* Lines Checkbox Group */}
                 <Col md={4}>
                   <h6>Lines</h6>
                   <div
@@ -434,7 +476,7 @@ const UserShiftReport = () => {
                               setSelectedLines((prev) =>
                                 prev.includes(lineName)
                                   ? prev.filter((name) => name !== lineName)
-                                  : [...prev, lineName],
+                                  : [...prev, lineName]
                               );
                             }}
                           />
@@ -495,33 +537,23 @@ const UserShiftReport = () => {
                 <tbody>
                   {paginatedData.map((shift, index) => (
                     <tr key={index}>
-                      <td>
-                        {highlightText(shift.userid || "", searchUserShift)}
-                      </td>
-                      <td>
-                        {highlightText(shift.user_name || "", searchUserShift)}
-                      </td>
-                      <td>
-                        {highlightText(shift.SHIFT_ID || "", searchUserShift)}
-                      </td>
-                      <td>
-                        {highlightText(shift.Stage_name || "", searchUserShift)}
-                      </td>
+                      <td>{highlightText(shift.userid, debouncedSearchUserShift)}</td>
+                      <td>{highlightText(shift.user_name, debouncedSearchUserShift)}</td>
+                      <td>{highlightText(shift.SHIFT_ID, debouncedSearchUserShift)}</td>
+                      <td>{highlightText(shift.Stage_name, debouncedSearchUserShift)}</td>
                       <td>
                         {highlightText(
                           formatDate(shift.Shift_date_from),
-                          searchUserShift,
+                          debouncedSearchUserShift
                         )}
                       </td>
                       <td>
                         {highlightText(
                           formatDate(shift.Shift_date_to),
-                          searchUserShift,
+                          debouncedSearchUserShift
                         )}
                       </td>
-                      <td>
-                        {highlightText(shift.LINE || "", searchUserShift)}
-                      </td>
+                      <td>{highlightText(shift.LINE, debouncedSearchUserShift)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -593,7 +625,7 @@ const UserShiftReport = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Shift Details Modal */}
+      {/* Shift Master Details Modal */}
       <Modal
         show={showShiftDetails}
         onHide={() => setShowShiftDetails(false)}

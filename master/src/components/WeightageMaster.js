@@ -26,7 +26,7 @@ const WeightageMaster = () => {
   const fetchWeightages = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("https://103.38.50.149:5000/api/weightage");
+      const response = await axios.get("https://192.168.2.54/api/weightage");
       setWeightages(response.data);
       setError(null);
     } catch (err) {
@@ -49,7 +49,7 @@ const WeightageMaster = () => {
 
   const handleSave = async (id) => {
     try {
-      await axios.put(`https://103.38.50.149:5000/api/weightage/${id}`, {
+      await axios.put(`https://192.168.2.54/api/weightage/${id}`, {
         weightage: editValue,
       });
       setSuccessMessage("Weightage updated successfully!");
@@ -67,7 +67,7 @@ const WeightageMaster = () => {
       return;
 
     try {
-      await axios.delete(`https://103.38.50.149:5000/api/weightage/${id}`);
+      await axios.delete(`https://192.168.2.54/api/weightage/${id}`);
       setSuccessMessage("Category deleted successfully!");
       fetchWeightages();
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -83,7 +83,7 @@ const WeightageMaster = () => {
     const weightage = e.target.weightage.value;
 
     try {
-      await axios.post("https://103.38.50.149:5000/api/weightage", {
+      await axios.post("https://192.168.2.54/api/weightage", {
         categoryName,
         weightage,
       });

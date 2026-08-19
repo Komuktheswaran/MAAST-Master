@@ -45,7 +45,7 @@ const AddUsers = () => {
   const fetchOptions = async () => {
     setLoadingLines(true);
     try {
-      const lineResponse = await axios.get("https://103.38.50.149:5000/api/lines");
+      const lineResponse = await axios.get("https://192.168.2.54/api/lines");
       setLineOptions(lineResponse.data || []);
     } catch (error) {
       console.error("Error fetching options:", error);
@@ -56,7 +56,7 @@ const AddUsers = () => {
   };
   const fetchData = async () => {
     try {
-      const response = await axios.get("https://103.38.50.149:5000/api/User-master");
+      const response = await axios.get("https://192.168.2.54/api/User-master");
       const sorted = response.data.sort((a, b) =>
         a.user_id.localeCompare(b.user_id),
       );
@@ -95,7 +95,7 @@ const AddUsers = () => {
 
   const addUser = async (userPayload) => {
     try {
-      await axios.post("https://103.38.50.149:5000/api/User-master", userPayload);
+      await axios.post("https://192.168.2.54/api/User-master", userPayload);
       setNotification("User added successfully");
       setSnackbarOpen(true);
       setNewUser({ user_id: "", password: "", Adminflag: "" });
@@ -111,7 +111,7 @@ const AddUsers = () => {
   const updateUser = async (userPayload) => {
     try {
       await axios.put(
-        `https://103.38.50.149:5000/api/User-master/${editingUser.user_id}`,
+        `https://192.168.2.54/api/User-master/${editingUser.user_id}`,
         userPayload,
       );
       setNotification("User updated successfully");
@@ -133,7 +133,7 @@ const AddUsers = () => {
 
   const deleteUser = async (id) => {
     try {
-      await axios.delete(`https://103.38.50.149:5000/api/User-master/${id}`);
+      await axios.delete(`https://192.168.2.54/api/User-master/${id}`);
       setNotification("User deleted successfully");
       setSnackbarOpen(true);
       fetchData();

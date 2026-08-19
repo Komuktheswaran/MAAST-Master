@@ -1500,73 +1500,85 @@ app.get("/api/shifts_list", async (req, res) => {
 
 // Fetch user shifts with optional date filter
 app.get("/api/getUserShifts", async (req, res) => {
-  const { date } = req.query;
   try {
-    let pool = await sql.connect(config);
-    let query = `
-          SELECT DISTINCT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
-          FROM Mx_UserShifts u
-          LEFT JOIN MX_USERMST m ON u.userid = m.USERID
-          LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
-          ORDER BY SHIFT_ID, Stage_name, LINE
-      `;
-
-    // Server-side filtering logic
     const { shifts, stages, lines, fromDate, toDate } = req.query;
+    console.log(req.query)
+
+    let pool = await sql.connect(config);
+    let request = pool.request();
     let conditions = [];
 
+    // Date Range Filter
     if (fromDate && toDate) {
-      conditions.push(
-        `(u.Shift_date_from >= '${fromDate}' AND u.Shift_date_from <= '${toDate}')`,
-      );
+      request.input("fromDate", sql.Date, fromDate);
+      request.input("toDate", sql.Date, toDate);
+      conditions.push("(u.Shift_date_from >= @fromDate AND u.Shift_date_from <= @toDate)");
     } else if (fromDate) {
-      conditions.push(`(u.Shift_date_from >= '${fromDate}')`);
+      request.input("fromDate", sql.Date, fromDate);
+      conditions.push("(u.Shift_date_from >= @fromDate)");
     } else if (toDate) {
-      conditions.push(`(u.Shift_date_from <= '${toDate}')`);
+      request.input("toDate", sql.Date, toDate);
+      conditions.push("(u.Shift_date_from <= @toDate)");
     }
 
+    // Shifts Filter (e.g., shifts="S1,S2")
     if (shifts && shifts.trim() !== "") {
-      const shiftList = shifts
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => `'${s}'`)
-        .join(",");
-      if (shiftList) conditions.push(`u.SHIFT_ID IN (${shiftList})`);
+      const shiftArr = shifts.split(",").map((s) => s.trim()).filter(Boolean);
+      const shiftParams = shiftArr.map((s, index) => {
+        const paramName = `shift_${index}`;
+        request.input(paramName, sql.VarChar, s);
+        return `@${paramName}`;
+      });
+      if (shiftParams.length) conditions.push(`u.SHIFT_ID IN (${shiftParams.join(",")})`);
     }
 
+    // Stages Filter (Handles both Stage IDs like "5" and Stage Names)
     if (stages && stages.trim() !== "") {
-      const stageList = stages
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => `'${s}'`)
-        .join(",");
-      if (stageList) conditions.push(`s.Stage_name IN (${stageList})`);
+      const stageArr = stages.split(",").map((s) => s.trim()).filter(Boolean);
+      const isNumeric = stageArr.every((stg) => !isNaN(stg));
+
+      const stageParams = stageArr.map((stg, index) => {
+        const paramName = `stage_${index}`;
+        if (isNumeric) {
+          request.input(paramName, sql.Int, parseInt(stg, 10));
+        } else {
+          request.input(paramName, sql.VarChar, stg);
+        }
+        return `@${paramName}`;
+      });
+
+      if (stageParams.length) {
+        // Query stage_id if numbers are passed, otherwise query Stage_name
+        const columnTarget = isNumeric ? "u.stage_id" : "s.Stage_name";
+        conditions.push(`${columnTarget} IN (${stageParams.join(",")})`);
+      }
     }
 
+    // Lines Filter (e.g., lines="3A,3B")
     if (lines && lines.trim() !== "") {
-      const lineList = lines
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((s) => `'${s}'`)
-        .join(",");
-      if (lineList) conditions.push(`u.LINE IN (${lineList})`);
+      const lineArr = lines.split(",").map((l) => l.trim()).filter(Boolean);
+      const lineParams = lineArr.map((line, index) => {
+        const paramName = `line_${index}`;
+        request.input(paramName, sql.VarChar, line);
+        return `@${paramName}`;
+      });
+      if (lineParams.length) conditions.push(`u.LINE IN (${lineParams.join(",")})`);
     }
+
+    let query = `
+      SELECT DISTINCT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
+      FROM Mx_UserShifts u
+      LEFT JOIN MX_USERMST m ON u.userid = m.USERID
+      LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
+    `;
 
     if (conditions.length > 0) {
-      query = `
-          SELECT DISTINCT u.Shift_date_from, u.Shift_date_to, u.userid, u.SHIFT_ID, u.LINE, s.Stage_name, m.NAME AS user_name
-          FROM Mx_UserShifts u
-          LEFT JOIN MX_USERMST m ON u.userid = m.USERID
-          LEFT JOIN Mx_StageMaster s ON u.stage_id = s.stage_id
-          WHERE ${conditions.join(" AND ")}
-          ORDER BY SHIFT_ID, Stage_name, LINE
-        `;
+      query += ` WHERE ${conditions.join(" AND ")}`;
     }
-    let result = await pool.request().query(query);
-    console.log("User Shifts Query Result:", result.recordset);
+
+    query += ` ORDER BY u.SHIFT_ID, s.Stage_name, u.LINE`;
+
+    const result = await request.query(query);
     res.json(result.recordset);
   } catch (error) {
     console.error("Error fetching user shifts:", error);
